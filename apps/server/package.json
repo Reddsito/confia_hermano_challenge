@@ -9,7 +9,8 @@
     "sync": "tsx src/cli/sync-once.ts",
     "doctor": "tsx src/cli/doctor.ts",
     "seed": "tsx src/cli/seed.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "reset": "tsx src/cli/reset.ts"
   },
   "dependencies": {
     "@challenge/core": "workspace:*",
