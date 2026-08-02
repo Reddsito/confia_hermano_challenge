@@ -3,7 +3,12 @@ import { resolve } from 'node:path';
 
 import type { TournamentMeta } from '@challenge/core/domain';
 
-import { parseEvents, type DiscordConfig } from './discord/notifier';
+import {
+  ALL_EVENTS,
+  parseEvents,
+  type DiscordConfig,
+  type DiscordEvent,
+} from './discord/notifier';
 import { isPlatformId, type PlatformId } from '@challenge/core/riot';
 
 export interface ServerConfig {
@@ -99,6 +104,7 @@ export function loadConfig(root: string): ServerConfig {
     discord: env('DISCORD_WEBHOOK_URL')
       ? {
           webhookUrl: env('DISCORD_WEBHOOK_URL'),
+          webhookByEvent: perEventWebhooks(),
           events: parseEvents(env('DISCORD_EVENTS')),
           username: env('DISCORD_USERNAME', file.name),
           avatarUrl: env('DISCORD_AVATAR_URL') || undefined,
@@ -123,6 +129,21 @@ export function loadConfig(root: string): ServerConfig {
       ),
     },
   };
+}
+
+/**
+ * Reads DISCORD_WEBHOOK_<EVENT> for each event, e.g. DISCORD_WEBHOOK_IN_GAME.
+ * Anything left unset falls back to the shared webhook.
+ */
+function perEventWebhooks(): Partial<Record<DiscordEvent, string>> {
+  const map: Partial<Record<DiscordEvent, string>> = {};
+
+  for (const event of ALL_EVENTS) {
+    const url = env(`DISCORD_WEBHOOK_${event.toUpperCase()}`);
+    if (url) map[event] = url;
+  }
+
+  return map;
 }
 
 function parseQueues(raw: string, fallback: number): number[] {

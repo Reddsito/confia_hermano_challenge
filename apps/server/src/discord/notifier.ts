@@ -10,7 +10,10 @@ export type DiscordEvent =
   | 'shell_stolen';
 
 export interface DiscordConfig {
+  /** Where anything without its own channel is posted. */
   webhookUrl: string;
+  /** Per-event overrides, so noisy events can live in their own channel. */
+  webhookByEvent: Partial<Record<DiscordEvent, string>>;
   /** Which event types actually get posted. */
   events: Set<DiscordEvent>;
   username: string;
@@ -72,39 +75,58 @@ export class DiscordNotifier {
     const pending = this.queue;
     this.queue = [];
 
-    // Anything allowed to ping the server is sent on its own. Batching it with
-    // ordinary messages would extend that permission to their text too, and a
-    // challenge named "@everyone do pushups" would reach the whole server.
-    const loud = pending.filter((item) => item.everyone);
-    const normal = pending.filter((item) => !item.everyone);
-
-    for (const item of loud) {
-      await this.send([item.embed], item.content, true);
+    // Grouped by destination first: messages bound for different channels
+    // cannot share a request, since a webhook only ever posts to its own.
+    const byUrl = new Map<string, Queued[]>();
+    for (const item of pending) {
+      const url = this.urlFor(item.event);
+      const bucket = byUrl.get(url);
+      if (bucket) bucket.push(item);
+      else byUrl.set(url, [item]);
     }
 
-    for (let i = 0; i < normal.length; i += MAX_EMBEDS_PER_MESSAGE) {
-      const batch = normal.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
-      const content = batch
-        .map((item) => item.content)
-        .filter(Boolean)
-        .join('\n');
+    for (const [url, items] of byUrl) {
+      // Anything allowed to ping the server is sent on its own. Batching it
+      // with ordinary messages would extend that permission to their text too,
+      // and a challenge named "@everyone do pushups" would reach everyone.
+      const loud = items.filter((item) => item.everyone);
+      const normal = items.filter((item) => !item.everyone);
 
-      await this.send(
-        batch.map((item) => item.embed),
-        content || undefined,
-      );
+      for (const item of loud) {
+        await this.send(url, [item.embed], item.content, true);
+      }
+
+      for (let i = 0; i < normal.length; i += MAX_EMBEDS_PER_MESSAGE) {
+        const batch = normal.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
+        const content = batch
+          .map((item) => item.content)
+          .filter(Boolean)
+          .join('\n');
+
+        await this.send(
+          url,
+          batch.map((item) => item.embed),
+          content || undefined,
+        );
+      }
     }
   }
 
+  /** An event's own channel, or the shared one when it has none. */
+  private urlFor(event: DiscordEvent): string {
+    return this.config?.webhookByEvent[event] ?? this.config?.webhookUrl ?? '';
+  }
+
   private async send(
+    url: string,
     embeds: DiscordEmbed[],
     content?: string,
     everyone = false,
   ): Promise<void> {
-    if (!this.config) return;
+    if (!this.config || !url) return;
 
     try {
-      const response = await fetch(this.config.webhookUrl, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,7 +145,7 @@ export class DiscordNotifier {
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get('Retry-After') ?? '2');
         await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-        await this.send(embeds, content, everyone);
+        await this.send(url, embeds, content, everyone);
         return;
       }
 
@@ -140,7 +162,7 @@ export class DiscordNotifier {
   }
 }
 
-const ALL_EVENTS: DiscordEvent[] = [
+export const ALL_EVENTS: DiscordEvent[] = [
   'in_game',
   'match_finished',
   'rank_change',
