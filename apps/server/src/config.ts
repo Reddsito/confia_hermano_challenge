@@ -128,7 +128,12 @@ export function loadConfig(root: string): ServerConfig {
 function parseQueues(raw: string, fallback: number): number[] {
   const parsed = raw
     .split(',')
-    .map((value) => Number(value.trim()))
+    .map((value) => value.trim())
+    // Empty entries must be dropped before Number(): Number('') is 0, which is
+    // a real queue id (custom games), so an unset variable would silently
+    // become "only count customs" instead of falling back.
+    .filter((value) => value.length > 0)
+    .map(Number)
     .filter((value) => Number.isInteger(value) && value >= 0);
 
   return parsed.length > 0 ? parsed : [fallback];
