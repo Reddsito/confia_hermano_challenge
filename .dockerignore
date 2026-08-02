@@ -1,0 +1,23 @@
+# Secrets and local state must never be baked into an image. Configuration is
+# injected at run time (env_file / -e), not copied at build time.
+**/.env
+**/.env.*
+!**/env.example
+**/data/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Rebuilt inside the image for the correct platform; copying the host's native
+# modules would ship a binary compiled for the wrong architecture.
+**/node_modules
+
+# Frontend artefacts: the backend image has no use for them.
+apps/web
+**/dist
+**/.astro
+
+.git
+.github
+**/*.log
+README.md

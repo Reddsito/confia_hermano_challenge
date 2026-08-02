@@ -1,0 +1,21 @@
+# Caddy terminates TLS in front of the API container.
+#
+# This is not optional: the frontend is served over HTTPS from Cloudflare Pages,
+# and a browser on an HTTPS page refuses to call an http:// endpoint. Without
+# this, every request from the site fails as mixed content.
+#
+# Caddy obtains and renews the certificate automatically. Point an A record at
+# the VPS first, then: caddy run --config deploy/Caddyfile
+
+api.example.com {
+	encode zstd gzip
+
+	# The container is published on 127.0.0.1 only, so it is never reachable
+	# from the internet except through here.
+	reverse_proxy 127.0.0.1:8787
+
+	log {
+		output file /var/log/caddy/challenge-api.log
+		format json
+	}
+}

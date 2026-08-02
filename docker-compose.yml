@@ -1,8 +1,11 @@
 services:
   api:
     build:
+      # Built from the repo root so the shared packages/core is in scope.
+      # .dockerignore keeps .env, the local database and the frontend out.
       context: .
       dockerfile: apps/server/Dockerfile
+    image: challenge-api
     restart: unless-stopped
     env_file:
       - apps/server/.env
