@@ -127,6 +127,3 @@ export function removePlayer(code: string, id: string): Promise<{ ok: true }> {
   return request(code, `/api/admin/players/${id}`, { method: 'DELETE' });
 }
 
-export function triggerRefresh(code: string): Promise<unknown> {
-  return request(code, '/api/admin/refresh', { method: 'POST' });
-}

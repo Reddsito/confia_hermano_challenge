@@ -13,7 +13,6 @@ import {
   removePlayer,
   setVisible,
   storeCode,
-  triggerRefresh,
   type PanelInfo,
   type RosterPlayer,
 } from '../lib/admin';
@@ -126,16 +125,6 @@ export function Panel() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(() => triggerRefresh(code), 'Refresh started.')
-            }
-            className="eyebrow min-h-10 rounded-full border border-line px-4 text-ink-2 transition-colors hover:border-[color:var(--color-accent)] hover:text-ink disabled:opacity-50"
-          >
-            Refresh now
-          </button>
           <button
             type="button"
             onClick={() => {
