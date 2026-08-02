@@ -151,7 +151,6 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           nextUpdateAt={snapshot.nextUpdateAt}
           intervalMinutes={snapshot.tournament.refreshIntervalMinutes}
           isRefreshing={isRefreshing}
-          onRefresh={() => void refresh()}
           source={snapshot.source}
         />
 

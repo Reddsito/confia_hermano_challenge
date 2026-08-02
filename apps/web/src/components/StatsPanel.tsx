@@ -16,6 +16,9 @@ interface Category {
   minimumGames: number;
 }
 
+/** How deep each board goes. One winner plus the chasing pack. */
+const TOP_N = 10;
+
 const CATEGORIES: Category[] = [
   {
     key: 'kills',
@@ -79,7 +82,7 @@ export function StatsPanel({ players }: { players: RankedPlayer[] }) {
         return { player, value, display: category.format(value) };
       })
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+      .slice(0, TOP_N);
 
   const kdaLeaders = players
     .filter((player) => player.totals.games >= 5)
@@ -89,7 +92,7 @@ export function StatsPanel({ players }: { players: RankedPlayer[] }) {
       display: player.kda.toFixed(2),
     }))
     .sort((a, b) => b.value - a.value)
-    .slice(0, 4);
+    .slice(0, TOP_N);
 
   return (
     <div className="space-y-4">
@@ -134,44 +137,72 @@ export function StatsPanel({ players }: { players: RankedPlayer[] }) {
             No player has reached 5 games yet.
           </p>
         ) : (
-          <ol className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {kdaLeaders.map((row, index) => (
-              <li
-                key={row.player.id}
-                className="flex items-center justify-center gap-3"
-              >
-                <span className="tabular text-fluid-sm text-ink-3">
-                  {index + 1}
-                </span>
-                <Avatar
-                  name={row.player.displayName}
-                  iconId={row.player.profileIconId}
-                  size={46}
-                  ring={tierColor(row.player.rank)}
-                />
-                <div>
-                  <p
-                    className="tabular text-[2rem] leading-none font-semibold"
-                    style={{
-                      color: 'var(--color-ink)',
-                      textShadow: '0 0 24px rgb(255 255 255 / 25%)',
-                    }}
-                  >
-                    {row.display}
-                  </p>
-                  <p className="mt-1 truncate text-fluid-xs text-ink-2">
-                    {row.player.displayName}
-                  </p>
-                  <p className="text-[0.68rem] text-ink-3">
-                    {row.player.totals.games} games
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <>
+            <Winner row={kdaLeaders[0]!} />
+            {kdaLeaders.length > 1 && (
+              <ol className="mt-4 grid gap-1.5 sm:grid-cols-2">
+                {kdaLeaders.slice(1).map((row, index) => (
+                  <ChaserRow key={row.player.id} row={row} position={index + 2} />
+                ))}
+              </ol>
+            )}
+          </>
         )}
       </section>
     </div>
+  );
+}
+
+function Winner({ row }: { row: LeaderRow }) {
+  return (
+    <div className="mt-5 flex items-center justify-center gap-3">
+      <span className="tabular text-fluid-sm text-ink-3">1</span>
+      <Avatar
+        name={row.player.displayName}
+        iconId={row.player.profileIconId}
+        size={52}
+        ring={tierColor(row.player.rank)}
+      />
+      <div className="min-w-0">
+        <p
+          className="tabular text-[2.1rem] leading-none font-semibold"
+          style={{ color: 'var(--color-ink)', textShadow: '0 0 24px rgb(255 255 255 / 25%)' }}
+        >
+          {row.display}
+        </p>
+        <p className="mt-1 truncate text-fluid-xs text-ink-2">
+          {row.player.displayName}
+        </p>
+        <p className="text-[0.68rem] text-ink-3">{row.player.totals.games} games</p>
+      </div>
+    </div>
+  );
+}
+
+function ChaserRow({ row, position }: { row: LeaderRow; position: number }) {
+  const accent = tierColor(row.player.rank);
+
+  return (
+    <li className="relative flex items-center gap-2 overflow-hidden rounded-lg bg-carbon-2 py-1.5 pr-2 pl-3">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-[2px]"
+        style={{ background: accent }}
+      />
+      <span className="tabular w-4 text-[0.7rem] text-ink-3">{position}</span>
+      <Avatar
+        name={row.player.displayName}
+        iconId={row.player.profileIconId}
+        size={22}
+      />
+      <span className="min-w-0 flex-1 truncate text-fluid-xs">
+        {row.player.displayName}
+      </span>
+      <span className="tabular text-fluid-xs font-semibold">{row.display}</span>
+      <span className="tabular hidden text-[0.65rem] whitespace-nowrap text-ink-3 sm:inline">
+        {row.player.totals.games}g
+      </span>
+    </li>
   );
 }
 
@@ -210,70 +241,11 @@ function LeaderColumn({
         </p>
       ) : (
         <>
-          <div className="mt-5 flex items-center justify-center gap-3">
-            <span className="tabular text-fluid-sm text-ink-3">1</span>
-            <Avatar
-              name={winner.player.displayName}
-              iconId={winner.player.profileIconId}
-              size={52}
-              ring={tierColor(winner.player.rank)}
-            />
-            <div className="min-w-0">
-              <p
-                className="tabular text-[2.1rem] leading-none font-semibold"
-                style={{
-                  color: 'var(--color-ink)',
-                  textShadow: '0 0 24px rgb(255 255 255 / 25%)',
-                }}
-              >
-                {winner.display}
-              </p>
-              <p className="mt-1 truncate text-fluid-xs text-ink-2">
-                {winner.player.displayName}
-              </p>
-              <p className="text-[0.68rem] text-ink-3">
-                {winner.player.totals.games} games
-              </p>
-            </div>
-          </div>
-
+          <Winner row={winner} />
           <ol className="mt-4 space-y-1.5">
-            {rest.map((row, index) => {
-              const accent = tierColor(row.player.rank);
-              return (
-                <li
-                  key={row.player.id}
-                  className="relative flex items-center gap-2 overflow-hidden rounded-lg bg-carbon-2 py-1.5 pr-2 pl-3"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-y-0 left-0 w-[2px]"
-                    style={{ background: accent }}
-                  />
-                  <span className="tabular w-3 text-[0.7rem] text-ink-3">
-                    {index + 2}
-                  </span>
-                  <Avatar
-                    name={row.player.displayName}
-                    iconId={row.player.profileIconId}
-                    size={22}
-                  />
-                  <span
-                    className={classNames(
-                      'min-w-0 flex-1 truncate text-fluid-xs',
-                    )}
-                  >
-                    {row.player.displayName}
-                  </span>
-                  <span className="tabular text-fluid-xs font-semibold">
-                    {row.display}
-                  </span>
-                  <span className="tabular hidden text-[0.65rem] whitespace-nowrap text-ink-3 sm:inline">
-                    {row.player.totals.games}g
-                  </span>
-                </li>
-              );
-            })}
+            {rest.map((row, index) => (
+              <ChaserRow key={row.player.id} row={row} position={index + 2} />
+            ))}
           </ol>
         </>
       )}

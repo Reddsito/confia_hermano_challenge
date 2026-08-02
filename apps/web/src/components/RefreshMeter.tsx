@@ -6,7 +6,6 @@ interface RefreshMeterProps {
   nextUpdateAt: string;
   intervalMinutes: number;
   isRefreshing: boolean;
-  onRefresh: () => void;
   source: 'mock' | 'riot';
 }
 
@@ -20,7 +19,6 @@ export function RefreshMeter({
   nextUpdateAt,
   intervalMinutes,
   isRefreshing,
-  onRefresh,
   source,
 }: RefreshMeterProps) {
   const countdown = useCountdown(nextUpdateAt);
@@ -67,19 +65,6 @@ export function RefreshMeter({
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={isRefreshing}
-        className={classNames(
-          'eyebrow ml-1 inline-flex min-h-9 items-center rounded-full border border-line px-3 transition-all',
-          isRefreshing
-            ? 'text-ink-3'
-            : 'text-ink-2 hover:border-[color:var(--color-accent)] hover:text-ink',
-        )}
-      >
-        {isRefreshing ? 'Loading' : 'Refresh'}
-      </button>
     </div>
   );
 }
