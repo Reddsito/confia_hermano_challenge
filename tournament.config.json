@@ -1,0 +1,101 @@
+{
+  "name": "Confia Hermano Challenge",
+  "edition": "Season 1",
+  "subtitle": "Private challenge among friends",
+  "platform": "euw1",
+  "queue": "RANKED_SOLO_5x5",
+  "startsAt": "2026-08-01T00:00:00.000Z",
+  "endsAt": "2026-09-01T22:00:00.000Z",
+  "refreshIntervalMinutes": 2,
+  "players": [
+    {
+      "id": "p01",
+      "displayName": "Reddsito",
+      "gameName": "Reddsito",
+      "tagLine": "EUW",
+      "role": "MID",
+      "mock": {
+        "wins": 100,
+        "losses": 0,
+        "ladderPoints": 4108,
+        "startLadderPoints": 2800
+      }
+    },
+    {
+      "id": "p02",
+      "displayName": "Kalel",
+      "gameName": "Kalel",
+      "tagLine": "1234",
+      "role": "JUNGLE"
+    },
+    {
+      "id": "p03",
+      "displayName": "Nyx",
+      "gameName": "Nyx",
+      "tagLine": "EUW",
+      "role": "ADC"
+    },
+    {
+      "id": "p04",
+      "displayName": "Bastion",
+      "gameName": "Bastion",
+      "tagLine": "TANK",
+      "role": "TOP"
+    },
+    {
+      "id": "p05",
+      "displayName": "Lumen",
+      "gameName": "Lumen",
+      "tagLine": "SUP",
+      "role": "SUPPORT"
+    },
+    {
+      "id": "p06",
+      "displayName": "Draven Enjoyer",
+      "gameName": "DravenEnjoyer",
+      "tagLine": "EUW",
+      "role": "ADC"
+    },
+    {
+      "id": "p07",
+      "displayName": "Ossa",
+      "gameName": "Ossa",
+      "tagLine": "0001",
+      "role": "MID"
+    },
+    {
+      "id": "p08",
+      "displayName": "Grumpy",
+      "gameName": "Grumpy",
+      "tagLine": "EUW",
+      "role": "TOP"
+    },
+    {
+      "id": "p09",
+      "displayName": "Vex",
+      "gameName": "Vex",
+      "tagLine": "JGL",
+      "role": "JUNGLE"
+    },
+    {
+      "id": "p10",
+      "displayName": "Halo",
+      "gameName": "Halo",
+      "tagLine": "SUP",
+      "role": "SUPPORT"
+    },
+    {
+      "id": "p11",
+      "displayName": "becksito",
+      "gameName": "becksito",
+      "tagLine": "EUW",
+      "role": "SUPPORT",
+      "mock": {
+        "wins": 2,
+        "losses": 100,
+        "ladderPoints": 0,
+        "startLadderPoints": 1000
+      }
+    }
+  ]
+}

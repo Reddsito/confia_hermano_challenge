@@ -1,0 +1,193 @@
+@import 'tailwindcss';
+
+/*
+ * Visual direction: a broadcast scoreboard. Monochrome by default, so the only
+ * colour on screen is colour that means something.
+ *
+ * Three layers, each with a different job:
+ *   1. Monochrome    — pure white is the loudest element on the page. Rank,
+ *                      LP and the winner are white; everything else is grey.
+ *   2. Accent (cyan) — interaction and liveness only: active tab, focus ring,
+ *                      the live dot, the progress rail. Never encodes data.
+ *   3. Information   — each player is tinted by their real League tier, so the
+ *                      colour of a row carries meaning instead of decorating it.
+ *
+ * The five data-mark colours were validated for lightness, chroma, contrast
+ * against the #0e1116 surface and colour-vision separation. Do not change one
+ * without re-validating the whole set.
+ */
+@theme {
+  --color-void: #05070a;
+  --color-carbon: #0e1116;
+  --color-carbon-2: #171b22;
+  --color-carbon-3: #222732;
+  --color-line: #232833;
+  --color-line-strong: #38404f;
+
+  --color-ink: #ffffff;
+  --color-ink-2: #aab4c2;
+  --color-ink-3: #5f6a78;
+
+  /* Accent — interaction and liveness only, never used to encode data. */
+  --color-accent: #22d3ee;
+  --color-accent-deep: #0e7490;
+
+  /* Validated data marks. */
+  --color-mark-red: #ec3a5e;
+  --color-mark-magenta: #b455e8;
+  --color-mark-amber: #c4830c;
+  --color-mark-teal: #0fa892;
+  --color-mark-blue: #3d7ce0;
+
+  --font-display: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-fluid-xs: clamp(0.7rem, 0.66rem + 0.2vw, 0.78rem);
+  --text-fluid-sm: clamp(0.8rem, 0.76rem + 0.25vw, 0.9rem);
+  --text-fluid-base: clamp(0.9rem, 0.85rem + 0.3vw, 1rem);
+  --text-fluid-lg: clamp(1.05rem, 0.95rem + 0.6vw, 1.35rem);
+  --text-fluid-xl: clamp(1.4rem, 1.1rem + 1.4vw, 2.1rem);
+  --text-fluid-2xl: clamp(2.4rem, 1.5rem + 4vw, 5rem);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Overwritten per element to tint a card, row or badge by League tier. */
+  --tier: var(--color-accent);
+}
+
+html {
+  background-color: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+}
+
+/*
+ * Ambient layer: a faint measurement grid that fades out downward, plus one
+ * cold wash behind the header. Fixed and non-interactive, so it never costs a
+ * repaint on scroll. Deliberately almost invisible — the page is monochrome,
+ * and the background should not be the thing anyone notices.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 4%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 4%) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      ellipse 65% 40% at 50% -8%,
+      color-mix(in oklab, var(--color-accent) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 45% 35% at 92% 5%,
+      rgb(255 255 255 / 5%),
+      transparent 70%
+    );
+}
+
+/*
+ * These live in the components layer on purpose. Tailwind emits utilities in a
+ * later layer, so `text-[0.62rem]` on an `.eyebrow` element wins instead of
+ * silently losing to the class's own font-size.
+ */
+@layer components {
+  /* Numeric columns must line up vertically to stay scannable. */
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Section labels, column headers and pill text. */
+  .eyebrow {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /*
+   * The signature treatment: a hairline edge in the element's tier colour with
+   * a soft outward bloom. Applied sparingly — podium cards only.
+   */
+  .neon {
+    border-color: color-mix(in oklab, var(--tier) 55%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--tier) 22%, transparent),
+      0 0 34px -12px color-mix(in oklab, var(--tier) 90%, transparent),
+      inset 0 1px 0 0 color-mix(in oklab, var(--tier) 30%, transparent);
+  }
+
+  .neon-text {
+    color: var(--tier);
+    text-shadow: 0 0 18px color-mix(in oklab, var(--tier) 55%, transparent);
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 35%, transparent);
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-mark-teal) 70%, transparent);
+  }
+  50% {
+    opacity: 0.75;
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-mark-teal) 0%, transparent);
+  }
+}
+
+.live-dot {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
