@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   MAX_HELD_SHELLS,
@@ -26,9 +26,7 @@ interface BlueShellsProps {
 }
 
 const SPIN_MS = 3200;
-const REEL_ITEM_HEIGHT = 64;
-/** How many times the wheel repeats before landing, so it reads as a spin. */
-const REEL_LOOPS = 7;
+
 
 export function BlueShells({
   user,
@@ -103,7 +101,7 @@ export function BlueShells({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
         <Inventory available={available} shells={mine?.shells ?? []} />
 
-        <Reel
+        <Wheel
           odds={odds}
           spinning={spinning}
           landed={landed}
@@ -177,8 +175,16 @@ export function BlueShells({
   );
 }
 
-/** The signature piece: a slot reel that decelerates onto the drawn result. */
-function Reel({
+/**
+ * A real wheel: one slice per challenge, sized by its weight, spun so the drawn
+ * result stops under the pointer.
+ *
+ * The rotation is computed from the outcome the server already picked, so the
+ * wheel can never stop somewhere other than what was recorded. Slice colour
+ * alternates purely so neighbours are distinguishable — the meaning is in the
+ * label under the pointer, never in the shade.
+ */
+function Wheel({
   odds,
   spinning,
   landed,
@@ -189,51 +195,49 @@ function Reel({
   landed: { name: string; detail: string } | null;
   targetName: string | null;
 }) {
-  const [offset, setOffset] = useState(0);
+  const [rotation, setRotation] = useState(0);
   const [animating, setAnimating] = useState(false);
-  const stripRef = useRef<HTMLUListElement>(null);
 
-  // The strip repeats the wheel several times and pins the drawn result at the
-  // end, so the animation is a single transition that cannot disagree with the
-  // recorded outcome.
-  const strip = useMemo(() => {
-    if (odds.length === 0) return [] as string[];
-    const looped: string[] = [];
-    for (let round = 0; round < REEL_LOOPS; round += 1) {
-      for (const challenge of odds) looped.push(challenge.name);
-    }
-    if (landed) looped.push(landed.name);
-    return looped;
-  }, [odds, landed]);
+  const slices = useMemo(() => {
+    const total = odds.reduce((sum, o) => sum + o.weight, 0) || 1;
+    let angle = 0;
+    return odds.map((challenge) => {
+      const sweep = (challenge.weight / total) * 360;
+      const slice = { challenge, start: angle, sweep, mid: angle + sweep / 2 };
+      angle += sweep;
+      return slice;
+    });
+  }, [odds]);
 
   useEffect(() => {
-    if (!landed || strip.length === 0) {
-      setAnimating(false);
-      setOffset(0);
-      return;
-    }
+    if (!landed || slices.length === 0) return;
 
-    // Start from the top, then travel to the final item.
-    setAnimating(false);
-    setOffset(0);
+    const target = slices.find((s) => s.challenge.name === landed.name);
+    if (!target) return;
 
     const reduced =
       typeof matchMedia !== 'undefined' &&
       matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    // Five full turns before settling, so it reads as a spin rather than a jump.
+    const settle = 360 * 5 - target.mid;
+
+    setAnimating(false);
+    setRotation(0);
     const id = requestAnimationFrame(() => {
-      // Someone who asked for less motion gets the answer, not the ride.
       setAnimating(!reduced);
-      setOffset((strip.length - 1) * REEL_ITEM_HEIGHT);
+      setRotation(reduced ? -target.mid : settle);
     });
     return () => cancelAnimationFrame(id);
-  }, [landed, strip.length]);
+  }, [landed, slices]);
 
   const done = Boolean(landed) && !spinning;
+  const size = 260;
+  const radius = size / 2 - 6;
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border bg-carbon p-5"
+      className="flex flex-col items-center rounded-2xl border bg-carbon p-5"
       style={{
         borderColor: done ? 'var(--color-accent)' : 'var(--color-line)',
         boxShadow: done ? '0 0 60px -24px var(--color-accent)' : undefined,
@@ -243,75 +247,102 @@ function Reel({
       <p className="eyebrow text-ink-3">
         {done
           ? targetName
-            ? `It landed on ${targetName}`
+            ? `Le cayó a ${targetName}`
             : 'It landed'
           : spinning
             ? 'Spinning'
             : 'The wheel'}
       </p>
 
-      <div
-        className="relative mt-3 overflow-hidden"
-        style={{ height: REEL_ITEM_HEIGHT }}
-      >
-        {strip.length === 0 ? (
-          <p className="flex h-full items-center text-fluid-sm text-ink-3">
-            Nothing on the wheel yet.
-          </p>
-        ) : (
-          <ul
-            ref={stripRef}
-            className="absolute inset-x-0 top-0"
-            style={{
-              transform: `translateY(-${offset}px)`,
-              transition: animating
-                ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.15, 1)`
-                : 'none',
-            }}
-          >
-            {strip.map((name, index) => (
-              <li
-                key={`${name}-${index}`}
-                className="display flex items-center truncate text-fluid-lg"
-                style={{
-                  height: REEL_ITEM_HEIGHT,
-                  color:
-                    done && index === strip.length - 1
-                      ? 'var(--color-accent)'
-                      : 'var(--color-ink-2)',
-                }}
-              >
-                {name}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Fades the items entering and leaving the window. */}
+      <div className="relative mt-4" style={{ width: size, height: size }}>
+        {/* Pointer, fixed at the top. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
+          className="absolute top-0 left-1/2 z-10 -translate-x-1/2"
           style={{
-            background:
-              'linear-gradient(var(--color-carbon), transparent 35%, transparent 65%, var(--color-carbon))',
+            width: 0,
+            height: 0,
+            borderLeft: '9px solid transparent',
+            borderRight: '9px solid transparent',
+            borderTop: '16px solid var(--color-accent)',
+            filter: 'drop-shadow(0 0 6px var(--color-accent))',
           }}
         />
+
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            transition: animating
+              ? `transform ${SPIN_MS}ms cubic-bezier(0.15, 0.75, 0.1, 1)`
+              : 'none',
+          }}
+        >
+          {slices.map((slice, index) => {
+            const isLanded = done && slice.challenge.name === landed?.name;
+            return (
+              <path
+                key={slice.challenge.id}
+                d={arc(size / 2, size / 2, radius, slice.start, slice.sweep)}
+                fill="var(--color-accent)"
+                fillOpacity={isLanded ? 0.85 : index % 2 === 0 ? 0.22 : 0.1}
+                stroke="var(--color-carbon)"
+                strokeWidth="2"
+              />
+            );
+          })}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius * 0.3}
+            fill="var(--color-carbon)"
+            stroke="var(--color-line)"
+            strokeWidth="2"
+          />
+        </svg>
       </div>
 
-      <div
-        className="mt-1 h-px w-full"
-        style={{
-          background: done
-            ? 'linear-gradient(90deg, var(--color-accent), transparent 70%)'
-            : 'var(--color-line)',
-        }}
-      />
-
-      <p className="mt-3 min-h-[1.5rem] text-fluid-sm text-ink-2">
-        {done ? landed?.detail || 'No excuses.' : ' '}
+      <p
+        className="display mt-4 min-h-[2rem] text-center text-fluid-lg leading-tight"
+        style={done ? { color: 'var(--color-accent)' } : { opacity: 0.6 }}
+      >
+        {done ? landed?.name : spinning ? '…' : 'Pick a victim and fire'}
       </p>
+      {done && landed?.detail && (
+        <p className="mt-1 text-center text-fluid-sm text-ink-2">
+          {landed.detail}
+        </p>
+      )}
     </section>
   );
+}
+
+/** SVG path for one slice, measured clockwise from twelve o'clock. */
+function arc(
+  cx: number,
+  cy: number,
+  r: number,
+  startDeg: number,
+  sweepDeg: number,
+): string {
+  // A single slice covering the whole circle cannot be drawn as an arc, since
+  // its start and end points coincide.
+  if (sweepDeg >= 359.9) {
+    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`;
+  }
+
+  const point = (deg: number) => {
+    const rad = ((deg - 90) * Math.PI) / 180;
+    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)] as const;
+  };
+
+  const [x1, y1] = point(startDeg);
+  const [x2, y2] = point(startDeg + sweepDeg);
+  const large = sweepDeg > 180 ? 1 : 0;
+
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
 function Inventory({
