@@ -184,6 +184,131 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
   );
 }
 
+/**
+ * One editable challenge.
+ *
+ * Fields keep local state and save on blur rather than on every keystroke:
+ * typing a name would otherwise fire a request per character.
+ */
+function ChallengeRow({
+  challenge,
+  share,
+  busy,
+  onPatch,
+  onDelete,
+}: {
+  challenge: AdminChallenge;
+  share: number | null;
+  busy: boolean;
+  onPatch: (input: Partial<AdminChallenge>) => void;
+  onDelete: () => void;
+}) {
+  const [name, setName] = useState(challenge.name);
+  const [detail, setDetail] = useState(challenge.detail);
+  const [weight, setWeight] = useState(String(challenge.weight));
+  const [confirming, setConfirming] = useState(false);
+
+  // Someone else may have edited this row; adopt the server's version unless
+  // this field is the one being typed in.
+  useEffect(() => setName(challenge.name), [challenge.name]);
+  useEffect(() => setDetail(challenge.detail), [challenge.detail]);
+  useEffect(() => setWeight(String(challenge.weight)), [challenge.weight]);
+
+  return (
+    <li
+      className={classNames(
+        'rounded-xl border border-line bg-carbon-2 p-2.5',
+        !challenge.enabled && 'opacity-50',
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="tabular w-12 shrink-0 text-fluid-xs text-ink-2">
+          {share === null ? '—' : formatPercent(share, 1)}
+        </span>
+
+        <input
+          value={name}
+          disabled={busy}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={() => {
+            const trimmed = name.trim();
+            if (!trimmed) return setName(challenge.name);
+            if (trimmed !== challenge.name) onPatch({ name: trimmed });
+          }}
+          placeholder="Challenge"
+          className="min-h-9 min-w-0 flex-[2] rounded-lg border border-line bg-carbon px-2 text-fluid-sm"
+        />
+
+        <label className="flex shrink-0 items-center gap-1.5">
+          <span className="eyebrow text-ink-3">Weight</span>
+          <input
+            type="number"
+            min={1}
+            value={weight}
+            disabled={busy}
+            onChange={(event) => setWeight(event.target.value)}
+            onBlur={() => {
+              const parsed = Math.max(Number(weight) || 1, 1);
+              if (parsed !== challenge.weight) onPatch({ weight: parsed });
+              setWeight(String(parsed));
+            }}
+            className="tabular min-h-9 w-16 rounded-lg border border-line bg-carbon px-2 text-fluid-sm"
+          />
+        </label>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onPatch({ enabled: !challenge.enabled })}
+          className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-2 hover:text-ink"
+        >
+          {challenge.enabled ? 'Disable' : 'Enable'}
+        </button>
+
+        {confirming ? (
+          <span className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              className="eyebrow min-h-9 rounded-full px-3 text-void"
+              style={{ background: 'var(--color-mark-red)' }}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="eyebrow min-h-9 px-2 text-ink-3"
+            >
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-3 hover:text-ink"
+          >
+            Delete
+          </button>
+        )}
+      </div>
+
+      <input
+        value={detail}
+        disabled={busy}
+        onChange={(event) => setDetail(event.target.value)}
+        onBlur={() => {
+          if (detail !== challenge.detail) onPatch({ detail });
+        }}
+        placeholder="Detail (optional)"
+        className="mt-1.5 min-h-8 w-full rounded-lg border border-line bg-carbon px-2 text-[0.72rem] text-ink-2 placeholder:text-ink-3"
+      />
+    </li>
+  );
+}
+
 function ChallengeEditor({
   challenges,
   busy,
@@ -216,64 +341,14 @@ function ChallengeEditor({
 
       <ul className="mt-4 space-y-2">
         {challenges.map((challenge) => (
-          <li
+          <ChallengeRow
             key={challenge.id}
-            className={classNames(
-              'flex flex-wrap items-center gap-2 rounded-xl border border-line bg-carbon-2 p-2.5',
-              !challenge.enabled && 'opacity-50',
-            )}
-          >
-            <span className="tabular w-12 shrink-0 text-fluid-xs text-ink-2">
-              {challenge.enabled
-                ? formatPercent(challenge.weight / total, 1)
-                : '—'}
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-fluid-sm">
-                {challenge.name}
-              </span>
-              {challenge.detail && (
-                <span className="block truncate text-[0.68rem] text-ink-3">
-                  {challenge.detail}
-                </span>
-              )}
-            </span>
-
-            <label className="flex items-center gap-1.5">
-              <span className="eyebrow text-ink-3">Weight</span>
-              <input
-                type="number"
-                min={1}
-                value={challenge.weight}
-                disabled={busy}
-                onChange={(event) =>
-                  onPatch(challenge.id, {
-                    weight: Math.max(Number(event.target.value) || 1, 1),
-                  })
-                }
-                className="tabular min-h-9 w-16 rounded-lg border border-line bg-carbon px-2 text-fluid-sm"
-              />
-            </label>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onPatch(challenge.id, { enabled: !challenge.enabled })}
-              className="eyebrow min-h-9 rounded-full border border-line px-3 text-ink-2 hover:text-ink"
-            >
-              {challenge.enabled ? 'Disable' : 'Enable'}
-            </button>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onDelete(challenge.id)}
-              className="eyebrow min-h-9 rounded-full border border-line px-3 text-ink-3 hover:text-ink"
-            >
-              Delete
-            </button>
-          </li>
+            challenge={challenge}
+            share={challenge.enabled ? challenge.weight / total : null}
+            busy={busy}
+            onPatch={(input) => onPatch(challenge.id, input)}
+            onDelete={() => onDelete(challenge.id)}
+          />
         ))}
       </ul>
 
