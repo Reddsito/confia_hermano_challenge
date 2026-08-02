@@ -42,13 +42,18 @@ export function Panel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The stored code is only readable after mount, so the gate must not render
+  // before that check finishes — otherwise it flashes and vanishes on its own.
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     fetchInfo().then(setInfo).catch(() => setInfo(null));
     const stored = readCode();
     if (stored) {
       setCode(stored);
-      void unlock(stored);
+      void unlock(stored).finally(() => setChecking(false));
+    } else {
+      setChecking(false);
     }
     // Runs once: the stored code is read on mount and never re-read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,6 +68,7 @@ export function Panel() {
       setError(null);
     } catch (cause) {
       setUnlocked(false);
+      clearCode();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
@@ -101,6 +107,14 @@ export function Panel() {
     },
     [reload],
   );
+
+  if (checking) {
+    return (
+      <p className="py-16 text-center text-fluid-sm text-ink-3" role="status">
+        Checking your saved code…
+      </p>
+    );
+  }
 
   if (!unlocked) {
     return (
