@@ -54,6 +54,57 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+
+  // One row per player per match. Aggregates alone cannot answer "who did we
+  // play against", "what happened on the 31st" or "how long were you dead" —
+  // those need the individual games kept around.
+  `
+  CREATE TABLE player_matches (
+    player_id        TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    match_id         TEXT NOT NULL,
+    played_at        INTEGER NOT NULL,
+    duration_minutes REAL NOT NULL,
+    team_id          INTEGER NOT NULL,
+    win              INTEGER NOT NULL,
+    champion_id      INTEGER NOT NULL,
+    champion_name    TEXT NOT NULL,
+    kills            INTEGER NOT NULL,
+    deaths           INTEGER NOT NULL,
+    assists          INTEGER NOT NULL,
+    creep_score      INTEGER NOT NULL,
+    gold_earned      INTEGER NOT NULL,
+    damage_to_champions INTEGER NOT NULL,
+    damage_taken     INTEGER NOT NULL,
+    vision_score     INTEGER NOT NULL,
+    time_dead_seconds INTEGER NOT NULL,
+    penta_kills      INTEGER NOT NULL,
+    quadra_kills     INTEGER NOT NULL,
+    triple_kills     INTEGER NOT NULL,
+    largest_spree    INTEGER NOT NULL,
+    solo_kills       INTEGER NOT NULL,
+    first_blood      INTEGER NOT NULL,
+    surrendered      INTEGER NOT NULL,
+    kill_participation REAL,
+    PRIMARY KEY (player_id, match_id)
+  );
+
+  CREATE INDEX idx_player_matches_match ON player_matches (match_id);
+  CREATE INDEX idx_player_matches_played ON player_matches (played_at);
+
+  -- Sampled once per cycle, and only when the rank actually moved. That keeps
+  -- the table small enough to chart directly and makes "best day" a group-by.
+  CREATE TABLE lp_history (
+    player_id     TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    recorded_at   INTEGER NOT NULL,
+    ladder_points INTEGER NOT NULL,
+    tier          TEXT NOT NULL,
+    division      TEXT,
+    league_points INTEGER NOT NULL,
+    PRIMARY KEY (player_id, recorded_at)
+  );
+
+  CREATE INDEX idx_lp_history_player ON lp_history (player_id, recorded_at);
+  `,
 ];
 
 export function openDatabase(path: string): Db {

@@ -4,6 +4,7 @@ import { buildRanking } from '@challenge/core/domain';
 import { ROLES, type Role, type Snapshot } from '@challenge/core/domain';
 import { SNAPSHOT_ENDPOINT } from '../lib/api';
 import { Filters, type FilterState, type SortKey } from './Filters';
+import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
 import { RankingTable } from './RankingTable';
 import { RefreshMeter } from './RefreshMeter';
@@ -21,6 +22,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('ranking');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     role: 'ALL',
     query: '',
@@ -100,6 +102,12 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     return [...filtered].sort(comparatorFor(filters.sort));
   }, [ranking, filters]);
 
+  // Resolved from the live ranking rather than stored, so an open card keeps
+  // updating when a refresh lands mid-view.
+  const selected = selectedId
+    ? (ranking.find((player) => player.id === selectedId) ?? null)
+    : null;
+
   const sections = [
     { id: 'ranking' as const, label: 'Ranking' },
     { id: 'stats' as const, label: 'Statistics' },
@@ -150,7 +158,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
       <div className="mt-6">
         <TabPanel id="ranking" active={section === 'ranking'}>
           {/* The podium always shows the true top three, never the filtered view. */}
-          <Podium players={ranking} />
+          <Podium players={ranking} onSelect={(p) => setSelectedId(p.id)} />
           <Filters
             value={filters}
             onChange={setFilters}
@@ -158,13 +166,25 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             liveCount={liveCount}
             resultCount={visible.length}
           />
-          <RankingTable players={visible} />
+          <RankingTable
+            players={visible}
+            onSelect={(p) => setSelectedId(p.id)}
+          />
         </TabPanel>
 
         <TabPanel id="stats" active={section === 'stats'}>
           <StatsPanel players={ranking} />
         </TabPanel>
       </div>
+
+      {selected && (
+        <PlayerDetail
+          player={selected}
+          snapshot={snapshot}
+          allPlayers={ranking}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -9,7 +9,9 @@
     "sync": "tsx src/cli/sync-once.ts",
     "doctor": "tsx src/cli/doctor.ts",
     "typecheck": "tsc --noEmit",
-    "reset": "tsx src/cli/reset.ts"
+    "reset": "tsx src/cli/reset.ts",
+    "backfill": "tsx src/cli/backfill.ts",
+    "discord:test": "tsx src/cli/discord-test.ts"
   },
   "dependencies": {
     "@challenge/core": "workspace:*",

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { TournamentMeta } from '@challenge/core/domain';
+
+import { parseEvents, type DiscordConfig } from './discord/notifier';
 import { isPlatformId, type PlatformId } from '@challenge/core/riot';
 
 export interface ServerConfig {
@@ -14,6 +16,10 @@ export interface ServerConfig {
   adminToken: string;
   /** Exact origins allowed to call the API. '*' allows any. */
   allowedOrigins: string[];
+  /** Null when DISCORD_WEBHOOK_URL is unset — notifications are optional. */
+  discord: DiscordConfig | null;
+  /** Public site URL, used for links inside Discord messages. */
+  siteUrl: string;
   platform: PlatformId;
   tournament: TournamentMeta;
 }
@@ -64,6 +70,15 @@ export function loadConfig(root: string): ServerConfig {
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    siteUrl: env('SITE_URL'),
+    discord: env('DISCORD_WEBHOOK_URL')
+      ? {
+          webhookUrl: env('DISCORD_WEBHOOK_URL'),
+          events: parseEvents(env('DISCORD_EVENTS')),
+          username: env('DISCORD_USERNAME', file.name),
+          avatarUrl: env('DISCORD_AVATAR_URL') || undefined,
+        }
+      : null,
     platform,
     tournament: {
       name: file.name,

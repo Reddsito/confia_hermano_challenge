@@ -44,6 +44,7 @@ export interface MatchParticipantDto {
   puuid: string;
   championId: number;
   championName: string;
+  teamId: number;
   kills: number;
   deaths: number;
   assists: number;
@@ -51,6 +52,25 @@ export interface MatchParticipantDto {
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
   teamPosition: string;
+  goldEarned: number;
+  totalDamageDealtToChampions: number;
+  totalDamageTaken: number;
+  visionScore: number;
+  totalTimeSpentDead: number;
+  pentaKills: number;
+  quadraKills: number;
+  tripleKills: number;
+  largestKillingSpree: number;
+  firstBloodKill: boolean;
+  gameEndedInSurrender: boolean;
+  /** Riot's own derived metrics. Absent on very old matches. */
+  challenges?: {
+    killParticipation?: number;
+    soloKills?: number;
+    damagePerMinute?: number;
+    goldPerMinute?: number;
+    visionScorePerMinute?: number;
+  };
 }
 
 export interface MatchDto {

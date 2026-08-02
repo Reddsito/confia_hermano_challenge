@@ -35,6 +35,9 @@ export function emptySnapshot(): Snapshot {
       refreshIntervalMinutes: 2,
     },
     players: [],
+    headToHead: [],
+    dailyDeltas: [],
+    lpSeries: [],
   };
 }
 

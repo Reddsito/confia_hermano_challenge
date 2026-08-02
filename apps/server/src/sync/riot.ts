@@ -1,8 +1,17 @@
 import type { ChampionUsage, MatchTotals } from '@challenge/core/domain';
 import { RiotApiError, type MatchDto, type RiotClient } from '@challenge/core/riot';
 
+import { opggUrl, toLadderPoints, type Rank } from '@challenge/core/domain';
+
 import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
+import { insertPlayerMatch, recordRankSample, type PlayerMatchRow } from '../db/matches';
+import {
+  inGameEmbed,
+  matchFinishedEmbed,
+  rankChangeEmbed,
+} from '../discord/embeds';
+import type { DiscordNotifier } from '../discord/notifier';
 import {
   emptyTotals,
   getPlayerState,
@@ -34,6 +43,7 @@ export async function runRiotCycle(
   db: Db,
   client: RiotClient,
   config: ServerConfig,
+  notifier: DiscordNotifier,
 ): Promise<CycleReport> {
   const started = Date.now();
   const players = listPlayers(db, 'approved');
@@ -54,7 +64,8 @@ export async function runRiotCycle(
         player,
         queueId,
         startTimeSeconds,
-        config.tournament.queue,
+        config,
+        notifier,
       );
       updated += 1;
     } catch (error) {
@@ -78,8 +89,10 @@ async function syncPlayer(
   player: PlayerRow,
   queueId: number,
   startTimeSeconds: number,
-  queueType: string,
+  config: ServerConfig,
+  notifier: DiscordNotifier,
 ): Promise<number> {
+  const queueType = config.tournament.queue;
   // The PUUID is stable, so it is resolved once and cached on the player row.
   let puuid = player.puuid;
   if (!puuid) {
@@ -100,6 +113,8 @@ async function syncPlayer(
   const currentRank = solo ? toRank(solo) : null;
 
   const existing = getPlayerState(db, player.id);
+  const previousRank = existing?.currentRank ?? null;
+  const wasInGame = existing?.inGame ?? false;
   const totals: MatchTotals = existing
     ? { ...existing.totals }
     : emptyTotals();
@@ -137,12 +152,31 @@ async function syncPlayer(
     .filter((id) => !isMatchProcessed(db, player.id, id))
     .reverse();
 
+  // LP movement can only be attributed to a single game. With several new
+  // matches in one cycle we cannot tell which one earned what, so we say
+  // nothing rather than guess.
+  const lpDelta =
+    fresh.length === 1 && previousRank && currentRank
+      ? toLadderPoints(currentRank) - toLadderPoints(previousRank)
+      : null;
+
   for (const matchId of fresh) {
     const match = await client.getMatch(matchId);
-    const outcome = applyMatch(totals, championUsage, match, puuid);
+    const row = applyMatch(totals, championUsage, match, puuid, player.id, matchId);
 
-    if (outcome !== null) {
-      recentResults = [outcome, ...recentResults].slice(0, MAX_RECENT_RESULTS);
+    if (row !== null) {
+      recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
+      insertPlayerMatch(db, row);
+
+      notifier.push(
+        'match_finished',
+        matchFinishedEmbed(player, row, currentRank, lpDelta, {
+          tournamentName: config.tournament.name,
+          siteUrl: config.siteUrl || undefined,
+          opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
+          profileIconId: summoner.profileIconId,
+        }),
+      );
     }
 
     // The counters and the "already counted" marker move together, so a crash
@@ -167,22 +201,73 @@ async function syncPlayer(
     })();
   }
 
+  recordRankSample(db, player.id, currentRank);
+  announceRankChange(player, previousRank, currentRank, config, notifier, summoner.profileIconId);
+
   const inGame = await client.isInGame(puuid).catch(() => false);
   db.prepare('UPDATE player_state SET in_game = ? WHERE player_id = ?').run(
     inGame ? 1 : 0,
     player.id,
   );
 
+  // Only the transition is interesting; re-announcing every cycle while someone
+  // sits in a 40-minute game would be spam.
+  if (inGame && !wasInGame) {
+    notifier.push(
+      'in_game',
+      inGameEmbed(player, currentRank, {
+        tournamentName: config.tournament.name,
+        siteUrl: config.siteUrl || undefined,
+        opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
+        profileIconId: summoner.profileIconId,
+      }),
+    );
+  }
+
   return fresh.length;
 }
 
-/** Folds one match into the running totals. Returns the result, or null if skipped. */
+/** Fires only when the tier or the division moved, not on every LP change. */
+function announceRankChange(
+  player: PlayerRow,
+  from: Rank | null,
+  to: Rank | null,
+  config: ServerConfig,
+  notifier: DiscordNotifier,
+  profileIconId: number | null,
+): void {
+  if (!to || !from) return;
+  if (from.tier === to.tier && from.division === to.division) return;
+
+  notifier.push(
+    'rank_change',
+    rankChangeEmbed(
+      player,
+      from,
+      to,
+      toLadderPoints(to) > toLadderPoints(from),
+      {
+        tournamentName: config.tournament.name,
+        siteUrl: config.siteUrl || undefined,
+        opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
+        profileIconId,
+      },
+    ),
+  );
+}
+
+/**
+ * Folds one match into the running totals and returns the row to persist, or
+ * null when the game should not count.
+ */
 function applyMatch(
   totals: MatchTotals,
   championUsage: Record<string, ChampionUsage>,
   match: MatchDto,
   puuid: string,
-): boolean | null {
+  playerId: string,
+  matchId: string,
+): PlayerMatchRow | null {
   const me = match.info.participants.find(
     (participant) => participant.puuid === puuid,
   );
@@ -214,7 +299,33 @@ function applyMatch(
     wins: usage.wins + (me.win ? 1 : 0),
   };
 
-  return me.win;
+  return {
+    playerId,
+    matchId,
+    playedAt: match.info.gameCreation,
+    durationMinutes,
+    teamId: me.teamId,
+    win: me.win,
+    championId: me.championId,
+    championName: me.championName,
+    kills: me.kills,
+    deaths: me.deaths,
+    assists: me.assists,
+    creepScore: me.totalMinionsKilled + me.neutralMinionsKilled,
+    goldEarned: me.goldEarned ?? 0,
+    damageToChampions: me.totalDamageDealtToChampions ?? 0,
+    damageTaken: me.totalDamageTaken ?? 0,
+    visionScore: me.visionScore ?? 0,
+    timeDeadSeconds: me.totalTimeSpentDead ?? 0,
+    pentaKills: me.pentaKills ?? 0,
+    quadraKills: me.quadraKills ?? 0,
+    tripleKills: me.tripleKills ?? 0,
+    largestSpree: me.largestKillingSpree ?? 0,
+    soloKills: me.challenges?.soloKills ?? 0,
+    firstBlood: Boolean(me.firstBloodKill),
+    surrendered: Boolean(me.gameEndedInSurrender),
+    killParticipation: me.challenges?.killParticipation ?? null,
+  };
 }
 
 function recordFailure(db: Db, player: PlayerRow, error: unknown): void {

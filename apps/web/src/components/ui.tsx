@@ -1,5 +1,7 @@
 import type { Rank, Role, Tier } from '@challenge/core/domain';
-import { formatRank, isApex, titleCase } from '@challenge/core/domain';
+import { TIER_COLOR, formatRank, isApex, titleCase } from '@challenge/core/domain';
+
+export { TIER_COLOR };
 
 /**
  * Pinned Data Dragon version. Bump it after a patch to pick up new champion
@@ -7,24 +9,6 @@ import { formatRank, isApex, titleCase } from '@challenge/core/domain';
  * missing new champions rather than breaking every image.
  */
 export const DDRAGON_VERSION = '15.15.1';
-
-/**
- * Tier colours are borrowed from the game's own ladder rather than invented,
- * which is what makes a row's colour mean something. They are identity
- * colours, always rendered next to the tier name, never the sole encoding.
- */
-export const TIER_COLOR: Record<Tier, string> = {
-  IRON: '#7c7480',
-  BRONZE: '#b0714c',
-  SILVER: '#9fb0c0',
-  GOLD: '#e0b955',
-  PLATINUM: '#4fd3c4',
-  EMERALD: '#34c26a',
-  DIAMOND: '#6aa6f5',
-  MASTER: '#b45ce8',
-  GRANDMASTER: '#e0455f',
-  CHALLENGER: '#f2d75e',
-};
 
 export function tierColor(rank: Rank | null): string {
   return rank ? TIER_COLOR[rank.tier] : 'var(--color-ink-3)';

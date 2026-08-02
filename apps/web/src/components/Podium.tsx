@@ -20,7 +20,13 @@ const PLACE_LABEL = ['1st', '2nd', '3rd'];
  * place numeral is set oversized behind the content so the three cards read as
  * a podium at a glance rather than as three identical panels.
  */
-export function Podium({ players }: { players: RankedPlayer[] }) {
+export function Podium({
+  players,
+  onSelect,
+}: {
+  players: RankedPlayer[];
+  onSelect: (player: RankedPlayer) => void;
+}) {
   const top = players.slice(0, 3);
   if (top.length === 0) return null;
 
@@ -32,7 +38,11 @@ export function Podium({ players }: { players: RankedPlayer[] }) {
       <ol className="grid gap-3 lg:grid-cols-3">
         {top.map((player, index) => (
           <li key={player.id}>
-            <PodiumCard player={player} place={index} />
+            <PodiumCard
+              player={player}
+              place={index}
+              onSelect={() => onSelect(player)}
+            />
           </li>
         ))}
       </ol>
@@ -43,9 +53,11 @@ export function Podium({ players }: { players: RankedPlayer[] }) {
 function PodiumCard({
   player,
   place,
+  onSelect,
 }: {
   player: RankedPlayer;
   place: number;
+  onSelect: () => void;
 }) {
   const accent = tierColor(player.rank);
   const leader = place === 0;
@@ -53,10 +65,11 @@ function PodiumCard({
   return (
     <article
       className={classNames(
-        'neon relative overflow-hidden rounded-2xl border bg-carbon p-4 sm:p-5',
+        'neon relative cursor-pointer overflow-hidden rounded-2xl border bg-carbon p-4 sm:p-5',
         leader && 'lg:p-6',
       )}
       style={{ '--tier': accent } as React.CSSProperties}
+      onClick={onSelect}
     >
       {/* Oversized place numeral, clipped by the card — the signature device. */}
       <span
@@ -81,7 +94,9 @@ function PodiumCard({
         >
           {PLACE_LABEL[place] ?? `#${player.position}`}
         </span>
-        <OpggLink url={player.opggUrl} />
+        <span onClick={(event) => event.stopPropagation()}>
+          <OpggLink url={player.opggUrl} />
+        </span>
       </div>
 
       <div className="relative mt-4 flex items-center gap-3">

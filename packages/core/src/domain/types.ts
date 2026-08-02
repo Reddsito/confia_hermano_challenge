@@ -69,6 +69,50 @@ export interface PlayerEntry {
   inGame: boolean;
   /** Set when this player's data could not be refreshed. */
   error: string | null;
+  /** Derived from the per-match table; absent until a cycle has stored games. */
+  extras: PlayerExtras | null;
+}
+
+export interface PlayerExtras {
+  timeDeadSeconds: number;
+  goldEarned: number;
+  damageToChampions: number;
+  damageTaken: number;
+  visionScore: number;
+  pentaKills: number;
+  quadraKills: number;
+  tripleKills: number;
+  largestSpree: number;
+  soloKills: number;
+  firstBloods: number;
+  surrenders: number;
+  /** Riot's own figure, averaged over the counted games. 0-1. */
+  killParticipation: number | null;
+  bestKdaGame: number | null;
+  /** Hour of day (UTC) this player queues most often. */
+  favouriteHour: number | null;
+}
+
+/** Two tracked players who ended up in the same game. */
+export interface HeadToHead {
+  playerA: string;
+  playerB: string;
+  against: number;
+  aWonAgainst: number;
+  together: number;
+  togetherWins: number;
+}
+
+export interface DayDelta {
+  playerId: string;
+  day: string;
+  delta: number;
+}
+
+export interface LpPoint {
+  playerId: string;
+  at: number;
+  ladderPoints: number;
 }
 
 export interface TournamentMeta {
@@ -90,6 +134,10 @@ export interface Snapshot {
   source: 'mock' | 'riot';
   tournament: TournamentMeta;
   players: PlayerEntry[];
+  /** Group-wide sections that cannot be derived from a single player. */
+  headToHead: HeadToHead[];
+  dailyDeltas: DayDelta[];
+  lpSeries: LpPoint[];
 }
 
 /** A player enriched with everything the UI needs, computed once. */

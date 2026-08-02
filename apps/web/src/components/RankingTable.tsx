@@ -14,7 +14,13 @@ import {
 } from './ui';
 import { RoleIcon, TierCrest } from './icons';
 
-export function RankingTable({ players }: { players: RankedPlayer[] }) {
+export function RankingTable({
+  players,
+  onSelect,
+}: {
+  players: RankedPlayer[];
+  onSelect: (player: RankedPlayer) => void;
+}) {
   if (players.length === 0) {
     return (
       <div className="rounded-2xl border border-line bg-carbon p-10 text-center">
@@ -73,8 +79,18 @@ export function RankingTable({ players }: { players: RankedPlayer[] }) {
               return (
                 <tr
                   key={player.id}
-                  className="group bg-carbon transition-colors hover:bg-carbon-2"
+                  className="group cursor-pointer bg-carbon transition-colors hover:bg-carbon-2"
                   style={{ '--tier': accent } as React.CSSProperties}
+                  onClick={() => onSelect(player)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Open stats for ${player.displayName}`}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelect(player);
+                    }
+                  }}
                 >
                   <td className="relative rounded-l-xl py-3 pr-2 pl-4">
                     {/* Tier-coloured rail: the row's identity, not decoration. */}
@@ -183,7 +199,10 @@ export function RankingTable({ players }: { players: RankedPlayer[] }) {
                     <ChampionStrip player={player} />
                   </td>
 
-                  <td className="rounded-r-xl px-4 py-3 text-right">
+                  <td
+                    className="rounded-r-xl px-4 py-3 text-right"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <OpggLink url={player.opggUrl} />
                   </td>
                 </tr>
@@ -200,8 +219,9 @@ export function RankingTable({ players }: { players: RankedPlayer[] }) {
           return (
             <li
               key={player.id}
-              className="relative overflow-hidden rounded-xl border border-line bg-carbon p-3 pl-4"
+              className="relative cursor-pointer overflow-hidden rounded-xl border border-line bg-carbon p-3 pl-4"
               style={{ '--tier': accent } as React.CSSProperties}
+              onClick={() => onSelect(player)}
             >
               <span
                 aria-hidden="true"
@@ -261,7 +281,9 @@ export function RankingTable({ players }: { players: RankedPlayer[] }) {
                 <span className="tabular text-fluid-xs text-ink-2">
                   KDA {player.kda.toFixed(2)}
                 </span>
-                <OpggLink url={player.opggUrl} />
+                <span onClick={(event) => event.stopPropagation()}>
+                  <OpggLink url={player.opggUrl} />
+                </span>
               </div>
             </li>
           );
