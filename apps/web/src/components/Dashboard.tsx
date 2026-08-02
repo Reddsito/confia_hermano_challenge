@@ -13,6 +13,7 @@ import {
   type SessionUser,
 } from '../lib/session';
 import { BlueShells, ShellMark } from './BlueShells';
+import { LiveGames } from './LiveGames';
 import { Filters, type FilterState, type SortKey } from './Filters';
 import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
@@ -25,7 +26,7 @@ import { TournamentClock, TournamentProgress } from './TournamentClock';
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-type Section = 'ranking' | 'stats' | 'shells';
+type Section = 'ranking' | 'live' | 'stats' | 'shells';
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -132,6 +133,12 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
   const sections = [
     { id: 'ranking' as const, label: 'Ranking' },
+    {
+      id: 'live' as const,
+      label: 'Live',
+      // The badge is the point of the tab: it tells you to look without looking.
+      badge: liveCount > 0 ? String(liveCount) : undefined,
+    },
     { id: 'stats' as const, label: 'Statistics' },
     // Signing in is what unlocks the tab; showing it while signed out would
     // only lead to a dead end.
@@ -207,8 +214,12 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           />
         </TabPanel>
 
+        <TabPanel id="live" active={section === 'live'}>
+          <LiveGames players={ranking} />
+        </TabPanel>
+
         <TabPanel id="stats" active={section === 'stats'}>
-          <StatsPanel players={ranking} />
+          <StatsPanel players={ranking} duos={snapshot.duos} />
         </TabPanel>
 
         <TabPanel id="shells" active={section === 'shells'}>

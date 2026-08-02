@@ -17,7 +17,12 @@ import {
 
 import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
-import { insertPlayerMatch, recordRankSample, type PlayerMatchRow } from '../db/matches';
+import {
+  insertPlayerMatch,
+  recordRankSample,
+  setActiveGame,
+  type PlayerMatchRow,
+} from '../db/matches';
 import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
 import {
   challengeServedEmbed,
@@ -276,6 +281,24 @@ async function syncPlayer(
   db.prepare('UPDATE player_state SET in_game = ? WHERE player_id = ?').run(
     inGame ? 1 : 0,
     player.id,
+  );
+
+  setActiveGame(
+    db,
+    player.id,
+    activeGame
+      ? {
+          gameId: activeGame.gameId,
+          queueId: activeGame.gameQueueConfigId,
+          gameLength: activeGame.gameLength,
+          participants: activeGame.participants.map((participant) => ({
+            puuid: participant.puuid,
+            championId: participant.championId,
+            teamId: participant.teamId,
+            riotId: participant.riotId ?? participant.summonerName ?? null,
+          })),
+        }
+      : null,
   );
 
   // Only the transition is interesting; re-announcing every cycle while someone

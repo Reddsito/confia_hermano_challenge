@@ -115,6 +115,13 @@ export interface HeadToHead {
   togetherWins: number;
 }
 
+export interface Duo {
+  playerA: string;
+  playerB: string;
+  games: number;
+  wins: number;
+}
+
 export interface DayDelta {
   playerId: string;
   day: string;
@@ -148,6 +155,7 @@ export interface Snapshot {
   players: PlayerEntry[];
   /** Group-wide sections that cannot be derived from a single player. */
   headToHead: HeadToHead[];
+  duos: Duo[];
   dailyDeltas: DayDelta[];
   lpSeries: LpPoint[];
 }

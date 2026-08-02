@@ -36,6 +36,7 @@ export function emptySnapshot(): Snapshot {
     },
     players: [],
     headToHead: [],
+    duos: [],
     dailyDeltas: [],
     lpSeries: [],
   };

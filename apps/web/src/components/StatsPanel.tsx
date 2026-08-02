@@ -1,4 +1,4 @@
-import type { RankedPlayer } from '@challenge/core/domain';
+import type { RankedPlayer, Snapshot } from '@challenge/core/domain';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 interface LeaderRow {
@@ -59,7 +59,13 @@ const CATEGORIES: Category[] = [
  * measure. Each column leads with its winner at display size because that is
  * the thing people actually come to look up.
  */
-export function StatsPanel({ players }: { players: RankedPlayer[] }) {
+export function StatsPanel({
+  players,
+  duos,
+}: {
+  players: RankedPlayer[];
+  duos: Snapshot['duos'];
+}) {
   const totals = players.reduce(
     (accumulator, player) => ({
       games: accumulator.games + player.totals.games,
@@ -124,6 +130,8 @@ export function StatsPanel({ players }: { players: RankedPlayer[] }) {
         ))}
       </div>
 
+      <DuoBoard duos={duos} players={players} />
+
       <section className="rounded-2xl border border-line bg-carbon p-4">
         <header className="text-center">
           <h3 className="display text-fluid-lg">KDA</h3>
@@ -150,6 +158,81 @@ export function StatsPanel({ players }: { players: RankedPlayer[] }) {
         )}
       </section>
     </div>
+  );
+}
+
+/** Pairs who queue together, ranked by how often it works out. */
+function DuoBoard({
+  duos,
+  players,
+}: {
+  duos: Snapshot['duos'];
+  players: RankedPlayer[];
+}) {
+  const byId = new Map(players.map((player) => [player.id, player]));
+
+  const rows = duos
+    .map((duo) => ({
+      a: byId.get(duo.playerA),
+      b: byId.get(duo.playerB),
+      games: duo.games,
+      wins: duo.wins,
+    }))
+    .filter((row) => row.a && row.b)
+    .slice(0, TOP_N);
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-4">
+      <header className="text-center">
+        <h3 className="display text-fluid-lg">Best duos</h3>
+        <p className="eyebrow mt-1 text-ink-3">
+          Games queued together · 2 game minimum
+        </p>
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="mt-4 text-center text-fluid-sm text-ink-3">
+          Nobody has duoed yet, or not enough games together.
+        </p>
+      ) : (
+        <ol className="mt-4 grid gap-1.5 sm:grid-cols-2">
+          {rows.map((row, index) => {
+            const rate = row.wins / row.games;
+            return (
+              <li
+                key={`${row.a!.id}-${row.b!.id}`}
+                className="relative flex items-center gap-2 overflow-hidden rounded-lg bg-carbon-2 py-1.5 pr-2 pl-3"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-0 w-[2px]"
+                  style={{
+                    background:
+                      rate >= 0.5
+                        ? 'var(--color-mark-teal)'
+                        : 'var(--color-mark-red)',
+                  }}
+                />
+                <span className="tabular w-4 text-[0.7rem] text-ink-3">
+                  {index + 1}
+                </span>
+                <Avatar name={row.a!.displayName} iconId={row.a!.profileIconId} size={20} />
+                <Avatar name={row.b!.displayName} iconId={row.b!.profileIconId} size={20} />
+                <span className="min-w-0 flex-1 truncate text-fluid-xs">
+                  {row.a!.displayName} + {row.b!.displayName}
+                </span>
+                <span className="tabular text-fluid-xs font-semibold">
+                  {formatPercent(rate)}
+                </span>
+                <span className="tabular text-[0.65rem] whitespace-nowrap text-ink-3">
+                  {row.wins}-{row.games - row.wins}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 

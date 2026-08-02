@@ -222,6 +222,38 @@ export function headToHead(db: Db): HeadToHead[] {
   return rows;
 }
 
+export interface Duo {
+  playerA: string;
+  playerB: string;
+  games: number;
+  wins: number;
+}
+
+/**
+ * Pairs who queued together, best win rate first.
+ *
+ * Same self-join as head-to-head, restricted to matching team ids. A minimum
+ * game count keeps one lucky game from topping the board.
+ */
+export function bestDuos(db: Db, minimumGames = 2): Duo[] {
+  return db
+    .prepare(
+      `SELECT a.player_id AS playerA,
+              b.player_id AS playerB,
+              COUNT(*) AS games,
+              SUM(CASE WHEN a.win = 1 THEN 1 ELSE 0 END) AS wins
+       FROM player_matches a
+       JOIN player_matches b
+         ON a.match_id = b.match_id
+        AND a.player_id < b.player_id
+        AND a.team_id = b.team_id
+       GROUP BY a.player_id, b.player_id
+       HAVING games >= ?
+       ORDER BY (wins * 1.0 / games) DESC, games DESC`,
+    )
+    .all(minimumGames) as Duo[];
+}
+
 export interface DayDelta {
   playerId: string;
   day: string;
@@ -273,4 +305,56 @@ export function lpSeries(db: Db): LpPoint[] {
        FROM lp_history ORDER BY recorded_at ASC`,
     )
     .all() as LpPoint[];
+}
+
+export interface StoredActiveGame {
+  gameId: number;
+  queueId: number;
+  gameLength: number;
+  participants: Array<{
+    puuid: string;
+    championId: number;
+    teamId: number;
+    riotId: string | null;
+  }>;
+}
+
+export function setActiveGame(
+  db: Db,
+  playerId: string,
+  game: StoredActiveGame | null,
+): void {
+  db.prepare('UPDATE player_state SET active_game = ? WHERE player_id = ?').run(
+    game ? JSON.stringify(game) : null,
+    playerId,
+  );
+}
+
+/** Every live game currently on record, one entry per game, not per player. */
+export function activeGames(db: Db): Array<{
+  playerIds: string[];
+  game: StoredActiveGame;
+}> {
+  const rows = db
+    .prepare(
+      'SELECT player_id AS playerId, active_game AS game FROM player_state WHERE active_game IS NOT NULL',
+    )
+    .all() as Array<{ playerId: string; game: string }>;
+
+  // Two tracked players can share a lobby, so games are keyed by id and the
+  // player list is merged rather than the game being listed twice.
+  const byGame = new Map<number, { playerIds: string[]; game: StoredActiveGame }>();
+
+  for (const row of rows) {
+    try {
+      const game = JSON.parse(row.game) as StoredActiveGame;
+      const existing = byGame.get(game.gameId);
+      if (existing) existing.playerIds.push(row.playerId);
+      else byGame.set(game.gameId, { playerIds: [row.playerId], game });
+    } catch {
+      // A malformed row is dropped rather than breaking the whole endpoint.
+    }
+  }
+
+  return [...byGame.values()];
 }

@@ -261,41 +261,89 @@ export function PlayerDetail({
             </section>
           )}
 
-          {rivals.length > 0 && (
+          {rivals.some((row) => row.together > 0) && (
             <section>
-              <h3 className="eyebrow mb-2 text-ink-3">Games against the group</h3>
+              <h3 className="eyebrow mb-2 text-ink-3">Duos</h3>
               <ul className="space-y-1.5">
-                {rivals.map((rival) => (
-                  <li
-                    key={rival.other!.id}
-                    className="flex flex-wrap items-center gap-2 rounded-lg bg-carbon-2 p-2 text-fluid-xs"
-                  >
-                    <Avatar
-                      name={rival.other!.displayName}
-                      iconId={rival.other!.profileIconId}
-                      size={22}
-                    />
-                    <span className="flex-1 truncate text-fluid-sm">
-                      {rival.other!.displayName}
-                    </span>
-                    {rival.against > 0 && (
-                      <span className="text-ink-2">
-                        as rivals{' '}
-                        <span className="tabular font-medium text-ink">
-                          {rival.wins}–{rival.against - rival.wins}
+                {rivals
+                  .filter((row) => row.together > 0)
+                  .sort(
+                    (a, b) =>
+                      b.togetherWins / b.together - a.togetherWins / a.together,
+                  )
+                  .map((duo) => {
+                    const rate = duo.togetherWins / duo.together;
+                    return (
+                      <li
+                        key={`duo-${duo.other!.id}`}
+                        className="flex items-center gap-2 rounded-lg bg-carbon-2 p-2"
+                      >
+                        <Avatar
+                          name={duo.other!.displayName}
+                          iconId={duo.other!.profileIconId}
+                          size={24}
+                          ring={tierColor(duo.other!.rank)}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-fluid-sm">
+                          {duo.other!.displayName}
                         </span>
-                      </span>
-                    )}
-                    {rival.together > 0 && (
-                      <span className="text-ink-2">
-                        together{' '}
-                        <span className="tabular font-medium text-ink">
-                          {rival.togetherWins}–{rival.together - rival.togetherWins}
+                        <span className="tabular text-fluid-xs text-ink-2">
+                          {duo.together} together
                         </span>
+                        <span
+                          className="tabular text-fluid-xs font-semibold"
+                          style={{
+                            color:
+                              rate >= 0.5
+                                ? 'var(--color-mark-teal)'
+                                : 'var(--color-mark-red)',
+                          }}
+                        >
+                          {duo.togetherWins}–{duo.together - duo.togetherWins}
+                        </span>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </section>
+          )}
+
+          {rivals.some((row) => row.against > 0) && (
+            <section>
+              <h3 className="eyebrow mb-2 text-ink-3">Faced in game</h3>
+              <ul className="space-y-1.5">
+                {rivals
+                  .filter((row) => row.against > 0)
+                  .map((rival) => (
+                    <li
+                      key={`vs-${rival.other!.id}`}
+                      className="flex items-center gap-2 rounded-lg bg-carbon-2 p-2"
+                    >
+                      <Avatar
+                        name={rival.other!.displayName}
+                        iconId={rival.other!.profileIconId}
+                        size={24}
+                        ring={tierColor(rival.other!.rank)}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-fluid-sm">
+                        {rival.other!.displayName}
                       </span>
-                    )}
-                  </li>
-                ))}
+                      <span className="tabular text-fluid-xs text-ink-2">
+                        {rival.against} faced
+                      </span>
+                      <span
+                        className="tabular text-fluid-xs font-semibold"
+                        style={{
+                          color:
+                            rival.wins * 2 >= rival.against
+                              ? 'var(--color-mark-teal)'
+                              : 'var(--color-mark-red)',
+                        }}
+                      >
+                        {rival.wins}–{rival.against - rival.wins}
+                      </span>
+                    </li>
+                  ))}
               </ul>
             </section>
           )}

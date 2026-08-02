@@ -169,6 +169,10 @@ const MIGRATIONS: string[] = [
   // Recorded so "only ranked solo counts" can be checked against the data
   // rather than trusted because of a query parameter.
   `ALTER TABLE player_matches ADD COLUMN queue_id INTEGER NOT NULL DEFAULT 0;`,
+
+  // The live game as last seen by the sync cycle. Stored so the site can show
+  // it without spending a fresh SPECTATOR-V5 call per visitor.
+  `ALTER TABLE player_state ADD COLUMN active_game TEXT;`,
 ];
 
 export function openDatabase(path: string): Db {

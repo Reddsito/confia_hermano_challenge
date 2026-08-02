@@ -8,6 +8,7 @@ import {
 import type { ServerConfig } from './config';
 import { getMeta, setMeta, type Db } from './db/index';
 import {
+  bestDuos,
   dailyDeltas,
   extraTotalsFor,
   headToHead,
@@ -79,6 +80,7 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
     tournament: config.tournament,
     players: entries,
     headToHead: headToHead(db),
+    duos: bestDuos(db),
     dailyDeltas: dailyDeltas(db),
     lpSeries: lpSeries(db),
   };
