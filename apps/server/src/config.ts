@@ -29,6 +29,12 @@ export interface ServerConfig {
   /** Signs login sessions. Falls back to ADMIN_TOKEN so it is never empty. */
   sessionSecret: string;
   platform: PlatformId;
+  /**
+   * Queue ids whose matches are ingested. Defaults to the challenge queue
+   * alone. Widen it to test with customs or normals — everything counts once
+   * ingested, stats and blue shells alike, so put it back afterwards.
+   */
+  ingestQueues: number[];
   tournament: TournamentMeta;
 }
 
@@ -99,6 +105,10 @@ export function loadConfig(root: string): ServerConfig {
         }
       : null,
     platform,
+    ingestQueues: parseQueues(
+      env('INGEST_QUEUES'),
+      QUEUE_IDS[file.queue ?? 'RANKED_SOLO_5x5'] ?? 420,
+    ),
     tournament: {
       name: file.name,
       edition: file.edition ?? '',
@@ -113,6 +123,15 @@ export function loadConfig(root: string): ServerConfig {
       ),
     },
   };
+}
+
+function parseQueues(raw: string, fallback: number): number[] {
+  const parsed = raw
+    .split(',')
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isInteger(value) && value >= 0);
+
+  return parsed.length > 0 ? parsed : [fallback];
 }
 
 export const QUEUE_IDS: Record<string, number> = {

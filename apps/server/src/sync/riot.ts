@@ -68,7 +68,7 @@ export async function runRiotCycle(
 ): Promise<CycleReport> {
   const started = Date.now();
   const players = listPlayers(db, 'approved');
-  const queueId = QUEUE_IDS[config.tournament.queue] ?? 420;
+  const queues = config.ingestQueues;
   const startTimeSeconds = Math.floor(
     Date.parse(config.tournament.startsAt) / 1000,
   );
@@ -83,7 +83,7 @@ export async function runRiotCycle(
         db,
         client,
         player,
-        queueId,
+        queues,
         startTimeSeconds,
         config,
         notifier,
@@ -108,11 +108,12 @@ async function syncPlayer(
   db: Db,
   client: RiotClient,
   player: PlayerRow,
-  queueId: number,
+  queues: number[],
   startTimeSeconds: number,
   config: ServerConfig,
   notifier: DiscordNotifier,
 ): Promise<number> {
+  const queueId = queues[0]!;
   const queueType = config.tournament.queue;
   // The PUUID is stable, so it is resolved once and cached on the player row.
   let puuid = player.puuid;
@@ -162,8 +163,10 @@ async function syncPlayer(
     updatedAt: new Date().toISOString(),
   });
 
+  // With a single queue, Riot filters for us. With several, the filter has to
+  // be dropped and applied locally — the endpoint takes only one queue id.
   const matchIds = await client.getMatchIds(puuid, {
-    queue: queueId,
+    ...(queues.length === 1 ? { queue: queueId } : {}),
     startTime: startTimeSeconds,
     count: MATCH_PAGE_SIZE,
   });
@@ -190,7 +193,7 @@ async function syncPlayer(
       puuid,
       player.id,
       matchId,
-      queueId,
+      queues,
     );
 
     if (row !== null) {
@@ -305,7 +308,7 @@ async function syncPlayer(
   // sits in a 40-minute game would be spam.
   // Customs and ARAMs are visible to the spectator API but mean nothing to the
   // challenge, so they stay out of the channel.
-  if (activeGame && !wasInGame && activeGame.gameQueueConfigId === queueId) {
+  if (activeGame && !wasInGame && queues.includes(activeGame.gameQueueConfigId)) {
     notifier.push(
       'in_game',
       inGameEmbed(
@@ -395,15 +398,11 @@ function applyMatch(
   puuid: string,
   playerId: string,
   matchId: string,
-  expectedQueueId: number,
+  allowedQueues: number[],
 ): PlayerMatchRow | null {
-  // The match list is already filtered by queue, so this should never trigger.
-  // It exists because "only ranked solo counts" is a rule of the challenge, and
-  // a rule that depends on a query parameter is one bad refactor from breaking.
-  if (match.info.queueId !== expectedQueueId) {
-    console.warn(
-      `[sync] ignoring ${matchId}: queue ${match.info.queueId}, expected ${expectedQueueId}`,
-    );
+  // Which queues count is a rule of the challenge, so it is enforced against
+  // each match's own queueId rather than trusted from a query parameter.
+  if (!allowedQueues.includes(match.info.queueId)) {
     return null;
   }
 
