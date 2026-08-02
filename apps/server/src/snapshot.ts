@@ -19,7 +19,7 @@ import {
   listPlayers,
   setLastPosition,
 } from './db/players';
-import { balanceFor, lastHits } from './db/shells';
+import { balanceFor, lastHits, pendingThrows } from './db/shells';
 import { newLeaderEmbed } from './discord/embeds';
 import type { DiscordNotifier } from './discord/notifier';
 import { computeStreak, topChampions } from './sync/helpers';
@@ -62,6 +62,7 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
       extras: extraTotalsFor(db, player.id),
       shells: balanceFor(db, player.id).available,
       lastHit: hits.get(player.id) ?? null,
+      owes: pendingThrows(db, player.id).map((row) => row.challengeName),
     };
   });
 

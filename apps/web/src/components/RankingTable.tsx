@@ -364,7 +364,9 @@ function SplitBar({ wins, losses }: { wins: number; losses: number }) {
 function ShellCount({ player }: { player: RankedPlayer }) {
   const hit = player.lastHit;
 
-  if (player.shells === 0 && !hit) {
+  const owed = player.owes.length;
+
+  if (player.shells === 0 && !hit && owed === 0) {
     return <span className="text-ink-3">—</span>;
   }
 
@@ -384,7 +386,20 @@ function ShellCount({ player }: { player: RankedPlayer }) {
         {player.shells}
       </span>
 
-      {hit && (
+      {owed > 0 && (
+        <span
+          className="tabular rounded px-1 text-[0.62rem] font-semibold"
+          style={{
+            color: 'var(--color-mark-amber)',
+            background: 'color-mix(in oklab, var(--color-mark-amber) 16%, transparent)',
+          }}
+          title={`${owed} challenge${owed > 1 ? 's' : ''} owed`}
+        >
+          {owed}
+        </span>
+      )}
+
+      {(hit || owed > 0) && (
         <span
           role="tooltip"
           className={classNames(
@@ -393,16 +408,39 @@ function ShellCount({ player }: { player: RankedPlayer }) {
             'opacity-0 transition-opacity group-hover/shell:opacity-100 group-focus/shell:opacity-100',
           )}
         >
-          <span className="eyebrow block text-ink-3">Last shell taken</span>
-          <span
-            className="mt-1 block text-fluid-xs font-medium"
-            style={{ color: 'var(--color-accent)' }}
-          >
-            {hit.challengeName}
-          </span>
-          {hit.fromName && (
-            <span className="mt-0.5 block text-[0.68rem] text-ink-3">
-              fired by {hit.fromName}
+          {hit && (
+            <>
+              <span className="eyebrow block text-ink-3">Last shell taken</span>
+              <span
+                className="mt-1 block text-fluid-xs font-medium"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                {hit.challengeName}
+              </span>
+              {hit.fromName && (
+                <span className="mt-0.5 block text-[0.68rem] text-ink-3">
+                  fired by {hit.fromName}
+                </span>
+              )}
+            </>
+          )}
+
+          {owed > 0 && (
+            <span className={hit ? 'mt-2 block border-t border-line pt-2' : 'block'}>
+              <span className="eyebrow block text-ink-3">
+                Still owes {owed}
+              </span>
+              <ul className="mt-1 space-y-0.5">
+                {player.owes.slice(0, 3).map((name, index) => (
+                  <li
+                    key={`${name}-${index}`}
+                    className="truncate text-[0.68rem]"
+                    style={{ color: 'var(--color-mark-amber)' }}
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
             </span>
           )}
         </span>

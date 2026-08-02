@@ -361,3 +361,64 @@ export function lastHits(db: Db): Map<string, LastHitRow> {
     ]),
   );
 }
+
+export interface PendingThrow {
+  id: string;
+  toPlayer: string;
+  challengeName: string;
+  fromName: string | null;
+  thrownAt: number;
+}
+
+/** Challenges a player still owes, oldest first. */
+export function pendingThrows(db: Db, playerId: string): PendingThrow[] {
+  return db
+    .prepare(
+      `SELECT t.id, t.to_player AS toPlayer, t.challenge_name AS challengeName,
+              p.display_name AS fromName, t.thrown_at AS thrownAt
+       FROM shell_throws t
+       LEFT JOIN players p ON p.id = t.from_player
+       WHERE t.to_player = ? AND t.fulfilled_match_id IS NULL
+       ORDER BY t.thrown_at ASC`,
+    )
+    .all(playerId) as PendingThrow[];
+}
+
+/**
+ * Marks the oldest outstanding challenge as served by this match.
+ *
+ * The rule is a timestamp comparison, and it is exactly why no "was he in a
+ * game?" flag is needed: a match already under way when the shell landed has a
+ * `gameCreation` earlier than `thrown_at`, so it cannot settle anything. The
+ * first game started *after* being hit is the one that counts.
+ *
+ * One match clears one challenge, so ten incoming shells cost ten games.
+ */
+export function fulfillOldestThrow(
+  db: Db,
+  playerId: string,
+  matchId: string,
+  playedAt: number,
+): PendingThrow | null {
+  const next = db
+    .prepare(
+      `SELECT t.id, t.to_player AS toPlayer, t.challenge_name AS challengeName,
+              p.display_name AS fromName, t.thrown_at AS thrownAt
+       FROM shell_throws t
+       LEFT JOIN players p ON p.id = t.from_player
+       WHERE t.to_player = ?
+         AND t.fulfilled_match_id IS NULL
+         AND t.thrown_at < ?
+       ORDER BY t.thrown_at ASC
+       LIMIT 1`,
+    )
+    .get(playerId, playedAt) as PendingThrow | undefined;
+
+  if (!next) return null;
+
+  db.prepare(
+    'UPDATE shell_throws SET fulfilled_match_id = ?, completed_at = ? WHERE id = ?',
+  ).run(matchId, Date.now(), next.id);
+
+  return next;
+}

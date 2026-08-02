@@ -86,6 +86,22 @@ export interface MatchDto {
   };
 }
 
+export interface ActiveGameParticipantDto {
+  puuid: string;
+  championId: number;
+  teamId: number;
+  /** Riot ID. `summonerName` is deprecated and now comes back empty. */
+  riotId?: string;
+  summonerName?: string;
+}
+
+export interface ActiveGameDto {
+  gameId: number;
+  gameQueueConfigId: number;
+  gameLength: number;
+  participants: ActiveGameParticipantDto[];
+}
+
 const MAX_RETRIES = 3;
 
 export class RiotClient {
@@ -191,15 +207,17 @@ export class RiotClient {
     );
   }
 
-  /** SPECTATOR-V5 — platform routing. 404 simply means "not in a game". */
-  async isInGame(puuid: string): Promise<boolean> {
+  /**
+   * SPECTATOR-V5 — platform routing. A 404 simply means "not in a game", which
+   * is the common case, so it comes back as null rather than as a throw.
+   */
+  async getActiveGame(puuid: string): Promise<ActiveGameDto | null> {
     try {
-      await this.request(
+      return await this.request<ActiveGameDto>(
         `${this.platformBase}/lol/spectator/v5/active-games/by-summoner/${puuid}`,
       );
-      return true;
     } catch (error) {
-      if (error instanceof RiotApiError && error.status === 404) return false;
+      if (error instanceof RiotApiError && error.status === 404) return null;
       throw error;
     }
   }

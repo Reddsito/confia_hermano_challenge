@@ -162,6 +162,9 @@ const MIGRATIONS: string[] = [
   // Added after player_matches already existed, so it has to be an ALTER.
   // Needed to count wins carrying Smite without re-reading every match.
   `ALTER TABLE player_matches ADD COLUMN used_smite INTEGER NOT NULL DEFAULT 0;`,
+
+  // Which game actually paid off a challenge. Nullable while it is still owed.
+  `ALTER TABLE shell_throws ADD COLUMN fulfilled_match_id TEXT;`,
 ];
 
 export function openDatabase(path: string): Db {

@@ -1,5 +1,10 @@
 import type { ChampionUsage, MatchTotals } from '@challenge/core/domain';
-import { RiotApiError, type MatchDto, type RiotClient } from '@challenge/core/riot';
+import {
+  RiotApiError,
+  type ActiveGameDto,
+  type MatchDto,
+  type RiotClient,
+} from '@challenge/core/riot';
 
 import {
   SMITE_SPELL_ID,
@@ -13,12 +18,15 @@ import {
 import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import { insertPlayerMatch, recordRankSample, type PlayerMatchRow } from '../db/matches';
-import { awardShells, progressFor } from '../db/shells';
+import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
 import {
+  challengeServedEmbed,
   inGameEmbed,
   matchFinishedEmbed,
   rankChangeEmbed,
+  type LiveTeams,
 } from '../discord/embeds';
+import { championNames } from '../riot/champions';
 import type { DiscordNotifier } from '../discord/notifier';
 import {
   emptyTotals,
@@ -196,6 +204,19 @@ async function syncPlayer(
         },
       );
 
+      const served = fulfillOldestThrow(db, player.id, matchId, row.playedAt);
+      if (served) {
+        notifier.push(
+          'challenge_served',
+          challengeServedEmbed(player.displayName, served.challengeName, row.win, {
+            tournamentName: config.tournament.name,
+            siteUrl: config.siteUrl || undefined,
+            opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
+            profileIconId: summoner.profileIconId,
+          }),
+        );
+      }
+
       if (earned.length > 0) {
         const awarded = awardShells(db, player.id, matchId, earned);
         if (awarded > 0) {
@@ -242,7 +263,8 @@ async function syncPlayer(
   recordRankSample(db, player.id, currentRank);
   announceRankChange(player, previousRank, currentRank, config, notifier, summoner.profileIconId);
 
-  const inGame = await client.isInGame(puuid).catch(() => false);
+  const activeGame = await client.getActiveGame(puuid).catch(() => null);
+  const inGame = activeGame !== null;
   db.prepare('UPDATE player_state SET in_game = ? WHERE player_id = ?').run(
     inGame ? 1 : 0,
     player.id,
@@ -250,19 +272,54 @@ async function syncPlayer(
 
   // Only the transition is interesting; re-announcing every cycle while someone
   // sits in a 40-minute game would be spam.
-  if (inGame && !wasInGame) {
+  if (activeGame && !wasInGame) {
     notifier.push(
       'in_game',
-      inGameEmbed(player, currentRank, {
-        tournamentName: config.tournament.name,
-        siteUrl: config.siteUrl || undefined,
-        opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
-        profileIconId: summoner.profileIconId,
-      }),
+      inGameEmbed(
+        player,
+        currentRank,
+        {
+          tournamentName: config.tournament.name,
+          siteUrl: config.siteUrl || undefined,
+          opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
+          profileIconId: summoner.profileIconId,
+        },
+        await describeTeams(activeGame, puuid),
+      ),
     );
   }
 
   return fresh.length;
+}
+
+/**
+ * Turns the live game into two champion lists, the tracked player's own pick
+ * marked. Names come from Data Dragon, which needs no key and is cached, so
+ * this costs nothing against the Riot rate limit.
+ */
+async function describeTeams(
+  game: ActiveGameDto,
+  puuid: string,
+): Promise<LiveTeams | null> {
+  const me = game.participants.find(
+    (participant) => participant.puuid === puuid,
+  );
+  if (!me) return null;
+
+  const names = await championNames();
+  const label = (participant: (typeof game.participants)[number]) => {
+    const champion = names.get(participant.championId) ?? `#${participant.championId}`;
+    return participant.puuid === puuid ? `**${champion}**` : champion;
+  };
+
+  return {
+    allies: game.participants
+      .filter((participant) => participant.teamId === me.teamId)
+      .map(label),
+    enemies: game.participants
+      .filter((participant) => participant.teamId !== me.teamId)
+      .map(label),
+  };
 }
 
 /** Fires only when the tier or the division moved, not on every LP change. */

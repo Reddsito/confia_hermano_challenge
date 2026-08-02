@@ -43,12 +43,27 @@ export interface EmbedContext {
   profileIconId: number | null;
 }
 
-/** Someone just queued up. Short and quiet — this fires often. */
+export interface LiveTeams {
+  allies: string[];
+  enemies: string[];
+}
+
+/** Someone just queued up, with both line-ups so the channel can follow along. */
 export function inGameEmbed(
   player: PlayerRow,
   rank: Rank | null,
   context: EmbedContext,
+  teams: LiveTeams | null,
 ): DiscordEmbed {
+  const fields: DiscordEmbed['fields'] = [];
+
+  if (teams && (teams.allies.length > 0 || teams.enemies.length > 0)) {
+    fields.push(
+      { name: 'Su equipo', value: teams.allies.join('\n') || '—', inline: true },
+      { name: 'Rivales', value: teams.enemies.join('\n') || '—', inline: true },
+    );
+  }
+
   return {
     color: tierColorInt(rank),
     author: {
@@ -57,6 +72,7 @@ export function inGameEmbed(
       url: context.opggUrl,
     },
     description: rank ? `Ahora mismo en **${formatRank(rank)}**` : undefined,
+    fields: fields.length > 0 ? fields : undefined,
     footer: { text: context.tournamentName },
     timestamp: new Date().toISOString(),
   };
@@ -189,6 +205,26 @@ export function shellThrowEmbed(
     description: `**${challengeName}**${challengeDetail ? `\n${challengeDetail}` : ''}`,
     thumbnail: { url: profileIcon(context.profileIconId) ?? championIcon('Ahri') },
     url: context.siteUrl,
+    footer: { text: context.tournamentName },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** A challenge has been paid off by playing the next game. */
+export function challengeServedEmbed(
+  playerName: string,
+  challengeName: string,
+  won: boolean,
+  context: EmbedContext,
+): DiscordEmbed {
+  return {
+    color: won ? 0x0fa892 : 0xec3a5e,
+    author: {
+      name: `${playerName} cumplió su reto`,
+      icon_url: profileIcon(context.profileIconId),
+      url: context.opggUrl,
+    },
+    description: `**${challengeName}**\n${won ? 'Y encima ganó.' : 'Y perdió igual.'}`,
     footer: { text: context.tournamentName },
     timestamp: new Date().toISOString(),
   };

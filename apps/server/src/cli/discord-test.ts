@@ -2,10 +2,12 @@ import { opggUrl } from '@challenge/core/domain';
 
 import { listPlayers } from '../db/players';
 import {
+  challengeServedEmbed,
   inGameEmbed,
   matchFinishedEmbed,
   newLeaderEmbed,
   rankChangeEmbed,
+  shellThrowEmbed,
 } from '../discord/embeds';
 import { DiscordNotifier } from '../discord/notifier';
 import { bootstrap } from './bootstrap';
@@ -75,7 +77,12 @@ const samples = [
   )],
   ['rank_change', rankChangeEmbed(player, previousRank, rank, true, context)],
   ['new_leader', newLeaderEmbed(player, rank, 'becksito', context)],
-  ['in_game', inGameEmbed(player, rank, context)],
+  ['in_game', inGameEmbed(player, rank, context, {
+    allies: ['**Ahri**', 'Lee Sin', 'Jinx', 'Thresh', 'Garen'],
+    enemies: ['Yasuo', 'Vi', 'Caitlyn', 'Yuumi', 'Sett'],
+  })],
+  ['shell_thrown', shellThrowEmbed('becksito', player.displayName, 'Juega de support la próxima', 'Aunque no sea tu rol', context)],
+  ['challenge_served', challengeServedEmbed(player.displayName, 'Sin usar el chat toda la partida', true, context)],
 ] as const;
 
 if (!config.discord) {

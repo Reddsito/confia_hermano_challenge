@@ -75,6 +75,8 @@ export interface PlayerEntry {
   shells: number;
   /** The most recent challenge fired at them, for the hover card. */
   lastHit: LastHit | null;
+  /** Challenges still owed, oldest first. One game settles one of them. */
+  owes: string[];
 }
 
 export interface LastHit {
