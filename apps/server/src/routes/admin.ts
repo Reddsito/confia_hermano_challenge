@@ -171,16 +171,43 @@ export function adminRoutes(
         puuid: account.puuid,
       };
     } catch (error) {
-      if (error instanceof RiotApiError && error.status === 404) {
+      // Logged in full so the terminal shows the real cause; the browser gets
+      // a message that says what to actually do about it.
+      console.error('[admin] Riot lookup failed:', error);
+
+      if (error instanceof RiotApiError) {
+        if (error.status === 404) {
+          return {
+            ok: false,
+            error: `No account found for ${gameName}#${tagLine} on ${config.platform}. Check the spelling and the tag — the tag is what comes after the # in the client.`,
+            status: 404,
+          };
+        }
+        if (error.status === 401 || error.status === 403) {
+          return {
+            ok: false,
+            error:
+              'Riot rejected the API key. A development key expires every 24 hours — generate a fresh one at developer.riotgames.com and restart the server.',
+            status: 502,
+          };
+        }
+        if (error.status === 429) {
+          return {
+            ok: false,
+            error: 'Rate limit reached. Wait a minute and try again.',
+            status: 502,
+          };
+        }
         return {
           ok: false,
-          error: `No account found for ${gameName}#${tagLine} on ${config.platform}. Check the spelling and the tag.`,
-          status: 404,
+          error: `Riot answered ${error.status}. Check the server logs.`,
+          status: 502,
         };
       }
+
       return {
         ok: false,
-        error: 'Riot did not answer. Try again in a minute.',
+        error: 'Could not reach Riot. Check the server logs and your connection.',
         status: 502,
       };
     }

@@ -87,12 +87,14 @@ export function Panel() {
         await action();
         await reload();
         if (success) setNotice(success);
+        return true;
       } catch (cause) {
         setError(
           cause instanceof ApiError || cause instanceof Error
             ? cause.message
             : String(cause),
         );
+        return false;
       } finally {
         setBusy(false);
       }
@@ -267,17 +269,18 @@ function AddPlayerForm({
   onAdd,
 }: {
   busy: boolean;
-  onAdd: (draft: Draft) => void;
+  onAdd: (draft: Draft) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
   return (
     <form
       className="rounded-2xl border border-line bg-carbon p-4"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        onAdd(draft);
-        setDraft(EMPTY_DRAFT);
+        // Only clear the fields once the player actually exists. A rejected
+        // Riot ID or a dead backend must not cost someone their typing.
+        if (await onAdd(draft)) setDraft(EMPTY_DRAFT);
       }}
     >
       <h3 className="eyebrow text-ink-3">Add a player</h3>
@@ -329,7 +332,7 @@ function PlayerRow({
   player: RosterPlayer;
   platform: string;
   busy: boolean;
-  onSave: (draft: Draft) => void;
+  onSave: (draft: Draft) => Promise<boolean>;
   onToggle: () => void;
   onDelete: () => void;
 }) {
@@ -384,9 +387,8 @@ function PlayerRow({
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              onSave(draft);
-              setEditing(false);
+            onClick={async () => {
+              if (await onSave(draft)) setEditing(false);
             }}
             className="eyebrow min-h-9 rounded-full px-4 text-void disabled:opacity-40"
             style={{ background: 'var(--color-accent)' }}

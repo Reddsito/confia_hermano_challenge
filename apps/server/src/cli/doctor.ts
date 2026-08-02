@@ -26,17 +26,18 @@ const route = regionalRouteFor(config.platform);
 console.log(`platform: ${config.platform}   regional route: ${route}`);
 
 const players = listPlayers(db, 'approved');
-if (players.length === 0) {
-  console.log('\nNo approved players yet. Run: pnpm seed\n');
-  db.close();
-  process.exit(0);
-}
 
-// One raw request so the rate-limit headers can be read off the response.
-const first = players[0]!;
+// One raw request so the rate-limit headers can be read off the response. With
+// an empty roster we probe a name that will not exist: a 404 still proves the
+// key is valid, which is exactly what we want to know before adding anyone.
+const probeTarget = players[0] ?? {
+  gameName: 'zzz-key-check-zzz',
+  tagLine: 'LAN',
+};
+
 const probe = await fetch(
   `https://${route}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/` +
-    `${encodeURIComponent(first.gameName)}/${encodeURIComponent(first.tagLine)}`,
+    `${encodeURIComponent(probeTarget.gameName)}/${encodeURIComponent(probeTarget.tagLine)}`,
   { headers: { 'X-Riot-Token': config.riotApiKey } },
 );
 
@@ -53,6 +54,14 @@ console.log('\nrate limits reported by Riot:');
 console.log(`  app:    ${probe.headers.get('X-App-Rate-Limit') ?? 'n/a'}`);
 console.log(`  used:   ${probe.headers.get('X-App-Rate-Limit-Count') ?? 'n/a'}`);
 console.log(`  method: ${probe.headers.get('X-Method-Rate-Limit') ?? 'n/a'}\n`);
+
+if (players.length === 0) {
+  console.log(
+    `[${OK}] The API key works. Add players at /panel — the roster is empty.\n`,
+  );
+  db.close();
+  process.exit(0);
+}
 
 console.log('roster:');
 const client = new RiotClient(config.riotApiKey, config.platform);
