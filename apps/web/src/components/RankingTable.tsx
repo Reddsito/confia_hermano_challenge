@@ -8,10 +8,12 @@ import {
   ROLE_LABEL,
   StreakPill,
   championIconUrl,
+  classNames,
   formatPercent,
   formatSigned,
   tierColor,
 } from './ui';
+import { ShellMark } from './BlueShells';
 import { RoleIcon, TierCrest } from './icons';
 
 export function RankingTable({
@@ -58,6 +60,9 @@ export function RankingTable({
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
                 Form
+              </th>
+              <th scope="col" className="px-2 pb-1 text-center font-semibold">
+                Shells
               </th>
               <th scope="col" className="px-2 pb-1 text-right font-semibold">
                 LP
@@ -187,6 +192,10 @@ export function RankingTable({
                     </div>
                   </td>
 
+                  <td className="px-2 py-3 text-center">
+                    <ShellCount player={player} />
+                  </td>
+
                   <td className="px-2 py-3 text-right">
                     <LpDelta value={player.ladderPointsGained} />
                   </td>
@@ -281,6 +290,7 @@ export function RankingTable({
                 <span className="tabular text-fluid-xs text-ink-2">
                   KDA {player.kda.toFixed(2)}
                 </span>
+                <ShellCount player={player} />
                 <span onClick={(event) => event.stopPropagation()}>
                   <OpggLink url={player.opggUrl} />
                 </span>
@@ -343,6 +353,61 @@ function SplitBar({ wins, losses }: { wins: number; losses: number }) {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Unspent shells, with the last challenge that landed on this player revealed
+ * on hover. The count alone says they are dangerous; the hover says what they
+ * are currently paying for.
+ */
+function ShellCount({ player }: { player: RankedPlayer }) {
+  const hit = player.lastHit;
+
+  if (player.shells === 0 && !hit) {
+    return <span className="text-ink-3">—</span>;
+  }
+
+  return (
+    <span
+      className="group/shell relative inline-flex items-center gap-1"
+      tabIndex={hit ? 0 : -1}
+      onClick={(event) => hit && event.stopPropagation()}
+    >
+      <ShellMark size={16} filled={player.shells > 0} />
+      <span
+        className="tabular text-fluid-xs font-semibold"
+        style={{
+          color: player.shells > 0 ? 'var(--color-accent)' : 'var(--color-ink-3)',
+        }}
+      >
+        {player.shells}
+      </span>
+
+      {hit && (
+        <span
+          role="tooltip"
+          className={classNames(
+            'pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-56 -translate-x-1/2',
+            'rounded-lg border border-line bg-carbon-2 p-2.5 text-left shadow-lg',
+            'opacity-0 transition-opacity group-hover/shell:opacity-100 group-focus/shell:opacity-100',
+          )}
+        >
+          <span className="eyebrow block text-ink-3">Last shell taken</span>
+          <span
+            className="mt-1 block text-fluid-xs font-medium"
+            style={{ color: 'var(--color-accent)' }}
+          >
+            {hit.challengeName}
+          </span>
+          {hit.fromName && (
+            <span className="mt-0.5 block text-[0.68rem] text-ink-3">
+              fired by {hit.fromName}
+            </span>
+          )}
+        </span>
+      )}
+    </span>
   );
 }
 

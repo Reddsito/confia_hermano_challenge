@@ -71,6 +71,16 @@ export interface PlayerEntry {
   error: string | null;
   /** Derived from the per-match table; absent until a cycle has stored games. */
   extras: PlayerExtras | null;
+  /** Unspent blue shells this player is holding. */
+  shells: number;
+  /** The most recent challenge fired at them, for the hover card. */
+  lastHit: LastHit | null;
+}
+
+export interface LastHit {
+  challengeName: string;
+  fromName: string | null;
+  at: number;
 }
 
 export interface PlayerExtras {

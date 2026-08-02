@@ -328,3 +328,36 @@ export function adjustShells(
 
   return balanceFor(db, playerId);
 }
+
+export interface LastHitRow {
+  challengeName: string;
+  fromName: string | null;
+  at: number;
+}
+
+/** The most recent shell that landed on each player, keyed by player id. */
+export function lastHits(db: Db): Map<string, LastHitRow> {
+  const rows = db
+    .prepare(
+      `SELECT t.to_player      AS toPlayer,
+              t.challenge_name AS challengeName,
+              p.display_name   AS fromName,
+              t.thrown_at      AS at
+       FROM shell_throws t
+       LEFT JOIN players p ON p.id = t.from_player
+       -- "inner" cannot be an alias: SQL reserves it for INNER JOIN.
+       WHERE t.thrown_at = (
+         SELECT MAX(latest.thrown_at)
+         FROM shell_throws latest
+         WHERE latest.to_player = t.to_player
+       )`,
+    )
+    .all() as Array<LastHitRow & { toPlayer: string }>;
+
+  return new Map(
+    rows.map((row) => [
+      row.toPlayer,
+      { challengeName: row.challengeName, fromName: row.fromName, at: row.at },
+    ]),
+  );
+}

@@ -19,6 +19,7 @@ import {
   listPlayers,
   setLastPosition,
 } from './db/players';
+import { balanceFor, lastHits } from './db/shells';
 import { newLeaderEmbed } from './discord/embeds';
 import type { DiscordNotifier } from './discord/notifier';
 import { computeStreak, topChampions } from './sync/helpers';
@@ -35,6 +36,7 @@ export const LAST_CYCLE_KEY = 'last_cycle_at';
 export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
   const players = listPlayers(db, 'approved');
   const states = listPlayerStates(db);
+  const hits = lastHits(db);
 
   const entries: PlayerEntry[] = players.map((player) => {
     const state = states.get(player.id);
@@ -58,6 +60,8 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
       inGame: state?.inGame ?? false,
       error: state?.lastError ?? null,
       extras: extraTotalsFor(db, player.id),
+      shells: balanceFor(db, player.id).available,
+      lastHit: hits.get(player.id) ?? null,
     };
   });
 
