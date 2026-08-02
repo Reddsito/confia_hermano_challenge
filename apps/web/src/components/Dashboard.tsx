@@ -107,7 +107,12 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
   return (
     <div>
-      <nav className="sticky top-0 z-20 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-void/85 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+      {/*
+        Sticky only from md up. On a phone the three rows below stack into a
+        ~150px bar, which would sit on top of a 667px screen permanently and eat
+        a fifth of the leaderboard.
+      */}
+      <nav className="relative z-20 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line bg-void/85 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 md:sticky md:top-0">
         <RefreshMeter
           generatedAt={snapshot.generatedAt}
           nextUpdateAt={snapshot.nextUpdateAt}
@@ -117,7 +122,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           source={snapshot.source}
         />
 
-        <div className="order-3 w-full lg:order-none lg:w-auto">
+        <div className="order-first w-full lg:order-none lg:w-auto">
           <Tabs
             tabs={sections}
             active={section}

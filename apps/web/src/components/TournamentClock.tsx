@@ -21,7 +21,7 @@ export function TournamentClock({
   ];
 
   return (
-    <div className="inline-flex items-center gap-3 rounded-full border border-line bg-carbon/80 px-4 py-2 backdrop-blur">
+    <div className="inline-flex shrink items-center gap-2 rounded-full border border-line bg-carbon/80 px-3 py-2 backdrop-blur sm:gap-3 sm:px-4">
       <span
         aria-hidden="true"
         className="h-2 w-2 shrink-0 rounded-full"
@@ -30,7 +30,7 @@ export function TournamentClock({
           boxShadow: '0 0 10px 0 var(--color-accent)',
         }}
       />
-      <span className="eyebrow max-w-[6.5rem] leading-tight text-ink-3">
+      <span className="eyebrow hidden leading-tight text-ink-3 sm:inline">
         {countdown.expired
           ? 'Challenge over'
           : notStarted

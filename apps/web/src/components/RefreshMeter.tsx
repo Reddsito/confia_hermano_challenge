@@ -33,11 +33,11 @@ export function RefreshMeter({
   );
 
   return (
-    <div className="inline-flex items-center gap-2.5">
+    <div className="inline-flex shrink items-center gap-2.5">
       <ProgressRing ratio={remaining} pulsing={isRefreshing} />
 
-      <div className="leading-tight">
-        <p className="eyebrow text-ink-3">
+      <div className="min-w-0 leading-tight">
+        <p className="eyebrow truncate text-ink-3">
           Last update{' '}
           <span className="text-ink-2">
             {ageMinutes === 0 ? 'moments ago' : `${ageMinutes} min ago`}
