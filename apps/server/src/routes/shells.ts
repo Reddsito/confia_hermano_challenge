@@ -14,6 +14,7 @@ import {
 } from '../db/shells';
 import { shellThrowEmbed } from '../discord/embeds';
 import { DiscordNotifier } from '../discord/notifier';
+import { mentionFor } from '../db/users';
 import { currentUser } from './auth';
 
 export function shellRoutes(db: Db, config: ServerConfig) {
@@ -102,6 +103,10 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     const notifier = new DiscordNotifier(config.discord);
     if (notifier.enabled) {
       const state = getPlayerState(db, target.id);
+      // Mentioning the target only works from the message body, so it rides
+      // alongside the embed rather than inside it.
+      const mention = mentionFor(db, target.id);
+
       notifier.push(
         'shell_thrown',
         shellThrowEmbed(
@@ -116,6 +121,7 @@ export function shellRoutes(db: Db, config: ServerConfig) {
             profileIconId: state?.profileIconId ?? null,
           },
         ),
+        mention ? `${mention} te cayó una Blue Shell` : undefined,
       );
       await notifier.flush();
     }

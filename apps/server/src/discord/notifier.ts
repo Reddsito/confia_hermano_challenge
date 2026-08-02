@@ -20,6 +20,11 @@ export interface DiscordConfig {
 interface Queued {
   event: DiscordEvent;
   embed: DiscordEmbed;
+  /**
+   * Plain text sent alongside the embed. Mentions only notify from here —
+   * Discord never pings for a mention written inside an embed.
+   */
+  content?: string;
 }
 
 /** Discord accepts at most 10 embeds per message. */
@@ -46,9 +51,9 @@ export class DiscordNotifier {
     return this.config?.events.has(event) ?? false;
   }
 
-  push(event: DiscordEvent, embed: DiscordEmbed): void {
+  push(event: DiscordEvent, embed: DiscordEmbed, content?: string): void {
     if (!this.wants(event)) return;
-    this.queue.push({ event, embed });
+    this.queue.push({ event, embed, content });
   }
 
   async flush(): Promise<void> {
@@ -59,11 +64,22 @@ export class DiscordNotifier {
 
     for (let i = 0; i < pending.length; i += MAX_EMBEDS_PER_MESSAGE) {
       const batch = pending.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
-      await this.send(batch.map((item) => item.embed));
+      const content = batch
+        .map((item) => item.content)
+        .filter(Boolean)
+        .join('\n');
+
+      await this.send(
+        batch.map((item) => item.embed),
+        content || undefined,
+      );
     }
   }
 
-  private async send(embeds: DiscordEmbed[]): Promise<void> {
+  private async send(
+    embeds: DiscordEmbed[],
+    content?: string,
+  ): Promise<void> {
     if (!this.config) return;
 
     try {
@@ -73,6 +89,10 @@ export class DiscordNotifier {
         body: JSON.stringify({
           username: this.config.username,
           avatar_url: this.config.avatarUrl,
+          content,
+          // Only user mentions notify. Without this, a stray @everyone in a
+          // challenge name would ping the whole server.
+          allowed_mentions: { parse: ['users'] },
           embeds,
         }),
       });
@@ -80,7 +100,7 @@ export class DiscordNotifier {
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get('Retry-After') ?? '2');
         await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-        await this.send(embeds);
+        await this.send(embeds, content);
         return;
       }
 

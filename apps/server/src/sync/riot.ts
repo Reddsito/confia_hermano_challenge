@@ -24,6 +24,7 @@ import {
   type PlayerMatchRow,
 } from '../db/matches';
 import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
+import { mentionFor } from '../db/users';
 import {
   challengeServedEmbed,
   inGameEmbed,
@@ -248,6 +249,9 @@ async function syncPlayer(
             opggUrl: opggUrl(config.platform, player.gameName, player.tagLine),
             profileIconId: summoner.profileIconId,
           }),
+          mentionFor(db, player.id)
+            ? `${mentionFor(db, player.id)} cumpliste tu reto`
+            : undefined,
         );
       }
 

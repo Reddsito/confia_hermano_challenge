@@ -91,3 +91,20 @@ export function linkDiscordUser(
 
   return true;
 }
+
+/** The Discord account linked to a roster player, if any. */
+export function getDiscordUserByPlayer(
+  db: Db,
+  playerId: string,
+): DiscordUserRow | null {
+  const row = db
+    .prepare('SELECT * FROM discord_users WHERE player_id = ?')
+    .get(playerId) as RawUser | undefined;
+  return row ? toUser(row) : null;
+}
+
+/** A Discord mention, or null when the player has not linked an account. */
+export function mentionFor(db: Db, playerId: string): string | null {
+  const user = getDiscordUserByPlayer(db, playerId);
+  return user ? `<@${user.discordId}>` : null;
+}

@@ -3,6 +3,7 @@ import { RiotClient } from '@challenge/core/riot';
 import { DiscordNotifier } from '../discord/notifier';
 import { shellStolenEmbed } from '../discord/embeds';
 import { listPlayers } from '../db/players';
+import { mentionFor } from '../db/users';
 import { resolveSteals } from '../db/shells';
 
 import type { ServerConfig } from '../config';
@@ -67,6 +68,8 @@ export class Scheduler {
         `[shells] ${winner} ${steal.kept ? 'stole' : 'destroyed'} ${loser}'s shell`,
       );
 
+      const mention = mentionFor(this.db, steal.loserId);
+
       this.notifier.push(
         'shell_stolen',
         shellStolenEmbed(winner, loser, steal.kept, {
@@ -75,6 +78,9 @@ export class Scheduler {
           opggUrl: this.config.siteUrl || '',
           profileIconId: null,
         }),
+        mention
+          ? `${mention} perdiste tu Blue Shell contra ${winner}`
+          : undefined,
       );
     }
   }
