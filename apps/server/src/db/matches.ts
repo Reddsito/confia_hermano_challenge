@@ -30,6 +30,7 @@ export interface PlayerMatchRow {
   surrendered: boolean;
   killParticipation: number | null;
   usedSmite: boolean;
+  queueId: number;
 }
 
 export function insertPlayerMatch(
@@ -44,8 +45,8 @@ export function insertPlayerMatch(
        gold_earned, damage_to_champions, damage_taken, vision_score,
        time_dead_seconds, penta_kills, quadra_kills, triple_kills,
        largest_spree, solo_kills, first_blood, surrendered, kill_participation,
-       used_smite
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       used_smite, queue_id
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     row.playerId,
     row.matchId,
@@ -73,6 +74,7 @@ export function insertPlayerMatch(
     row.surrendered ? 1 : 0,
     row.killParticipation,
     row.usedSmite ? 1 : 0,
+    row.queueId,
   );
 }
 

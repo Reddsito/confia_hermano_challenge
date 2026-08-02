@@ -73,7 +73,7 @@ for (const player of listPlayers(db, 'approved')) {
     );
 
     const durationMinutes = match.info.gameDuration / 60;
-    if (!me || durationMinutes < 5) {
+    if (!me || durationMinutes < 5 || match.info.queueId !== queueId) {
       skipped += 1;
       continue;
     }
@@ -105,6 +105,7 @@ for (const player of listPlayers(db, 'approved')) {
       surrendered: Boolean(me.gameEndedInSurrender),
       killParticipation: me.challenges?.killParticipation ?? null,
       usedSmite: me.summoner1Id === 11 || me.summoner2Id === 11,
+      queueId: match.info.queueId,
     }, force);
     added += 1;
   }

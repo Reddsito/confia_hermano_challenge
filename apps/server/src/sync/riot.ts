@@ -178,7 +178,15 @@ async function syncPlayer(
 
   for (const matchId of fresh) {
     const match = await client.getMatch(matchId);
-    const row = applyMatch(totals, championUsage, match, puuid, player.id, matchId);
+    const row = applyMatch(
+      totals,
+      championUsage,
+      match,
+      puuid,
+      player.id,
+      matchId,
+      queueId,
+    );
 
     if (row !== null) {
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
@@ -362,7 +370,18 @@ function applyMatch(
   puuid: string,
   playerId: string,
   matchId: string,
+  expectedQueueId: number,
 ): PlayerMatchRow | null {
+  // The match list is already filtered by queue, so this should never trigger.
+  // It exists because "only ranked solo counts" is a rule of the challenge, and
+  // a rule that depends on a query parameter is one bad refactor from breaking.
+  if (match.info.queueId !== expectedQueueId) {
+    console.warn(
+      `[sync] ignoring ${matchId}: queue ${match.info.queueId}, expected ${expectedQueueId}`,
+    );
+    return null;
+  }
+
   const me = match.info.participants.find(
     (participant) => participant.puuid === puuid,
   );
@@ -422,6 +441,7 @@ function applyMatch(
     killParticipation: me.challenges?.killParticipation ?? null,
     usedSmite:
       me.summoner1Id === SMITE_SPELL_ID || me.summoner2Id === SMITE_SPELL_ID,
+    queueId: match.info.queueId,
   };
 }
 

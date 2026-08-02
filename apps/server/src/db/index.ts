@@ -165,6 +165,10 @@ const MIGRATIONS: string[] = [
 
   // Which game actually paid off a challenge. Nullable while it is still owed.
   `ALTER TABLE shell_throws ADD COLUMN fulfilled_match_id TEXT;`,
+
+  // Recorded so "only ranked solo counts" can be checked against the data
+  // rather than trusted because of a query parameter.
+  `ALTER TABLE player_matches ADD COLUMN queue_id INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export function openDatabase(path: string): Db {

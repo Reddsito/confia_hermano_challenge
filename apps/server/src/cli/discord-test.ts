@@ -70,6 +70,7 @@ const samples = [
       surrendered: false,
       killParticipation: 0.68,
       usedSmite: false,
+      queueId: 420,
     },
     rank,
     18,
