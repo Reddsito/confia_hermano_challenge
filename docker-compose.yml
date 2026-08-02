@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     image: challenge-api
+    container_name: challenge-api
     restart: unless-stopped
     env_file:
       - apps/server/.env
@@ -13,13 +14,22 @@ services:
       PORT: 8787
       DATABASE_PATH: /repo/apps/server/data/challenge.db
     volumes:
-      # Named volume, not a bind mount into the image: the SQLite file has to
+      # Named volume, not a path inside the image: the SQLite file has to
       # outlive every rebuild, otherwise the accumulated totals reset.
       - challenge-data:/repo/apps/server/data
-    ports:
-      # Bound to localhost only. Put a TLS terminator (Caddy, nginx, Traefik)
-      # in front — a browser on an HTTPS page cannot call an http:// API.
-      - '127.0.0.1:8787:8787'
+    networks:
+      - proxy
+    # No ports are published on purpose. The only way in is through the reverse
+    # proxy, which reaches this container by name on the shared network.
+
+networks:
+  proxy:
+    # The network an existing Caddy/nginx/Traefik container already runs on.
+    # Find it with:
+    #   docker inspect <proxy-container> \
+    #     --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'
+    external: true
+    name: ${PROXY_NETWORK:-proxy}
 
 volumes:
   challenge-data:

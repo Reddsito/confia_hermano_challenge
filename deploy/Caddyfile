@@ -1,18 +1,15 @@
-# Caddy terminates TLS in front of the API container.
+# Add this block to the Caddyfile your existing Caddy container already uses —
+# do not start a second Caddy, ports 80 and 443 can only be held once.
 #
-# This is not optional: the frontend is served over HTTPS from Cloudflare Pages,
-# and a browser on an HTTPS page refuses to call an http:// endpoint. Without
-# this, every request from the site fails as mixed content.
+# The upstream is the container name on the shared Docker network, not a host
+# port: the API publishes nothing to the host, so the proxy is the only way in.
 #
-# Caddy obtains and renews the certificate automatically. Point an A record at
-# the VPS first, then: caddy run --config deploy/Caddyfile
+# After editing:  docker exec <caddy-container> caddy reload --config /etc/caddy/Caddyfile
 
 api.example.com {
 	encode zstd gzip
 
-	# The container is published on 127.0.0.1 only, so it is never reachable
-	# from the internet except through here.
-	reverse_proxy 127.0.0.1:8787
+	reverse_proxy challenge-api:8787
 
 	log {
 		output file /var/log/caddy/challenge-api.log
