@@ -1,5 +1,5 @@
 import type { TournamentMeta } from '@challenge/core/domain';
-import { useCountdown } from './useCountdown';
+import { useCountdown, useMounted } from './useCountdown';
 
 /**
  * Header pill: the deadline is the one number that frames everything else on
@@ -11,7 +11,9 @@ export function TournamentClock({
   tournament: TournamentMeta;
 }) {
   const countdown = useCountdown(tournament.endsAt);
-  const notStarted = Date.now() < Date.parse(tournament.startsAt);
+  const notStarted = countdown.ready
+    ? Date.now() < Date.parse(tournament.startsAt)
+    : false;
 
   const segments = [
     { label: 'd', value: countdown.days },
@@ -31,21 +33,21 @@ export function TournamentClock({
         }}
       />
       <span className="eyebrow hidden leading-tight text-ink-3 sm:inline">
-        {countdown.expired
+        {countdown.ready && countdown.expired
           ? 'Challenge over'
           : notStarted
             ? 'Starts in'
             : 'Ends in'}
       </span>
 
-      {countdown.expired ? (
+      {countdown.ready && countdown.expired ? (
         <span className="display text-fluid-sm">Final standings</span>
       ) : (
         <span className="flex items-baseline gap-1">
           {segments.map((segment, index) => (
             <span key={segment.label} className="flex items-baseline">
               <span className="tabular text-fluid-lg leading-none font-semibold">
-                {String(segment.value).padStart(2, '0')}
+                {countdown.ready ? String(segment.value).padStart(2, '0') : '--'}
               </span>
               <span className="ml-0.5 text-[0.65rem] text-ink-3">
                 {segment.label}
@@ -69,10 +71,13 @@ export function TournamentProgress({
 }: {
   tournament: TournamentMeta;
 }) {
+  const mounted = useMounted();
   const start = Date.parse(tournament.startsAt);
   const end = Date.parse(tournament.endsAt);
   const span = Math.max(end - start, 1);
-  const progress = Math.min(Math.max(Date.now() - start, 0), span) / span;
+  const progress = mounted
+    ? Math.min(Math.max(Date.now() - start, 0), span) / span
+    : 0;
 
   return (
     <div className="flex items-center gap-3">

@@ -1,4 +1,4 @@
-import { formatDuration, useCountdown } from './useCountdown';
+import { formatDuration, useCountdown, useMounted } from './useCountdown';
 import { classNames } from './ui';
 
 interface RefreshMeterProps {
@@ -23,12 +23,14 @@ export function RefreshMeter({
 }: RefreshMeterProps) {
   const countdown = useCountdown(nextUpdateAt);
   const intervalMs = Math.max(intervalMinutes * 60_000, 1);
-  const remaining = Math.min(countdown.totalMs / intervalMs, 1);
+  const remaining = countdown.ready
+    ? Math.min(countdown.totalMs / intervalMs, 1)
+    : 0;
 
-  const ageMinutes = Math.max(
-    Math.floor((Date.now() - Date.parse(generatedAt)) / 60_000),
-    0,
-  );
+  const mounted = useMounted();
+  const ageMinutes = mounted
+    ? Math.max(Math.floor((Date.now() - Date.parse(generatedAt)) / 60_000), 0)
+    : 0;
 
   return (
     <div className="inline-flex shrink items-center gap-2.5">
@@ -38,7 +40,11 @@ export function RefreshMeter({
         <p className="eyebrow truncate text-ink-3">
           Last update{' '}
           <span className="text-ink-2">
-            {ageMinutes === 0 ? 'moments ago' : `${ageMinutes} min ago`}
+            {!mounted
+              ? '…'
+              : ageMinutes === 0
+                ? 'moments ago'
+                : `${ageMinutes} min ago`}
           </span>
           {source === 'mock' && (
             <span
@@ -54,7 +60,9 @@ export function RefreshMeter({
           )}
         </p>
         <p className="tabular text-fluid-xs">
-          {countdown.expired ? (
+          {!countdown.ready ? (
+            <span className="text-ink-3">…</span>
+          ) : countdown.expired ? (
             <span className="text-ink-2">Refreshing…</span>
           ) : (
             <>
