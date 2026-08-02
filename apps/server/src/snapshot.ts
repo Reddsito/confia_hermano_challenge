@@ -28,6 +28,7 @@ import { computeStreak, topChampions } from './sync/helpers';
 const LEADER_KEY = 'current_leader';
 
 export const LAST_CYCLE_KEY = 'last_cycle_at';
+export const NEXT_CYCLE_KEY = 'next_cycle_at';
 
 /**
  * Projects the database into the exact JSON contract the frontend already
@@ -68,9 +69,16 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
   });
 
   const generatedAt = getMeta(db, LAST_CYCLE_KEY) ?? new Date().toISOString();
-  const nextUpdateAt = new Date(
-    Date.parse(generatedAt) + config.tournament.refreshIntervalMinutes * 60_000,
-  ).toISOString();
+
+  // Taken from the scheduler rather than derived from generatedAt: the next
+  // cycle fires a fixed interval after the previous one *started*, so adding
+  // the interval to when it *finished* overstates the wait by however long the
+  // cycle took, and the countdown never lines up with reality.
+  const nextUpdateAt =
+    getMeta(db, NEXT_CYCLE_KEY) ??
+    new Date(
+      Date.parse(generatedAt) + config.tournament.refreshIntervalMinutes * 60_000,
+    ).toISOString();
 
   return {
     version: 1,
@@ -143,6 +151,7 @@ export function recordPositions(
   setMeta(db, LEADER_KEY, leader.id);
 }
 
-export function markCycleComplete(db: Db): void {
+export function markCycleComplete(db: Db, nextRunAt: number): void {
   setMeta(db, LAST_CYCLE_KEY, new Date().toISOString());
+  setMeta(db, NEXT_CYCLE_KEY, new Date(nextRunAt).toISOString());
 }

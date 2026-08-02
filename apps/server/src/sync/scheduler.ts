@@ -25,6 +25,9 @@ export class Scheduler {
     this.notifier = new DiscordNotifier(config.discord);
   }
 
+  /** When the next tick fires. The countdown on the site reads this. */
+  private nextRunAt = 0;
+
   start(): void {
     const intervalMs = this.config.tournament.refreshIntervalMinutes * 60_000;
     console.log(
@@ -33,8 +36,15 @@ export class Scheduler {
         `${this.notifier.enabled ? ' · discord on' : ''}`,
     );
 
+    this.nextRunAt = Date.now() + intervalMs;
     void this.runCycle();
-    this.timer = setInterval(() => void this.runCycle(), intervalMs);
+
+    this.timer = setInterval(() => {
+      // Recorded before the work starts, so it reflects the tick schedule
+      // rather than however long this particular cycle happens to take.
+      this.nextRunAt = Date.now() + intervalMs;
+      void this.runCycle();
+    }, intervalMs);
   }
 
   stop(): void {
@@ -54,7 +64,11 @@ export class Scheduler {
         ? await runRiotCycle(this.db, this.client, this.config, this.notifier)
         : runMockCycle(this.db);
 
-      markCycleComplete(this.db);
+      markCycleComplete(
+        this.db,
+        this.nextRunAt ||
+          Date.now() + this.config.tournament.refreshIntervalMinutes * 60_000,
+      );
       recordPositions(this.db, this.config, this.notifier);
 
       // Sent after the data is committed, so a Discord outage can never delay
