@@ -93,65 +93,90 @@ later.
 
 ---
 
-## Deploying the backend
+## Deploying
 
-The frontend is on Cloudflare Pages and the backend on your own machine, so
+The frontend goes on Cloudflare Pages and the backend on your own machine, so
 every browser call is cross-origin and **the API must be served over HTTPS**.
 A browser on an HTTPS page refuses to call `http://`.
 
-### 1. On the VPS
+### 1. Push
 
 ```bash
-git clone <your-repo> && cd soloq-challenge
+git push origin master
+```
+
+### 2. Backend, on the VPS
+
+```bash
+git clone git@github.com:you/your-repo.git && cd your-repo
 cp apps/server/env.example apps/server/.env
 ```
 
-Production `.env`:
+Production `apps/server/.env`:
 
 ```ini
 DATA_SOURCE=riot
 RIOT_API_KEY=RGAPI-...
-PLATFORM=euw1
-ADMIN_TOKEN=<openssl rand -hex 32>
-ALLOWED_ORIGINS=https://your-site.pages.dev
+PLATFORM=la1
 REFRESH_INTERVAL_MINUTES=2
+
+ADMIN_TOKEN=<openssl rand -hex 32>
+SESSION_SECRET=<openssl rand -hex 32>
+ALLOWED_ORIGINS=https://your-site.pages.dev
+SITE_URL=https://your-site.pages.dev
+
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+DISCORD_CLIENT_ID=...
+DISCORD_CLIENT_SECRET=...
+DISCORD_REDIRECT_URI=https://api.your-domain.com/api/auth/discord/callback
 ```
 
 ```bash
 docker compose up -d --build
 docker compose logs -f api
-# then open https://your-site.pages.dev/panel and add the players
 ```
 
-The compose file publishes to `127.0.0.1:8787`, not `0.0.0.0` — the container is
-only reachable through the TLS terminator.
+The compose file publishes to `127.0.0.1:8787`, never `0.0.0.0` — the container
+is only reachable through the TLS terminator.
 
-### 2. TLS
+### 3. TLS
 
-Point an A record at the VPS, edit the domain in `deploy/Caddyfile`, then run
-Caddy. It obtains and renews the certificate itself.
+Point an A record at the VPS, set the domain in `deploy/Caddyfile`, run Caddy.
+It obtains and renews the certificate itself.
 
-### 3. Frontend
+### 4. Discord redirects
 
-On Cloudflare Pages:
+In the Discord application, **OAuth2 → Redirects**, add the production callback
+exactly as written in `DISCORD_REDIRECT_URI`. Discord rejects any redirect that
+is not on that list, character for character.
 
-- Build command: `pnpm install && pnpm build`
-- Output directory: `apps/web/dist`
-- Environment variable: `PUBLIC_API_URL=https://api.your-domain.com`
+### 5. Frontend, on Cloudflare Pages
 
-Then put that Pages URL into the backend's `ALLOWED_ORIGINS` and restart it.
+Connect the repository, then:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `pnpm install && pnpm build` |
+| Output directory | `apps/web/dist` |
+| Root directory | repository root |
+| `PUBLIC_API_URL` | `https://api.your-domain.com` |
+| `NODE_VERSION` | `24` |
+
+The build fetches `/api/snapshot` so the page ships with real standings; if the
+backend is unreachable it renders an empty shell instead of failing, and the
+client fills it in on load.
 
 ### Operational notes
 
-- **The volume is not optional.** The SQLite file lives on a named volume; if it
-  lived in the image, every redeploy would wipe the accumulated totals and the
-  challenge would restart from zero.
+- **The volume is not optional.** The SQLite file lives on a named volume; in
+  the image it would be wiped on every redeploy and the challenge would restart
+  from zero.
 - **`.dockerignore` keeps `.env`, `data/` and the frontend out of the image.**
   Without it the Riot key and admin token get baked into anything you publish.
-- Back up by copying the volume, or
-  `docker compose exec api node -e "..."` against the database file.
+- Changing `SESSION_SECRET` signs everyone out.
+- The Riot development key expires every 24 hours. Apply for a Personal key
+  before this goes anywhere real.
 
----
 
 ## Rate limit budget
 
