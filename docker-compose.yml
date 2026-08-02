@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - apps/server/.env
+    environment:
+      PORT: 8787
+      DATABASE_PATH: /repo/apps/server/data/challenge.db
+    volumes:
+      # Named volume, not a bind mount into the image: the SQLite file has to
+      # outlive every rebuild, otherwise the accumulated totals reset.
+      - challenge-data:/repo/apps/server/data
+    ports:
+      # Bound to localhost only. Put a TLS terminator (Caddy, nginx, Traefik)
+      # in front — a browser on an HTTPS page cannot call an http:// API.
+      - '127.0.0.1:8787:8787'
+
+volumes:
+  challenge-data:

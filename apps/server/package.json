@@ -1,0 +1,26 @@
+{
+  "name": "@challenge/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "sync": "tsx src/cli/sync-once.ts",
+    "doctor": "tsx src/cli/doctor.ts",
+    "seed": "tsx src/cli/seed.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@challenge/core": "workspace:*",
+    "@hono/node-server": "^1.14.0",
+    "better-sqlite3": "^12.2.0",
+    "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

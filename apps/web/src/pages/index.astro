@@ -1,0 +1,54 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { Dashboard } from '../components/Dashboard';
+import { loadSnapshotAtBuild } from '../lib/api';
+
+const snapshot = await loadSnapshotAtBuild();
+const { tournament } = snapshot;
+const playerCount = snapshot.players.length;
+---
+
+<Layout
+  title={`${tournament.name}${tournament.edition ? ` · ${tournament.edition}` : ''}`}
+  description={tournament.subtitle ||
+    'Private SoloQ challenge standings, updated automatically.'}
+>
+  <div class="mx-auto w-full max-w-[1500px] px-4 pb-16 sm:px-6">
+    <header class="pt-10 pb-8 sm:pt-14">
+      <p class="eyebrow" style="color: var(--color-accent)">
+        {tournament.edition || 'Live standings'} · {playerCount} players
+      </p>
+
+      <h1
+        class="display mt-3 text-fluid-2xl leading-[0.92] tracking-tight uppercase"
+      >
+        {tournament.name}
+      </h1>
+
+      {
+        tournament.subtitle && (
+          <p class="mt-3 max-w-xl text-fluid-base text-ink-2">
+            {tournament.subtitle}
+          </p>
+        )
+      }
+
+      <div
+        class="mt-6 h-px w-full"
+        style="background: linear-gradient(90deg, var(--color-accent), transparent 60%)"
+      >
+      </div>
+    </header>
+
+    <Dashboard initialSnapshot={snapshot} client:load />
+
+    <footer class="mt-20 border-t border-line pt-6 text-fluid-xs text-ink-3">
+      <p class="max-w-3xl">
+        {tournament.name} isn't endorsed by Riot Games and doesn't reflect the views
+        or opinions of Riot Games or anyone officially involved in producing or managing
+        Riot Games properties. Riot Games and all associated properties are trademarks
+        or registered trademarks of Riot Games, Inc.
+      </p>
+    </footer>
+  </div>
+</Layout>
