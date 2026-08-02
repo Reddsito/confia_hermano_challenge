@@ -79,6 +79,13 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     }
   }, []);
 
+  // The HTML was pre-rendered at build time, so whatever it carries is stale by
+  // definition — and empty if the backend was down during the build. Fetch once
+  // on mount rather than waiting for the first interval tick.
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   useEffect(() => {
     const dueAt = Date.parse(snapshot.nextUpdateAt);
 
@@ -210,6 +217,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           />
           <RankingTable
             players={visible}
+            rosterSize={ranking.length}
+            loading={isRefreshing}
             onSelect={(p) => setSelectedId(p.id)}
           />
         </TabPanel>

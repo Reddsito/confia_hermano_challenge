@@ -18,17 +18,35 @@ import { RoleIcon, TierCrest } from './icons';
 
 export function RankingTable({
   players,
+  rosterSize,
+  loading,
   onSelect,
 }: {
   players: RankedPlayer[];
+  rosterSize: number;
+  loading: boolean;
   onSelect: (player: RankedPlayer) => void;
 }) {
   if (players.length === 0) {
+    // Saying "no match" when the roster itself is empty sends people hunting
+    // for a filter they never set.
+    const emptyRoster = rosterSize === 0;
+
     return (
       <div className="rounded-2xl border border-line bg-carbon p-10 text-center">
-        <p className="display text-fluid-lg">No players match these filters</p>
+        <p className="display text-fluid-lg">
+          {emptyRoster
+            ? loading
+              ? 'Loading the standings…'
+              : 'No players yet'
+            : 'No players match these filters'}
+        </p>
         <p className="mt-1 text-fluid-sm text-ink-2">
-          Clear the search or pick a different role.
+          {emptyRoster
+            ? loading
+              ? 'Fetching from the server.'
+              : 'Add players from the roster panel to get started.'
+            : 'Clear the search or pick a different role.'}
         </p>
       </div>
     );
