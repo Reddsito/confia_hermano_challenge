@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { MAX_HELD_SHELLS, SHELL_RULE_LABEL, type RankedPlayer } from '@challenge/core/domain';
+import {
+  MAX_HELD_SHELLS,
+  SHELL_RULE_LABEL,
+  type RankedPlayer,
+} from '@challenge/core/domain';
 
 import {
   fetchChallenges,
@@ -11,6 +15,7 @@ import {
   type SessionUser,
   type ShellsState,
 } from '../lib/session';
+import { TierCrest } from './icons';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 interface BlueShellsProps {
@@ -20,8 +25,10 @@ interface BlueShellsProps {
   onBalanceChange: () => void;
 }
 
-/** How long the wheel spins before revealing the result. */
-const SPIN_MS = 2600;
+const SPIN_MS = 3200;
+const REEL_ITEM_HEIGHT = 64;
+/** How many times the wheel repeats before landing, so it reads as a spin. */
+const REEL_LOOPS = 7;
 
 export function BlueShells({
   user,
@@ -33,7 +40,9 @@ export function BlueShells({
   const [odds, setOdds] = useState<ChallengeOdds[]>([]);
   const [target, setTarget] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<{ name: string; detail: string } | null>(null);
+  const [landed, setLanded] = useState<{ name: string; detail: string } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -53,7 +62,6 @@ export function BlueShells({
     () => new Map(players.map((player) => [player.id, player])),
     [players],
   );
-
   const balances = useMemo(
     () => new Map((state?.players ?? []).map((row) => [row.playerId, row])),
     [state],
@@ -61,323 +69,549 @@ export function BlueShells({
 
   const mine = user?.playerId ? balances.get(user.playerId) : null;
   const available = mine?.available ?? 0;
+  const targetPlayer = target ? byId.get(target) : null;
 
   const fire = async () => {
     if (!token || !target || spinning) return;
 
     setError(null);
-    setResult(null);
+    setLanded(null);
     setSpinning(true);
 
     try {
-      // The server decides the outcome before the animation starts. The wheel
-      // is a reveal, not the draw — a client-side spin would be trivial to
-      // re-roll from the console.
+      // The server draws before the reel moves. A client-side spin would be a
+      // re-roll away from meaningless.
       const outcome = await throwShell(token, target);
+      setLanded(outcome.challenge);
       await new Promise((resolve) => setTimeout(resolve, SPIN_MS));
-      setResult(outcome.challenge);
       await reload();
       onBalanceChange();
+      setTarget(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      setLanded(null);
     } finally {
       setSpinning(false);
     }
   };
 
-  if (!user) {
-    return (
-      <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-8 text-center">
-        <ShellMark size={56} />
-        <h2 className="display mt-4 text-fluid-lg">Blue Shells</h2>
-        <p className="mt-2 text-fluid-sm text-ink-2">
-          Sign in with Discord to see your shells and fire one at someone.
-        </p>
-        <a
-          href={loginUrl()}
-          className="eyebrow mt-5 inline-flex min-h-11 items-center rounded-full px-5 text-void"
-          style={{ background: 'var(--color-accent)' }}
-        >
-          Sign in with Discord
-        </a>
-      </div>
-    );
-  }
-
-  if (!user.playerId) {
-    return (
-      <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-8 text-center">
-        <h2 className="display text-fluid-lg">Almost there</h2>
-        <p className="mt-2 text-fluid-sm text-ink-2">
-          You are signed in as <strong>{user.username}</strong>, but your Discord
-          account is not linked to a player yet. An admin links it from the
-          roster panel.
-        </p>
-      </div>
-    );
-  }
+  if (!user) return <Gate />;
+  if (!user.playerId) return <Unlinked username={user.username} />;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-line bg-carbon p-5">
-        <div className="flex flex-wrap items-center gap-4">
-          <ShellMark size={44} />
-          <div>
-            <p className="eyebrow text-ink-3">Your shells</p>
-            <p className="tabular text-[2.25rem] leading-none font-semibold">
-              {available}
-              <span className="eyebrow ml-2 text-ink-3">of {MAX_HELD_SHELLS}</span>
-            </p>
-          </div>
-          <div className="ml-auto flex gap-1.5">
-            {Array.from({ length: MAX_HELD_SHELLS }, (_, index) => (
-              <span
-                key={index}
-                className={classNames(
-                  'h-3 w-3 rounded-full transition-colors',
-                  index < available ? '' : 'bg-carbon-3',
-                )}
-                style={
-                  index < available
-                    ? {
-                        background: 'var(--color-accent)',
-                        boxShadow: '0 0 12px -2px var(--color-accent)',
-                      }
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        </div>
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
+        <Inventory available={available} shells={mine?.shells ?? []} />
 
-        {available >= MAX_HELD_SHELLS && (
-          <p className="mt-3 text-fluid-xs" style={{ color: 'var(--color-mark-amber)' }}>
-            You are at the cap. Achievements stop paying out until you fire one.
+        <Reel
+          odds={odds}
+          spinning={spinning}
+          landed={landed}
+          targetName={targetPlayer?.displayName ?? null}
+        />
+      </div>
+
+      <section className="rounded-2xl border border-line bg-carbon p-5">
+        <header className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="display text-fluid-lg">Choose a victim</h3>
+          <p className="text-fluid-xs text-ink-3">
+            The wheel decides what they owe.
           </p>
-        )}
+        </header>
 
-        {mine && mine.shells.length > 0 && (
-          <ul className="mt-4 space-y-1.5 border-t border-line pt-3">
-            {mine.shells.slice(0, 6).map((shell) => (
-              <li key={shell.id} className="flex items-center gap-2 text-fluid-xs">
-                <span
-                  className="tabular font-semibold"
-                  style={{ color: 'var(--color-accent)' }}
-                >
-                  +{shell.amount}
-                </span>
-                <span className="text-ink-2">
-                  {SHELL_RULE_LABEL[shell.rule as keyof typeof SHELL_RULE_LABEL] ??
-                    shell.rule}
-                </span>
-                <span className="truncate text-ink-3">· {shell.detail}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-line bg-carbon p-5">
-        <h3 className="display text-fluid-lg">Fire a shell</h3>
-        <p className="mt-1 text-fluid-xs text-ink-3">
-          Pick a target. The wheel decides what they have to do.
-        </p>
-
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {players
             .filter((player) => player.id !== user.playerId)
-            .map((player) => {
-              const selected = target === player.id;
-              const accent = tierColor(player.rank);
-              return (
-                <li key={player.id}>
-                  <button
-                    type="button"
-                    disabled={spinning}
-                    onClick={() => setTarget(player.id)}
-                    aria-pressed={selected}
-                    className={classNames(
-                      'flex w-full items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-50',
-                      selected
-                        ? 'border-[color:var(--color-accent)] bg-carbon-2'
-                        : 'border-line hover:border-line-strong',
-                    )}
-                  >
-                    <Avatar
-                      name={player.displayName}
-                      iconId={player.profileIconId}
-                      size={32}
-                      ring={accent}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-fluid-sm">
-                      {player.displayName}
-                    </span>
-                    <span className="tabular text-fluid-xs text-ink-3">
-                      #{player.position}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+            .map((player) => (
+              <TargetCard
+                key={player.id}
+                player={player}
+                selected={target === player.id}
+                disabled={spinning}
+                onSelect={() => setTarget(player.id)}
+              />
+            ))}
         </ul>
 
         <button
           type="button"
           disabled={!target || available <= 0 || spinning}
           onClick={() => void fire()}
-          className="eyebrow mt-4 min-h-12 w-full rounded-full px-6 text-void transition-opacity disabled:opacity-40"
-          style={{ background: 'var(--color-accent)' }}
+          className={classNames(
+            'eyebrow mt-4 min-h-14 w-full rounded-2xl px-6 text-void transition-all',
+            'disabled:cursor-not-allowed disabled:opacity-35',
+          )}
+          style={{
+            background: 'var(--color-accent)',
+            boxShadow:
+              target && available > 0 && !spinning
+                ? '0 0 40px -12px var(--color-accent)'
+                : undefined,
+          }}
         >
           {spinning
-            ? 'Spinning…'
+            ? 'Incoming…'
             : available <= 0
               ? 'No shells to fire'
-              : target
-                ? `Fire at ${byId.get(target)?.displayName ?? ''}`
-                : 'Pick a target'}
+              : targetPlayer
+                ? `Fire at ${targetPlayer.displayName}`
+                : 'Pick a victim first'}
         </button>
 
         {error && (
-          <p className="mt-3 text-fluid-xs" style={{ color: 'var(--color-mark-red)' }}>
+          <p
+            role="alert"
+            className="mt-3 text-fluid-xs"
+            style={{ color: 'var(--color-mark-red)' }}
+          >
             {error}
           </p>
         )}
       </section>
 
-      {(spinning || result) && (
-        <Wheel odds={odds} spinning={spinning} result={result} />
-      )}
-
-      <section className="rounded-2xl border border-line bg-carbon p-5">
-        <h3 className="display text-fluid-lg">The wheel</h3>
-        <p className="mt-1 text-fluid-xs text-ink-3">
-          What can land on someone, and how likely each one is.
-        </p>
-        <ul className="mt-4 space-y-1.5">
-          {odds.map((challenge) => (
-            <li key={challenge.id} className="flex items-center gap-3">
-              <span className="tabular w-12 shrink-0 text-right text-fluid-xs text-ink-2">
-                {formatPercent(challenge.chance, 1)}
-              </span>
-              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-carbon-3">
-                <span
-                  className="block h-full rounded-full"
-                  style={{
-                    width: `${challenge.chance * 100}%`,
-                    background: 'var(--color-accent)',
-                  }}
-                />
-              </span>
-              <span className="min-w-0 flex-[2] truncate text-fluid-sm">
-                {challenge.name}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {state && state.throws.length > 0 && (
-        <section className="rounded-2xl border border-line bg-carbon p-5">
-          <h3 className="display text-fluid-lg">Recent hits</h3>
-          <ul className="mt-3 space-y-1.5">
-            {state.throws.slice(0, 12).map((row) => (
-              <li key={row.id} className="flex flex-wrap items-baseline gap-1.5 text-fluid-xs">
-                <span className="text-ink-2">
-                  {row.fromPlayer ? byId.get(row.fromPlayer)?.displayName : 'Someone'}
-                </span>
-                <span className="text-ink-3">hit</span>
-                <span className="font-medium">
-                  {byId.get(row.toPlayer)?.displayName ?? 'someone'}
-                </span>
-                <span className="text-ink-3">·</span>
-                <span style={{ color: 'var(--color-accent)' }}>{row.challengeName}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Odds odds={odds} />
+        <History state={state} byId={byId} />
+      </div>
     </div>
   );
 }
 
-/**
- * The reveal. The list scrolls past while the request is in flight and stops on
- * whatever the server already decided, so the animation can never disagree with
- * the recorded outcome.
- */
-function Wheel({
+/** The signature piece: a slot reel that decelerates onto the drawn result. */
+function Reel({
   odds,
   spinning,
-  result,
+  landed,
+  targetName,
 }: {
   odds: ChallengeOdds[];
   spinning: boolean;
-  result: { name: string; detail: string } | null;
+  landed: { name: string; detail: string } | null;
+  targetName: string | null;
 }) {
-  const [index, setIndex] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const stripRef = useRef<HTMLUListElement>(null);
+
+  // The strip repeats the wheel several times and pins the drawn result at the
+  // end, so the animation is a single transition that cannot disagree with the
+  // recorded outcome.
+  const strip = useMemo(() => {
+    if (odds.length === 0) return [] as string[];
+    const looped: string[] = [];
+    for (let round = 0; round < REEL_LOOPS; round += 1) {
+      for (const challenge of odds) looped.push(challenge.name);
+    }
+    if (landed) looped.push(landed.name);
+    return looped;
+  }, [odds, landed]);
 
   useEffect(() => {
-    if (!spinning || odds.length === 0) return;
+    if (!landed || strip.length === 0) {
+      setAnimating(false);
+      setOffset(0);
+      return;
+    }
 
-    let delay = 60;
-    let timer: ReturnType<typeof setTimeout>;
+    // Start from the top, then travel to the final item.
+    setAnimating(false);
+    setOffset(0);
 
-    const tick = () => {
-      setIndex((current) => (current + 1) % odds.length);
-      // Ease out by stretching the interval, so it visibly slows to a stop.
-      delay = Math.min(delay * 1.12, 320);
-      timer = setTimeout(tick, delay);
-    };
+    const reduced =
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    timer = setTimeout(tick, delay);
-    return () => clearTimeout(timer);
-  }, [spinning, odds.length]);
+    const id = requestAnimationFrame(() => {
+      // Someone who asked for less motion gets the answer, not the ride.
+      setAnimating(!reduced);
+      setOffset((strip.length - 1) * REEL_ITEM_HEIGHT);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [landed, strip.length]);
 
-  const showing = result?.name ?? odds[index]?.name ?? '…';
+  const done = Boolean(landed) && !spinning;
 
   return (
     <section
-      className="rounded-2xl border p-8 text-center"
+      className="relative overflow-hidden rounded-2xl border bg-carbon p-5"
       style={{
-        borderColor: result ? 'var(--color-accent)' : 'var(--color-line)',
-        background: 'var(--color-carbon)',
-        boxShadow: result ? '0 0 40px -18px var(--color-accent)' : undefined,
+        borderColor: done ? 'var(--color-accent)' : 'var(--color-line)',
+        boxShadow: done ? '0 0 60px -24px var(--color-accent)' : undefined,
       }}
       aria-live="polite"
     >
-      <p className="eyebrow text-ink-3">{result ? 'It landed on' : 'Spinning'}</p>
-      <p
-        className={classNames(
-          'display mt-3 text-fluid-xl leading-tight',
-          !result && 'opacity-70',
-        )}
-        style={result ? { color: 'var(--color-accent)' } : undefined}
-      >
-        {showing}
+      <p className="eyebrow text-ink-3">
+        {done
+          ? targetName
+            ? `It landed on ${targetName}`
+            : 'It landed'
+          : spinning
+            ? 'Spinning'
+            : 'The wheel'}
       </p>
-      {result?.detail && (
-        <p className="mt-2 text-fluid-sm text-ink-2">{result.detail}</p>
+
+      <div
+        className="relative mt-3 overflow-hidden"
+        style={{ height: REEL_ITEM_HEIGHT }}
+      >
+        {strip.length === 0 ? (
+          <p className="flex h-full items-center text-fluid-sm text-ink-3">
+            Nothing on the wheel yet.
+          </p>
+        ) : (
+          <ul
+            ref={stripRef}
+            className="absolute inset-x-0 top-0"
+            style={{
+              transform: `translateY(-${offset}px)`,
+              transition: animating
+                ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.15, 1)`
+                : 'none',
+            }}
+          >
+            {strip.map((name, index) => (
+              <li
+                key={`${name}-${index}`}
+                className="display flex items-center truncate text-fluid-lg"
+                style={{
+                  height: REEL_ITEM_HEIGHT,
+                  color:
+                    done && index === strip.length - 1
+                      ? 'var(--color-accent)'
+                      : 'var(--color-ink-2)',
+                }}
+              >
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Fades the items entering and leaving the window. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(var(--color-carbon), transparent 35%, transparent 65%, var(--color-carbon))',
+          }}
+        />
+      </div>
+
+      <div
+        className="mt-1 h-px w-full"
+        style={{
+          background: done
+            ? 'linear-gradient(90deg, var(--color-accent), transparent 70%)'
+            : 'var(--color-line)',
+        }}
+      />
+
+      <p className="mt-3 min-h-[1.5rem] text-fluid-sm text-ink-2">
+        {done ? landed?.detail || 'No excuses.' : ' '}
+      </p>
+    </section>
+  );
+}
+
+function Inventory({
+  available,
+  shells,
+}: {
+  available: number;
+  shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
+}) {
+  const full = available >= MAX_HELD_SHELLS;
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <p className="eyebrow text-ink-3">Your arsenal</p>
+
+      <div className="mt-3 flex items-center gap-2">
+        {Array.from({ length: MAX_HELD_SHELLS }, (_, index) => (
+          <ShellMark key={index} size={44} filled={index < available} />
+        ))}
+        <span className="tabular ml-auto text-[2.5rem] leading-none font-semibold">
+          {available}
+          <span className="eyebrow ml-1 text-ink-3">/{MAX_HELD_SHELLS}</span>
+        </span>
+      </div>
+
+      <p
+        className="mt-3 text-fluid-xs"
+        style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
+      >
+        {full
+          ? 'Full. Nothing else counts until you fire one.'
+          : `Room for ${MAX_HELD_SHELLS - available} more.`}
+      </p>
+
+      {shells.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-line pt-3">
+          {shells.slice(0, 5).map((shell) => (
+            <li key={shell.id} className="flex items-start gap-2">
+              <span
+                className="tabular mt-px text-fluid-xs font-semibold"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                +{shell.amount}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-fluid-xs">
+                  {SHELL_RULE_LABEL[shell.rule as keyof typeof SHELL_RULE_LABEL] ??
+                    'Adjustment'}
+                </span>
+                <span className="block truncate text-[0.68rem] text-ink-3">
+                  {shell.detail}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-/** A shell, drawn rather than imported so it inherits the accent colour. */
-export function ShellMark({ size = 24 }: { size?: number }) {
+function TargetCard({
+  player,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  player: RankedPlayer;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const accent = tierColor(player.rank);
+
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <li>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onSelect}
+        aria-pressed={selected}
+        className={classNames(
+          'flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all',
+          'disabled:cursor-not-allowed disabled:opacity-40',
+          selected ? 'bg-carbon-2' : 'border-line hover:border-line-strong',
+        )}
+        style={
+          selected
+            ? {
+                borderColor: 'var(--color-accent)',
+                boxShadow: '0 0 26px -14px var(--color-accent)',
+              }
+            : undefined
+        }
+      >
+        <Avatar
+          name={player.displayName}
+          iconId={player.profileIconId}
+          size={38}
+          ring={accent}
+          inGame={player.inGame}
+        />
+
+        <span className="min-w-0 flex-1">
+          <span className="display block truncate text-fluid-sm">
+            {player.displayName}
+          </span>
+          <span className="block truncate text-[0.68rem] text-ink-3">
+            #{player.position} · {player.totals.wins}W {player.totals.losses}L
+          </span>
+        </span>
+
+        <TierCrest rank={player.rank} size={26} />
+      </button>
+    </li>
+  );
+}
+
+function Odds({ odds }: { odds: ChallengeOdds[] }) {
+  const highest = Math.max(...odds.map((challenge) => challenge.chance), 0.01);
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <h3 className="display text-fluid-lg">What can land</h3>
+      <p className="mt-1 text-fluid-xs text-ink-3">
+        Odds are derived from the weights set in the panel.
+      </p>
+
+      <ul className="mt-4 space-y-2.5">
+        {odds.map((challenge) => (
+          <li key={challenge.id}>
+            <div className="flex items-baseline gap-2">
+              <span className="tabular w-11 shrink-0 text-fluid-xs font-medium">
+                {formatPercent(challenge.chance, 1)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-fluid-sm">
+                {challenge.name}
+              </span>
+            </div>
+            <div className="mt-1 ml-[3.25rem] h-1 overflow-hidden rounded-full bg-carbon-3">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  // Scaled against the most likely entry so small differences
+                  // stay visible instead of all collapsing near zero.
+                  width: `${(challenge.chance / highest) * 100}%`,
+                  background: 'var(--color-accent)',
+                  boxShadow: '0 0 10px -2px var(--color-accent)',
+                }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function History({
+  state,
+  byId,
+}: {
+  state: ShellsState | null;
+  byId: Map<string, RankedPlayer>;
+}) {
+  const throws = state?.throws ?? [];
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <h3 className="display text-fluid-lg">Recent hits</h3>
+
+      {throws.length === 0 ? (
+        <p className="mt-3 text-fluid-sm text-ink-3">
+          Nobody has been hit yet. Someone has to go first.
+        </p>
+      ) : (
+        <ol className="mt-4 space-y-3">
+          {throws.slice(0, 8).map((row) => (
+            <li key={row.id} className="flex gap-3">
+              <span
+                aria-hidden="true"
+                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{
+                  background: 'var(--color-accent)',
+                  boxShadow: '0 0 8px 0 var(--color-accent)',
+                }}
+              />
+              <span className="min-w-0">
+                <span className="block text-fluid-sm">
+                  <span className="text-ink-2">
+                    {row.fromPlayer
+                      ? (byId.get(row.fromPlayer)?.displayName ?? 'Someone')
+                      : 'Someone'}
+                  </span>
+                  <span className="text-ink-3"> hit </span>
+                  <span className="font-medium">
+                    {byId.get(row.toPlayer)?.displayName ?? 'someone'}
+                  </span>
+                </span>
+                <span
+                  className="block truncate text-[0.72rem]"
+                  style={{ color: 'var(--color-accent)' }}
+                >
+                  {row.challengeName}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function Gate() {
+  return (
+    <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-8 text-center">
+      <span className="inline-flex">
+        <ShellMark size={64} filled />
+      </span>
+      <h2 className="display mt-4 text-fluid-lg">Blue Shells</h2>
+      <p className="mt-2 text-fluid-sm text-ink-2">
+        Earn them by doing something absurd in a game. Spend them making someone
+        else suffer.
+      </p>
+      <a
+        href={loginUrl()}
+        className="eyebrow mt-6 inline-flex min-h-12 items-center rounded-full px-6 text-void"
+        style={{
+          background: 'var(--color-accent)',
+          boxShadow: '0 0 36px -14px var(--color-accent)',
+        }}
+      >
+        Sign in with Discord
+      </a>
+    </div>
+  );
+}
+
+function Unlinked({ username }: { username: string }) {
+  return (
+    <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-8 text-center">
+      <ShellMark size={48} />
+      <h2 className="display mt-4 text-fluid-lg">Almost there</h2>
+      <p className="mt-2 text-fluid-sm text-ink-2">
+        Signed in as <strong>{username}</strong>, but this Discord account is not
+        linked to a player yet. An admin does that from the roster panel.
+      </p>
+    </div>
+  );
+}
+
+/** Drawn rather than imported, so it inherits the accent colour and can dim. */
+export function ShellMark({
+  size = 24,
+  filled = false,
+}: {
+  size?: number;
+  filled?: boolean;
+}) {
+  const colour = filled ? 'var(--color-accent)' : 'var(--color-line-strong)';
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden="true"
+      style={
+        filled
+          ? { filter: 'drop-shadow(0 0 8px color-mix(in oklab, var(--color-accent) 60%, transparent))' }
+          : undefined
+      }
+    >
       <path
-        d="M16 4c6.6 0 12 4.6 12 10.4 0 2.6-1 4.6-2.7 6.2-1 3.4-4.6 6-9.3 6s-8.3-2.6-9.3-6C5 19 4 17 4 14.4 4 8.6 9.4 4 16 4Z"
-        fill="var(--color-accent)"
-        fillOpacity="0.18"
-        stroke="var(--color-accent)"
-        strokeWidth="1.6"
+        d="M16 3.5c7 0 12.6 4.9 12.6 11 0 2.8-1.1 4.9-2.9 6.6-1.1 3.6-4.9 6.4-9.7 6.4s-8.6-2.8-9.7-6.4C4.5 19.4 3.4 17.3 3.4 14.5c0-6.1 5.6-11 12.6-11Z"
+        fill={colour}
+        fillOpacity={filled ? 0.2 : 0.08}
+        stroke={colour}
+        strokeWidth="1.7"
       />
       <path
-        d="M16 8.5c3.6 0 6.6 2.4 6.6 5.6M11 21.5c1.4 1.2 3.1 1.8 5 1.8s3.6-.6 5-1.8"
-        stroke="var(--color-accent)"
-        strokeWidth="1.6"
+        d="M16 8c3.8 0 7 2.6 7 6"
+        stroke={colour}
+        strokeWidth="1.7"
         strokeLinecap="round"
+      />
+      <path
+        d="M10.4 22.6c1.6 1.2 3.5 1.9 5.6 1.9s4-.7 5.6-1.9"
+        stroke={colour}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16 12.5v4M13.5 14.5h5"
+        stroke={colour}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity={filled ? 0.9 : 0.5}
       />
     </svg>
   );
