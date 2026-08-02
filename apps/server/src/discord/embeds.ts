@@ -229,3 +229,25 @@ export function challengeServedEmbed(
     timestamp: new Date().toISOString(),
   };
 }
+
+/** One participant beat another and took their shell. */
+export function shellStolenEmbed(
+  winnerName: string,
+  loserName: string,
+  kept: boolean,
+  context: EmbedContext,
+): DiscordEmbed {
+  return {
+    color: 0x22d3ee,
+    author: { name: `${winnerName} le ganó a ${loserName}` },
+    title: kept
+      ? `Le robó su Blue Shell`
+      : `Le destruyó su Blue Shell`,
+    description: kept
+      ? `Ahora la tiene ${winnerName}.`
+      : `${winnerName} ya estaba lleno, así que no la queda nadie.`,
+    url: context.siteUrl,
+    footer: { text: context.tournamentName },
+    timestamp: new Date().toISOString(),
+  };
+}

@@ -36,10 +36,10 @@ export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
 
 /**
  * Nobody can sit on more than this many unspent shells. Earning is capped, not
- * queued: reaching the cap means further achievements pay nothing until some
- * are fired. It keeps hoarding from turning into an endgame barrage.
+ * queued: at the cap, further achievements pay nothing until the shell is
+ * fired. Holding one at a time keeps them moving.
  */
-export const MAX_HELD_SHELLS = 3;
+export const MAX_HELD_SHELLS = 1;
 
 /** Riot's summoner spell id for Smite. */
 export const SMITE_SPELL_ID = 11;

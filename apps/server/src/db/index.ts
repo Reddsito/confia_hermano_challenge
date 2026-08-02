@@ -173,6 +173,20 @@ const MIGRATIONS: string[] = [
   // The live game as last seen by the sync cycle. Stored so the site can show
   // it without spending a fresh SPECTATOR-V5 call per visitor.
   `ALTER TABLE player_state ADD COLUMN active_game TEXT;`,
+
+  // One row per settled duel. The primary key is what makes stealing
+  // idempotent: a match re-examined on a later cycle cannot pay out twice.
+  `
+  CREATE TABLE shell_steals (
+    match_id   TEXT NOT NULL,
+    winner_id  TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    loser_id   TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    taken      INTEGER NOT NULL,
+    kept       INTEGER NOT NULL,
+    settled_at INTEGER NOT NULL,
+    PRIMARY KEY (match_id, winner_id, loser_id)
+  );
+  `,
 ];
 
 export function openDatabase(path: string): Db {

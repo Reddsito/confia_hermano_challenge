@@ -1,6 +1,9 @@
 import { RiotClient } from '@challenge/core/riot';
 
 import { DiscordNotifier } from '../discord/notifier';
+import { shellStolenEmbed } from '../discord/embeds';
+import { listPlayers } from '../db/players';
+import { resolveSteals } from '../db/shells';
 
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
@@ -47,6 +50,35 @@ export class Scheduler {
     }, intervalMs);
   }
 
+  /** Resolves duels between tracked players and announces the outcome. */
+  private settleSteals(): void {
+    const names = new Map(
+      listPlayers(this.db, 'approved').map((player) => [
+        player.id,
+        player.displayName,
+      ]),
+    );
+
+    for (const steal of resolveSteals(this.db)) {
+      const winner = names.get(steal.winnerId) ?? 'Someone';
+      const loser = names.get(steal.loserId) ?? 'someone';
+
+      console.log(
+        `[shells] ${winner} ${steal.kept ? 'stole' : 'destroyed'} ${loser}'s shell`,
+      );
+
+      this.notifier.push(
+        'shell_stolen',
+        shellStolenEmbed(winner, loser, steal.kept, {
+          tournamentName: this.config.tournament.name,
+          siteUrl: this.config.siteUrl || undefined,
+          opggUrl: this.config.siteUrl || '',
+          profileIconId: null,
+        }),
+      );
+    }
+  }
+
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
@@ -63,6 +95,10 @@ export class Scheduler {
       const report = this.client
         ? await runRiotCycle(this.db, this.client, this.config, this.notifier)
         : runMockCycle(this.db);
+
+      // After ingestion, so both sides of a duel are on record before it is
+      // settled — the two players are fetched independently.
+      if (!this.config.useMockData) this.settleSteals();
 
       markCycleComplete(
         this.db,

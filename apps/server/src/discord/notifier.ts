@@ -6,7 +6,8 @@ export type DiscordEvent =
   | 'rank_change'
   | 'new_leader'
   | 'shell_thrown'
-  | 'challenge_served';
+  | 'challenge_served'
+  | 'shell_stolen';
 
 export interface DiscordConfig {
   webhookUrl: string;
@@ -103,6 +104,7 @@ const ALL_EVENTS: DiscordEvent[] = [
   'new_leader',
   'shell_thrown',
   'challenge_served',
+  'shell_stolen',
 ];
 
 /** Parses DISCORD_EVENTS, defaulting to everything except the noisy one. */

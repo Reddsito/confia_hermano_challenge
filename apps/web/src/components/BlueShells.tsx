@@ -342,8 +342,12 @@ function Inventory({
         style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
       >
         {full
-          ? 'Full. Nothing else counts until you fire one.'
-          : `Room for ${MAX_HELD_SHELLS - available} more.`}
+          ? 'Loaded. Nothing else counts until you fire it.'
+          : 'Empty. Earn one, or take it from someone you beat.'}
+      </p>
+      <p className="mt-1 text-fluid-xs text-ink-3">
+        Beat another participant in a game and their shell is yours — or gone,
+        if you were already loaded.
       </p>
 
       {shells.length > 0 && (

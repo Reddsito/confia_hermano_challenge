@@ -422,3 +422,105 @@ export function fulfillOldestThrow(
 
   return next;
 }
+
+export interface Steal {
+  matchId: string;
+  winnerId: string;
+  loserId: string;
+  /** True when the loser actually had a shell to lose. */
+  taken: boolean;
+  /** False when the winner was already at the cap, so the shell is destroyed. */
+  kept: boolean;
+}
+
+/**
+ * Settles every duel between tracked players that has not been settled yet.
+ *
+ * Beating another participant takes their shell. If the winner is already at
+ * the cap the shell is not gained — it is simply destroyed, which is what makes
+ * winning worth something even when you are full.
+ *
+ * Run after a cycle rather than during ingestion: both sides of a duel are
+ * fetched independently, so the second player's row may not exist yet while the
+ * first is being processed.
+ */
+export function resolveSteals(db: Db): Steal[] {
+  const duels = db
+    .prepare(
+      `SELECT w.match_id AS matchId,
+              w.player_id AS winnerId,
+              l.player_id AS loserId
+       FROM player_matches w
+       JOIN player_matches l
+         ON w.match_id = l.match_id
+        AND w.team_id <> l.team_id
+       WHERE w.win = 1 AND l.win = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM shell_steals s
+           WHERE s.match_id = w.match_id
+             AND s.winner_id = w.player_id
+             AND s.loser_id = l.player_id
+         )`,
+    )
+    .all() as Array<{ matchId: string; winnerId: string; loserId: string }>;
+
+  const settled: Steal[] = [];
+
+  for (const duel of duels) {
+    const loserHas = balanceFor(db, duel.loserId).available > 0;
+    const winnerHasRoom =
+      balanceFor(db, duel.winnerId).available < MAX_HELD_SHELLS;
+    const kept = loserHas && winnerHasRoom;
+
+    db.transaction(() => {
+      if (loserHas) {
+        db.prepare(
+          `INSERT INTO blue_shells
+             (id, player_id, match_id, rule, amount, detail, earned_at)
+           VALUES (?, ?, ?, 'STOLEN_FROM', -1, ?, ?)`,
+        ).run(
+          randomUUID(),
+          duel.loserId,
+          duel.matchId,
+          'Lost a duel against another participant',
+          Date.now(),
+        );
+      }
+
+      if (kept) {
+        db.prepare(
+          `INSERT INTO blue_shells
+             (id, player_id, match_id, rule, amount, detail, earned_at)
+           VALUES (?, ?, ?, 'STOLEN', 1, ?, ?)`,
+        ).run(
+          randomUUID(),
+          duel.winnerId,
+          duel.matchId,
+          'Taken from a beaten participant',
+          Date.now(),
+        );
+      }
+
+      // Recorded even when nothing changed hands, so the duel is not
+      // re-examined on every cycle for the rest of the challenge.
+      db.prepare(
+        `INSERT OR IGNORE INTO shell_steals
+           (match_id, winner_id, loser_id, taken, kept, settled_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(
+        duel.matchId,
+        duel.winnerId,
+        duel.loserId,
+        loserHas ? 1 : 0,
+        kept ? 1 : 0,
+        Date.now(),
+      );
+    })();
+
+    if (loserHas) {
+      settled.push({ ...duel, taken: true, kept });
+    }
+  }
+
+  return settled;
+}
