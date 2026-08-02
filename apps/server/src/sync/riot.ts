@@ -115,21 +115,31 @@ async function syncPlayer(
 ): Promise<number> {
   const queueId = queues[0]!;
   const queueType = config.tournament.queue;
-  // The PUUID is stable, so it is resolved once and cached on the player row.
-  let puuid = player.puuid;
-  if (!puuid) {
-    const account = await client.getAccountByRiotId(
-      player.gameName,
-      player.tagLine,
-    );
-    puuid = account.puuid;
-    setPlayerPuuid(db, player.id, puuid);
-  }
 
-  const [summoner, entries] = await Promise.all([
-    client.getSummonerByPuuid(puuid),
-    client.getLeagueEntriesByPuuid(puuid),
-  ]);
+  let puuid = player.puuid ?? (await resolvePuuid(db, client, player));
+
+  let summoner;
+  let entries;
+  try {
+    [summoner, entries] = await Promise.all([
+      client.getSummonerByPuuid(puuid),
+      client.getLeagueEntriesByPuuid(puuid),
+    ]);
+  } catch (error) {
+    // Riot encrypts PUUIDs per API key, and a development key is replaced every
+    // 24 hours — after which every cached PUUID is rejected with a 400. Rather
+    // than failing daily, drop the stale value and resolve it again.
+    if (!(error instanceof RiotApiError) || error.status !== 400) throw error;
+
+    console.warn(
+      `[sync] cached PUUID rejected for ${player.displayName}, re-resolving`,
+    );
+    puuid = await resolvePuuid(db, client, player);
+    [summoner, entries] = await Promise.all([
+      client.getSummonerByPuuid(puuid),
+      client.getLeagueEntriesByPuuid(puuid),
+    ]);
+  }
 
   const solo = entries.find((entry) => entry.queueType === queueType);
   const currentRank = solo ? toRank(solo) : null;
@@ -326,6 +336,20 @@ async function syncPlayer(
   }
 
   return fresh.length;
+}
+
+/** Resolves a Riot ID to a PUUID and caches it on the player row. */
+async function resolvePuuid(
+  db: Db,
+  client: RiotClient,
+  player: PlayerRow,
+): Promise<string> {
+  const account = await client.getAccountByRiotId(
+    player.gameName,
+    player.tagLine,
+  );
+  setPlayerPuuid(db, player.id, account.puuid);
+  return account.puuid;
 }
 
 /**
