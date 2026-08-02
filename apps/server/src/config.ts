@@ -14,10 +14,6 @@ export interface ServerConfig {
   adminToken: string;
   /** Exact origins allowed to call the API. '*' allows any. */
   allowedOrigins: string[];
-  /** New signups land as 'pending' unless this is true. */
-  autoApproveSignups: boolean;
-  /** Cap on Riot lookups triggered by the public signup form, per day. */
-  signupLookupsPerDay: number;
   platform: PlatformId;
   tournament: TournamentMeta;
 }
@@ -84,8 +80,6 @@ export function loadConfig(root: string): ServerConfig {
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
-    autoApproveSignups: env('AUTO_APPROVE_SIGNUPS') === 'true',
-    signupLookupsPerDay: envInt('SIGNUP_LOOKUPS_PER_DAY', 200),
     platform,
     tournament: {
       name: file.name,

@@ -8,7 +8,6 @@ import { loadConfig } from './config';
 import { openDatabase } from './db/index';
 import { listPlayers } from './db/players';
 import { adminRoutes } from './routes/admin';
-import { signupRoutes } from './routes/signup';
 import { buildSnapshot } from './snapshot';
 import { Scheduler } from './sync/scheduler';
 
@@ -38,7 +37,7 @@ app.use(
       if (config.allowedOrigins.includes('*')) return origin ?? '*';
       return config.allowedOrigins.includes(origin) ? origin : null;
     },
-    allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,
   }),
@@ -48,8 +47,10 @@ app.get('/api/health', (context) =>
   context.json({
     ok: true,
     source: config.useMockData ? 'mock' : 'riot',
+    // The panel needs the platform to build OP.GG links.
+    platform: config.platform,
+    tournament: config.tournament.name,
     approved: listPlayers(db, 'approved').length,
-    pending: listPlayers(db, 'pending').length,
   }),
 );
 
@@ -61,7 +62,6 @@ app.get('/api/snapshot', (context) => {
   return context.json(snapshot);
 });
 
-app.route('/api/signup', signupRoutes(db, config));
 app.route('/api/admin', adminRoutes(db, config, scheduler));
 
 app.notFound((context) => context.json({ error: 'Not found' }, 404));

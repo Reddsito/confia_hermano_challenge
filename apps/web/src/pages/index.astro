@@ -43,6 +43,14 @@ const playerCount = snapshot.players.length;
     <Dashboard initialSnapshot={snapshot} client:load />
 
     <footer class="mt-20 border-t border-line pt-6 text-fluid-xs text-ink-3">
+      <p class="mb-4">
+        <a
+          href="/panel"
+          class="eyebrow text-ink-3 transition-colors hover:text-ink"
+        >
+          Edit roster →
+        </a>
+      </p>
       <p class="max-w-3xl">
         {tournament.name} isn't endorsed by Riot Games and doesn't reflect the views
         or opinions of Riot Games or anyone officially involved in producing or managing

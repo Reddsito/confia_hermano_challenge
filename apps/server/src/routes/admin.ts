@@ -1,15 +1,18 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { ROLES, type Role } from '@challenge/core/domain';
+import { RiotApiError, RiotClient } from '@challenge/core/riot';
 import { Hono } from 'hono';
 
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import {
   deletePlayer,
+  findPlayerByRiotId,
   insertPlayer,
   listPlayers,
   setPlayerStatus,
+  updatePlayer,
   type PlayerStatus,
 } from '../db/players';
 import type { Scheduler } from '../sync/scheduler';
@@ -62,14 +65,54 @@ export function adminRoutes(
       );
     }
 
+    if (findPlayerByRiotId(db, gameName, tagLine)) {
+      return context.json({ error: 'That Riot ID is already on the roster.' }, 409);
+    }
+
+    // Verifying here means a typo is caught while someone is looking at the
+    // panel, instead of becoming an empty row on the leaderboard days later.
+    const verified = await verifyRiotId(gameName, tagLine);
+    if (!verified.ok) {
+      return context.json({ error: verified.error }, verified.status);
+    }
+
     const player = insertPlayer(db, {
-      displayName: (body.displayName ?? '').trim() || gameName,
-      gameName,
-      tagLine,
+      displayName: (body.displayName ?? '').trim() || verified.gameName,
+      gameName: verified.gameName,
+      tagLine: verified.tagLine,
       role,
       status: 'approved',
+      puuid: verified.puuid,
     });
     return context.json({ player }, 201);
+  });
+
+  app.patch('/players/:id', async (context) => {
+    const body = await context.req.json<{
+      displayName?: string;
+      gameName?: string;
+      tagLine?: string;
+      role?: string;
+    }>();
+
+    if (body.role && !ROLES.includes(body.role.toUpperCase() as Role)) {
+      return context.json({ error: 'Invalid role.' }, 400);
+    }
+
+    const result = updatePlayer(db, context.req.param('id'), {
+      displayName: body.displayName,
+      gameName: body.gameName,
+      tagLine: body.tagLine,
+      role: body.role ? (body.role.toUpperCase() as Role) : undefined,
+    });
+
+    if (!result) return context.json({ error: 'No such player' }, 404);
+
+    return context.json({
+      player: result.player,
+      // Surfaced so the panel can explain why the stats went back to zero.
+      statsReset: result.riotIdChanged,
+    });
   });
 
   app.post('/players/:id/approve', (context) => {
@@ -100,6 +143,48 @@ export function adminRoutes(
       ? context.json({ report })
       : context.json({ error: 'A cycle is already running.' }, 409);
   });
+
+  /**
+   * Resolves a Riot ID so the panel can reject typos immediately. In mock mode
+   * there is no key to check against, so the input is taken as typed.
+   */
+  async function verifyRiotId(
+    gameName: string,
+    tagLine: string,
+  ): Promise<
+    // `ok` is a literal discriminant so TypeScript narrows the union at the
+    // call site; a `null | string` field does not narrow.
+    | { ok: true; gameName: string; tagLine: string; puuid: string | null }
+    | { ok: false; error: string; status: 404 | 502 }
+  > {
+    if (config.useMockData) {
+      return { ok: true, gameName, tagLine, puuid: null };
+    }
+
+    try {
+      const client = new RiotClient(config.riotApiKey, config.platform);
+      const account = await client.getAccountByRiotId(gameName, tagLine);
+      return {
+        ok: true,
+        gameName: account.gameName,
+        tagLine: account.tagLine,
+        puuid: account.puuid,
+      };
+    } catch (error) {
+      if (error instanceof RiotApiError && error.status === 404) {
+        return {
+          ok: false,
+          error: `No account found for ${gameName}#${tagLine} on ${config.platform}. Check the spelling and the tag.`,
+          status: 404,
+        };
+      }
+      return {
+        ok: false,
+        error: 'Riot did not answer. Try again in a minute.',
+        status: 502,
+      };
+    }
+  }
 
   return app;
 }

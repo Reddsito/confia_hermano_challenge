@@ -150,6 +150,59 @@ export function deletePlayer(db: Db, id: string): boolean {
   return db.prepare('DELETE FROM players WHERE id = ?').run(id).changes > 0;
 }
 
+export interface PlayerEdit {
+  displayName?: string;
+  gameName?: string;
+  tagLine?: string;
+  role?: Role;
+}
+
+/**
+ * Applies an edit and reports whether the Riot ID changed. A changed Riot ID
+ * means a different account, so the caller must discard the accumulated stats —
+ * keeping them would attribute one person's climb to another.
+ */
+export function updatePlayer(
+  db: Db,
+  id: string,
+  edit: PlayerEdit,
+): { player: PlayerRow; riotIdChanged: boolean } | null {
+  const current = db.prepare('SELECT * FROM players WHERE id = ?').get(id) as
+    | RawPlayer
+    | undefined;
+  if (!current) return null;
+
+  const gameName = edit.gameName?.trim() || current.game_name;
+  const tagLine = edit.tagLine?.trim().replace(/^#/, '') || current.tag_line;
+  const riotIdChanged =
+    gameName.toLowerCase() !== current.game_name.toLowerCase() ||
+    tagLine.toLowerCase() !== current.tag_line.toLowerCase();
+
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE players SET display_name = ?, game_name = ?, tag_line = ?, role = ?, puuid = ?
+       WHERE id = ?`,
+    ).run(
+      edit.displayName?.trim() || current.display_name,
+      gameName,
+      tagLine,
+      edit.role ?? current.role,
+      riotIdChanged ? null : current.puuid,
+      id,
+    );
+
+    if (riotIdChanged) {
+      db.prepare('DELETE FROM player_state WHERE player_id = ?').run(id);
+      db.prepare('DELETE FROM processed_matches WHERE player_id = ?').run(id);
+    }
+  })();
+
+  const updated = db.prepare('SELECT * FROM players WHERE id = ?').get(id) as
+    | RawPlayer
+    | undefined;
+  return updated ? { player: toPlayer(updated), riotIdChanged } : null;
+}
+
 export function setPlayerPuuid(db: Db, id: string, puuid: string): void {
   db.prepare('UPDATE players SET puuid = ? WHERE id = ?').run(puuid, id);
 }
