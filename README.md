@@ -50,7 +50,6 @@ pnpm install
 ```bash
 cd apps/server
 cp env.example .env          # then edit it, see below
-pnpm seed                    # imports the roster from tournament.config.json
 pnpm dev                     # http://localhost:8787
 ```
 
@@ -72,7 +71,11 @@ pnpm dev                     # http://localhost:4321
 ```
 
 It defaults to `http://localhost:8787`, so no configuration is needed locally.
-The roster panel is at `/panel`.
+
+Then open `/panel`, enter your `ADMIN_TOKEN`, and add the players. The roster
+lives in the database and is edited only there — `tournament.config.json` holds
+tournament-wide settings (name, dates, platform, queue, interval) and nothing
+about who is playing.
 
 ### Switching to real Riot data
 
@@ -117,7 +120,7 @@ REFRESH_INTERVAL_MINUTES=2
 ```bash
 docker compose up -d --build
 docker compose logs -f api
-docker compose exec api pnpm seed     # first run only
+# then open https://your-site.pages.dev/panel and add the players
 ```
 
 The compose file publishes to `127.0.0.1:8787`, not `0.0.0.0` — the container is

@@ -6,14 +6,5 @@
   "queue": "RANKED_SOLO_5x5",
   "startsAt": "2026-08-01T00:00:00.000Z",
   "endsAt": "2026-09-01T22:00:00.000Z",
-  "refreshIntervalMinutes": 2,
-  "players": [
-    {
-      "id": "p01",
-      "displayName": "CAMBIAME",
-      "gameName": "CAMBIAME",
-      "tagLine": "LAN",
-      "role": "MID"
-    }
-  ]
+  "refreshIntervalMinutes": 2
 }

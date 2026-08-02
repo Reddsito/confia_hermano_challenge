@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { ROLES, type Role, type TournamentMeta } from '@challenge/core/domain';
+import type { TournamentMeta } from '@challenge/core/domain';
 import { isPlatformId, type PlatformId } from '@challenge/core/riot';
 
 export interface ServerConfig {
@@ -18,15 +18,7 @@ export interface ServerConfig {
   tournament: TournamentMeta;
 }
 
-export interface TournamentFile extends TournamentMeta {
-  players?: Array<{
-    id?: string;
-    displayName: string;
-    gameName: string;
-    tagLine: string;
-    role: Role;
-  }>;
-}
+export type TournamentFile = TournamentMeta;
 
 function env(name: string, fallback = ''): string {
   return process.env[name]?.trim() || fallback;
@@ -60,14 +52,6 @@ export function loadConfig(root: string): ServerConfig {
     throw new Error(
       'ADMIN_TOKEN is required outside mock mode, otherwise the admin API is open to anyone.',
     );
-  }
-
-  for (const player of file.players ?? []) {
-    if (!ROLES.includes(player.role)) {
-      throw new Error(
-        `Seed player "${player.displayName}" has invalid role "${player.role}".`,
-      );
-    }
   }
 
   return {
