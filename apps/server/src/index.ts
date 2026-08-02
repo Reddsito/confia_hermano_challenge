@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config';
 import { openDatabase } from './db/index';
 import { listPlayers } from './db/players';
+import { seedDefaultChallenges } from './db/shells';
+import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
+import { shellRoutes } from './routes/shells';
 import { buildSnapshot } from './snapshot';
 import { Scheduler } from './sync/scheduler';
 
@@ -21,6 +24,8 @@ try {
 
 const config = loadConfig(ROOT);
 const db = openDatabase(config.databasePath);
+// The wheel must never be empty when someone spends a shell.
+seedDefaultChallenges(db);
 const scheduler = new Scheduler(db, config);
 
 const app = new Hono();
@@ -62,6 +67,8 @@ app.get('/api/snapshot', (context) => {
   return context.json(snapshot);
 });
 
+app.route('/api/auth', authRoutes(db, config));
+app.route('/api/shells', shellRoutes(db, config));
 app.route('/api/admin', adminRoutes(db, config, scheduler));
 
 app.notFound((context) => context.json({ error: 'Not found' }, 404));

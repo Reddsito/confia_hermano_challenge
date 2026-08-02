@@ -173,3 +173,23 @@ export function newLeaderEmbed(
     timestamp: new Date().toISOString(),
   };
 }
+
+/** Fired by one participant at another. The loud one — this is the whole game. */
+export function shellThrowEmbed(
+  fromName: string,
+  toName: string,
+  challengeName: string,
+  challengeDetail: string,
+  context: EmbedContext,
+): DiscordEmbed {
+  return {
+    color: 0x22d3ee,
+    author: { name: `${fromName} lanzó una Blue Shell` },
+    title: `Le cayó a ${toName}`,
+    description: `**${challengeName}**${challengeDetail ? `\n${challengeDetail}` : ''}`,
+    thumbnail: { url: profileIcon(context.profileIconId) ?? championIcon('Ahri') },
+    url: context.siteUrl,
+    footer: { text: context.tournamentName },
+    timestamp: new Date().toISOString(),
+  };
+}

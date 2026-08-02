@@ -20,6 +20,14 @@ export interface ServerConfig {
   discord: DiscordConfig | null;
   /** Public site URL, used for links inside Discord messages. */
   siteUrl: string;
+  /** Null unless a Discord application is configured for login. */
+  discordOAuth: {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+  } | null;
+  /** Signs login sessions. Falls back to ADMIN_TOKEN so it is never empty. */
+  sessionSecret: string;
   platform: PlatformId;
   tournament: TournamentMeta;
 }
@@ -71,6 +79,17 @@ export function loadConfig(root: string): ServerConfig {
       .map((origin) => origin.trim())
       .filter(Boolean),
     siteUrl: env('SITE_URL'),
+    sessionSecret: env('SESSION_SECRET') || adminToken || 'insecure-dev-secret',
+    discordOAuth:
+      env('DISCORD_CLIENT_ID') && env('DISCORD_CLIENT_SECRET')
+        ? {
+            clientId: env('DISCORD_CLIENT_ID'),
+            clientSecret: env('DISCORD_CLIENT_SECRET'),
+            redirectUri:
+              env('DISCORD_REDIRECT_URI') ||
+              `http://localhost:${envInt('PORT', 8787)}/api/auth/discord/callback`,
+          }
+        : null,
     discord: env('DISCORD_WEBHOOK_URL')
       ? {
           webhookUrl: env('DISCORD_WEBHOOK_URL'),

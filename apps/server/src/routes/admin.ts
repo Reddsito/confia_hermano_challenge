@@ -15,6 +15,13 @@ import {
   updatePlayer,
   type PlayerStatus,
 } from '../db/players';
+import {
+  deleteChallenge,
+  insertChallenge,
+  listChallenges,
+  updateChallenge,
+} from '../db/shells';
+import { linkDiscordUser, listDiscordUsers } from '../db/users';
 import type { Scheduler } from '../sync/scheduler';
 
 /** Constant-time compare so the token cannot be guessed by timing the response. */
@@ -134,6 +141,62 @@ export function adminRoutes(
     return changed
       ? context.json({ ok: true })
       : context.json({ error: 'No such player' }, 404);
+  });
+
+  app.get('/discord-users', (context) =>
+    context.json({ users: listDiscordUsers(db) }),
+  );
+
+  /** Links a Discord account to a roster entry, or unlinks it with null. */
+  app.post('/discord-users/:discordId/link', async (context) => {
+    const body = await context.req
+      .json<{ playerId?: string | null }>()
+      .catch(() => ({}) as { playerId?: string | null });
+
+    const playerId = body.playerId ?? null;
+    if (playerId && !listPlayers(db).some((player) => player.id === playerId)) {
+      return context.json({ error: 'No such player' }, 404);
+    }
+
+    const ok = linkDiscordUser(db, context.req.param('discordId'), playerId);
+    return ok
+      ? context.json({ ok: true })
+      : context.json({ error: 'No such Discord user' }, 404);
+  });
+
+  app.get('/challenges', (context) =>
+    context.json({ challenges: listChallenges(db) }),
+  );
+
+  app.post('/challenges', async (context) => {
+    const body = await context.req.json<{
+      name?: string;
+      detail?: string;
+      weight?: number;
+    }>();
+    const name = (body.name ?? '').trim();
+    if (!name) return context.json({ error: 'A challenge needs a name.' }, 400);
+
+    return context.json(
+      { challenge: insertChallenge(db, { name, detail: body.detail, weight: body.weight }) },
+      201,
+    );
+  });
+
+  app.patch('/challenges/:id', async (context) => {
+    const body = await context.req.json<{
+      name?: string;
+      detail?: string;
+      weight?: number;
+      enabled?: boolean;
+    }>();
+    const ok = updateChallenge(db, context.req.param('id'), body);
+    return ok ? context.json({ ok: true }) : context.json({ error: 'Not found' }, 404);
+  });
+
+  app.delete('/challenges/:id', (context) => {
+    const ok = deleteChallenge(db, context.req.param('id'));
+    return ok ? context.json({ ok: true }) : context.json({ error: 'Not found' }, 404);
   });
 
   /** Forces a cycle now instead of waiting for the next tick. */
