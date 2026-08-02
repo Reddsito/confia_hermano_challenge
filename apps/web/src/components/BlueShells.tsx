@@ -38,9 +38,11 @@ export function BlueShells({
   const [odds, setOdds] = useState<ChallengeOdds[]>([]);
   const [target, setTarget] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
-  const [landed, setLanded] = useState<{ name: string; detail: string } | null>(
-    null,
-  );
+  // The whole challenge, not just its text: two entries can share a name, and
+  // the wheel has to stop on the exact one the server drew.
+  const [landed, setLanded] = useState<
+    { id: string; name: string; detail: string } | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -80,6 +82,9 @@ export function BlueShells({
       // The server draws before the reel moves. A client-side spin would be a
       // re-roll away from meaningless.
       const outcome = await throwShell(token, target);
+      // The wheel may be out of date if someone edited it while this page was
+      // open; refresh it first so the drawn slice exists to stop on.
+      setOdds(await fetchChallenges());
       setLanded(outcome.challenge);
       await new Promise((resolve) => setTimeout(resolve, SPIN_MS));
       await reload();
@@ -192,7 +197,7 @@ function Wheel({
 }: {
   odds: ChallengeOdds[];
   spinning: boolean;
-  landed: { name: string; detail: string } | null;
+  landed: { id: string; name: string; detail: string } | null;
   targetName: string | null;
 }) {
   const [rotation, setRotation] = useState(0);
@@ -212,7 +217,9 @@ function Wheel({
   useEffect(() => {
     if (!landed || slices.length === 0) return;
 
-    const target = slices.find((s) => s.challenge.name === landed.name);
+    const target = slices.find((s) => s.challenge.id === landed.id);
+    // Nothing to point at if the entry was deleted mid-spin; the result is
+    // still shown as text below.
     if (!target) return;
 
     const reduced =
@@ -281,7 +288,7 @@ function Wheel({
           }}
         >
           {slices.map((slice, index) => {
-            const isLanded = done && slice.challenge.name === landed?.name;
+            const isLanded = done && slice.challenge.id === landed?.id;
             return (
               <path
                 key={slice.challenge.id}
