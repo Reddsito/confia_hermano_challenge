@@ -303,7 +303,9 @@ async function syncPlayer(
 
   // Only the transition is interesting; re-announcing every cycle while someone
   // sits in a 40-minute game would be spam.
-  if (activeGame && !wasInGame) {
+  // Customs and ARAMs are visible to the spectator API but mean nothing to the
+  // challenge, so they stay out of the channel.
+  if (activeGame && !wasInGame && activeGame.gameQueueConfigId === queueId) {
     notifier.push(
       'in_game',
       inGameEmbed(

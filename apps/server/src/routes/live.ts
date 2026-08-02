@@ -14,15 +14,19 @@ function championIcon(championId: number): string {
 }
 
 const QUEUE_LABEL: Record<number, string> = {
-  420: 'Ranked Solo/Duo',
-  440: 'Ranked Flex',
-  400: 'Normal Draft',
-  430: 'Normal Blind',
-  450: 'ARAM',
   0: 'Custom',
+  400: 'Normal Draft',
+  420: 'Ranked Solo/Duo',
+  430: 'Normal Blind',
+  440: 'Ranked Flex',
+  450: 'ARAM',
+  490: 'Quickplay',
+  700: 'Clash',
+  1700: 'Arena',
+  3100: 'Custom',
 };
 
-export function liveRoutes(db: Db) {
+export function liveRoutes(db: Db, challengeQueueId: number) {
   const app = new Hono();
 
   /**
@@ -69,6 +73,10 @@ export function liveRoutes(db: Db) {
           queueId: game.queueId,
           queueLabel: QUEUE_LABEL[game.queueId] ?? `Queue ${game.queueId}`,
           gameLength: game.gameLength,
+          // Riot reports a negative length during champion select, before the
+          // clock starts. Surfaced rather than clamped, so the UI can say so.
+          inChampSelect: game.gameLength < 0,
+          countsForChallenge: game.queueId === challengeQueueId,
           trackedPlayerIds: playerIds,
           allies: game.participants
             .filter((participant) => participant.teamId === ours)

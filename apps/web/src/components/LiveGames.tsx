@@ -21,6 +21,8 @@ interface LiveGame {
   queueLabel: string;
   gameLength: number;
   trackedPlayerIds: string[];
+  inChampSelect: boolean;
+  countsForChallenge: boolean;
   allies: LiveParticipant[];
   enemies: LiveParticipant[];
 }
@@ -68,7 +70,7 @@ export function LiveGames({ players }: { players: RankedPlayer[] }) {
     return (
       <Empty
         title="Nobody is playing"
-        detail="Games show up here within a couple of minutes of starting. Custom games and the practice tool never appear — Riot does not publish them."
+        detail="Games show up here within a couple of minutes of starting. The practice tool never appears — Riot only publishes games that can be spectated."
       />
     );
   }
@@ -107,7 +109,22 @@ function GameCard({
             {tracked.map((player) => player.displayName).join(' · ') ||
               'Tracked player'}
           </p>
-          <p className="text-[0.68rem] text-ink-3">{game.queueLabel}</p>
+          <p className="flex flex-wrap items-center gap-1.5 text-[0.68rem] text-ink-3">
+            {game.queueLabel}
+            {!game.countsForChallenge && (
+              <span
+                className="rounded px-1 py-px"
+                style={{
+                  color: 'var(--color-mark-amber)',
+                  background:
+                    'color-mix(in oklab, var(--color-mark-amber) 16%, transparent)',
+                }}
+                title="This queue does not count towards the challenge"
+              >
+                doesn't count
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -123,7 +140,7 @@ function GameCard({
         </div>
 
         <span className="tabular text-fluid-sm text-ink-2">
-          {formatLength(game.gameLength)}
+          {game.inChampSelect ? 'Champ select' : formatLength(game.gameLength)}
         </span>
       </header>
 
