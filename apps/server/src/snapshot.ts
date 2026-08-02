@@ -22,6 +22,7 @@ import {
 } from './db/players';
 import { balanceFor, lastHits, pendingThrows } from './db/shells';
 import { newLeaderEmbed } from './discord/embeds';
+import { mentionFor } from './db/users';
 import type { DiscordNotifier } from './discord/notifier';
 import { computeStreak, topChampions } from './sync/helpers';
 
@@ -145,6 +146,8 @@ export function recordPositions(
           profileIconId: leader.profileIconId,
         },
       ),
+      `@everyone ${mentionFor(db, leader.id) ?? leader.displayName} tomó el primer puesto`,
+      true,
     );
   }
 

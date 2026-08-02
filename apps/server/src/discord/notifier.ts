@@ -25,6 +25,11 @@ interface Queued {
    * Discord never pings for a mention written inside an embed.
    */
   content?: string;
+  /**
+   * Whether this message may ping the whole server. Reserved for the rare
+   * events that genuinely warrant it.
+   */
+  everyone?: boolean;
 }
 
 /** Discord accepts at most 10 embeds per message. */
@@ -51,9 +56,14 @@ export class DiscordNotifier {
     return this.config?.events.has(event) ?? false;
   }
 
-  push(event: DiscordEvent, embed: DiscordEmbed, content?: string): void {
+  push(
+    event: DiscordEvent,
+    embed: DiscordEmbed,
+    content?: string,
+    everyone = false,
+  ): void {
     if (!this.wants(event)) return;
-    this.queue.push({ event, embed, content });
+    this.queue.push({ event, embed, content, everyone });
   }
 
   async flush(): Promise<void> {
@@ -62,8 +72,18 @@ export class DiscordNotifier {
     const pending = this.queue;
     this.queue = [];
 
-    for (let i = 0; i < pending.length; i += MAX_EMBEDS_PER_MESSAGE) {
-      const batch = pending.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
+    // Anything allowed to ping the server is sent on its own. Batching it with
+    // ordinary messages would extend that permission to their text too, and a
+    // challenge named "@everyone do pushups" would reach the whole server.
+    const loud = pending.filter((item) => item.everyone);
+    const normal = pending.filter((item) => !item.everyone);
+
+    for (const item of loud) {
+      await this.send([item.embed], item.content, true);
+    }
+
+    for (let i = 0; i < normal.length; i += MAX_EMBEDS_PER_MESSAGE) {
+      const batch = normal.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
       const content = batch
         .map((item) => item.content)
         .filter(Boolean)
@@ -79,6 +99,7 @@ export class DiscordNotifier {
   private async send(
     embeds: DiscordEmbed[],
     content?: string,
+    everyone = false,
   ): Promise<void> {
     if (!this.config) return;
 
@@ -90,9 +111,11 @@ export class DiscordNotifier {
           username: this.config.username,
           avatar_url: this.config.avatarUrl,
           content,
-          // Only user mentions notify. Without this, a stray @everyone in a
+          // Explicitly enumerated: without this, an @everyone typed into a
           // challenge name would ping the whole server.
-          allowed_mentions: { parse: ['users'] },
+          allowed_mentions: {
+            parse: everyone ? ['users', 'everyone'] : ['users'],
+          },
           embeds,
         }),
       });
@@ -100,7 +123,7 @@ export class DiscordNotifier {
       if (response.status === 429) {
         const retryAfter = Number(response.headers.get('Retry-After') ?? '2');
         await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-        await this.send(embeds, content);
+        await this.send(embeds, content, everyone);
         return;
       }
 
