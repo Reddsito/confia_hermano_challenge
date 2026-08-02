@@ -1,158 +1,208 @@
 # Confia Hermano Challenge
 
-Leaderboard for a private League of Legends SoloQ challenge. Renders standings,
-a podium, per-role filters and aggregate statistics, and refreshes itself on a
-fixed interval.
+Leaderboard for a private League of Legends SoloQ challenge. Standings, podium,
+per-role filters, aggregate statistics, and a roster panel the group edits with
+one shared code.
 
-Built with Astro (static output), one React island for the interactive parts,
-and a separate Node worker that talks to the Riot API.
-
-## How it works
+## Layout
 
 ```
-scripts/refresh.ts  ──►  Riot API  ──►  data/state.json
-        │                                     │
-        └──────────────────────────►  public/data/snapshot.json
-                                              │
-                              Astro renders it at build time
-                                              │
-                              React island re-fetches every cycle
+packages/core     Domain logic (ladder points, win rate, KDA) + Riot client.
+apps/web          Astro static site, one React island. Deploys to Cloudflare Pages.
+apps/server       Hono + SQLite. Polls Riot, serves the API. Runs in Docker on a VPS.
+deploy/Caddyfile  TLS terminator to put in front of the API.
+```
+
+`packages/core` knows nothing about React, Hono or SQLite, which is why the same
+ranking maths runs in the browser and on the server without duplication.
+
+## How the pieces talk
+
+```
+apps/server ──poll──► Riot API
+     │
+     └── SQLite ──► GET /api/snapshot ──► apps/web (build + client polling)
+                 ◄── /api/admin/*      ◄── /panel (shared code)
 ```
 
 Two rules drive this shape:
 
-1. **The browser never talks to Riot.** The API key stays on the machine running
-   the worker. A key shipped to the client is a leaked key.
-2. **The worker is the only consumer of the API.** It owns the rate limiter, so
-   traffic to Riot is a function of the refresh interval and the roster size —
-   not of how many people have the page open.
+1. **The browser never talks to Riot.** The API key lives only on the server. A
+   key shipped to the client is a leaked key.
+2. **The server is the only consumer of the Riot API.** It owns the rate
+   limiter, so traffic to Riot depends on the refresh interval and roster size,
+   never on how many people have the page open.
 
-`data/state.json` accumulates per-player totals and the set of matches already
-counted, so each cycle only downloads matches it has never seen.
+Match ingestion is idempotent at the database level: `processed_matches` has a
+`(player_id, match_id)` primary key, and the counters and that marker are
+written in one transaction. A crash mid-cycle can never double-count.
 
-## Getting started
+---
+
+## Running it locally
 
 ```bash
 pnpm install
-pnpm refresh      # writes public/data/snapshot.json using simulated data
-pnpm dev
 ```
 
-The site works immediately with mock data — no Riot key required. Use this to
-build and review the UI without spending rate limit.
+### 1. Backend
 
-## Going live with real data
-
-1. Get a key at [developer.riotgames.com](https://developer.riotgames.com).
-   Development keys expire every 24 hours. For a private challenge, register the
-   product and request a **Personal key**, which does not expire.
-2. `cp env.example .env` and fill in `RIOT_API_KEY`, then set `DATA_SOURCE=riot`.
-3. Edit `tournament.config.json` with the real roster and dates.
-4. `pnpm refresh` once to verify, then `pnpm refresh:watch` to keep it running.
-
-### tournament.config.json
-
-| Field                    | Meaning                                                    |
-| ------------------------ | ---------------------------------------------------------- |
-| `platform`               | Riot platform id (`euw1`, `na1`, `la2`, …), not the region |
-| `queue`                  | `RANKED_SOLO_5x5` or `RANKED_FLEX_SR`                      |
-| `startsAt` / `endsAt`    | ISO timestamps; drive LP-gained and the end countdown      |
-| `refreshIntervalMinutes` | Worker cadence and the countdown the page displays         |
-| `players[].role`         | One of `TOP`, `JUNGLE`, `MID`, `ADC`, `SUPPORT`            |
-| `players[].mock`         | Optional fixture for mock mode; ignored when using Riot    |
-
-A `mock` block pins a player to fixed values so the simulated board keeps a
-known shape. `ladderPoints` is absolute: `2800` is Master 0 LP, `0` is Iron IV.
-
-```json
-"mock": { "wins": 100, "losses": 0, "ladderPoints": 4108, "startLadderPoints": 2800 }
+```bash
+cd apps/server
+cp env.example .env          # then edit it, see below
+pnpm seed                    # imports the roster from tournament.config.json
+pnpm dev                     # http://localhost:8787
 ```
 
-The config is validated on startup — a bad role or a malformed date fails loudly
-instead of producing a half-broken leaderboard.
+Minimum to set in `apps/server/.env`:
+
+```ini
+DATA_SOURCE=mock             # "mock" needs no Riot key at all
+PLATFORM=euw1                # euw1 / na1 / la1 / la2 / kr ...
+ADMIN_TOKEN=devtoken         # the code /panel asks for
+ALLOWED_ORIGINS=*            # local dev only
+```
+
+### 2. Frontend
+
+In a second terminal, from the repo root:
+
+```bash
+pnpm dev                     # http://localhost:4321
+```
+
+It defaults to `http://localhost:8787`, so no configuration is needed locally.
+The roster panel is at `/panel`.
+
+### Switching to real Riot data
+
+```bash
+cd apps/server
+# in .env: DATA_SOURCE=riot, RIOT_API_KEY=RGAPI-..., real PLATFORM
+pnpm doctor                  # validates the key and every Riot ID first
+pnpm sync                    # one cycle, then check the site
+```
+
+`pnpm doctor` makes a single probe request and prints the live
+`X-App-Rate-Limit` headers plus a per-player resolution report. Run it before
+`pnpm sync` — a typo in a tag shows up there instead of as an empty row days
+later.
+
+---
+
+## Deploying the backend
+
+The frontend is on Cloudflare Pages and the backend on your own machine, so
+every browser call is cross-origin and **the API must be served over HTTPS**.
+A browser on an HTTPS page refuses to call `http://`.
+
+### 1. On the VPS
+
+```bash
+git clone <your-repo> && cd soloq-challenge
+cp apps/server/env.example apps/server/.env
+```
+
+Production `.env`:
+
+```ini
+DATA_SOURCE=riot
+RIOT_API_KEY=RGAPI-...
+PLATFORM=euw1
+ADMIN_TOKEN=<openssl rand -hex 32>
+ALLOWED_ORIGINS=https://your-site.pages.dev
+REFRESH_INTERVAL_MINUTES=2
+```
+
+```bash
+docker compose up -d --build
+docker compose logs -f api
+docker compose exec api pnpm seed     # first run only
+```
+
+The compose file publishes to `127.0.0.1:8787`, not `0.0.0.0` — the container is
+only reachable through the TLS terminator.
+
+### 2. TLS
+
+Point an A record at the VPS, edit the domain in `deploy/Caddyfile`, then run
+Caddy. It obtains and renews the certificate itself.
+
+### 3. Frontend
+
+On Cloudflare Pages:
+
+- Build command: `pnpm install && pnpm build`
+- Output directory: `apps/web/dist`
+- Environment variable: `PUBLIC_API_URL=https://api.your-domain.com`
+
+Then put that Pages URL into the backend's `ALLOWED_ORIGINS` and restart it.
+
+### Operational notes
+
+- **The volume is not optional.** The SQLite file lives on a named volume; if it
+  lived in the image, every redeploy would wipe the accumulated totals and the
+  challenge would restart from zero.
+- **`.dockerignore` keeps `.env`, `data/` and the frontend out of the image.**
+  Without it the Riot key and admin token get baked into anything you publish.
+- Back up by copying the volume, or
+  `docker compose exec api node -e "..."` against the database file.
+
+---
 
 ## Rate limit budget
 
-Per cycle, per player: 1 ACCOUNT-V1 + 1 SUMMONER-V4 + 1 LEAGUE-V4 +
-1 SPECTATOR-V5 + 1 MATCH-V5 list, plus one MATCH-V5 detail per *new* match.
-That is ~5 calls per player in a quiet cycle.
+Per cycle, per player: 1 SUMMONER-V4 + 1 LEAGUE-V4 + 1 MATCH-V5 list +
+1 SPECTATOR-V5, plus one MATCH-V5 detail per *new* match. ACCOUNT-V1 runs only
+once per player, since the PUUID is cached on the row.
 
-With a 100-requests-per-2-minutes budget, a 2-minute cycle supports roughly
-**15 players** before the limiter starts pacing calls into the next window.
-Raise `refreshIntervalMinutes` as the roster grows — the limiter will never
-exceed the budget, it will just take longer to finish a cycle.
+That is ~4 calls per player in a quiet cycle. With a 100-per-2-minutes budget, a
+2-minute cycle comfortably supports ~15 players. Raise
+`REFRESH_INTERVAL_MINUTES` as the roster grows — the limiter never exceeds the
+budget, cycles just take longer.
 
-Both limit windows are enforced in `src/lib/riot/rate-limiter.ts`, and a 429
-response applies a penalty derived from Riot's `Retry-After` header.
+Both windows are enforced in `packages/core/src/riot/rate-limiter.ts`, and a 429
+applies a penalty derived from Riot's `Retry-After` header.
 
-## Deployment
+---
 
-`pnpm build` produces a static `dist/`. Host it anywhere.
+## The roster panel
 
-The worker runs separately and must be able to write into the same
-`public/data/snapshot.json` the site serves. Two workable setups:
+`/panel` asks for one shared code (the backend's `ADMIN_TOKEN`), stored in
+localStorage. Anyone with the code can add, rename, hide or delete players, and
+force a refresh. It is a group password, not a user account system.
 
-- **Single box**: serve `dist/` with any static server and run
-  `pnpm refresh:watch` alongside it, writing into `dist/data/snapshot.json`.
-- **Static host**: run the worker on a small VPS or a cron job that pushes the
-  updated `snapshot.json` to object storage the site reads from.
+Adding a player verifies the Riot ID against ACCOUNT-V1, so typos are rejected
+immediately. **Changing a player's Riot ID clears their accumulated stats** —
+the row now points at a different account, and keeping the totals would credit
+one person's climb to another. The panel warns before saving.
 
-## Project layout
+---
 
-```
-src/lib/domain/     Pure logic: ladder points, win rate, KDA. No I/O.
-src/lib/riot/       Riot API client, dual routing, rate limiter.
-src/lib/providers/  Mock and Riot data sources; accumulated worker state.
-src/components/     React island and its presentational pieces.
-src/pages/          Astro page; reads the snapshot at build time.
-scripts/refresh.ts  The worker entry point.
-```
+## Design notes
 
-`domain` knows nothing about Riot or React, which is why the mock provider and
-the real one are interchangeable without touching a single component.
+Single dark mode, deliberately. Three colour layers:
 
-## Notes on the design
+- **Monochrome** — pure white is the loudest thing on the page.
+- **Accent** (`--color-accent`, cyan) — interaction and liveness only. Never
+  encodes data.
+- **Information** — every player is tinted by their real League tier.
 
-Single dark mode, deliberately. Three colour layers, each with a different job:
-
-- **Monochrome** — pure white is the loudest thing on the page. Rank numbers,
-  LP and the category winners are white; everything else is grey.
-- **Accent** (`--color-accent`, cyan) — interaction and liveness only: active
-  tab, focus ring, live dot, progress rail. It never encodes data.
-- **Information** — every player is tinted by their real League tier, so a row's
-  colour means something instead of decorating it.
-
-The five data-mark colours (`--color-mark-*`) were validated for lightness band,
-chroma floor, contrast against the `#0e1116` surface, and colour-vision
-separation. Changing one means re-validating the whole set.
+The five `--color-mark-*` colours were validated for lightness band, chroma
+floor, contrast against the `#0e1116` surface, and colour-vision separation.
+Changing one means re-validating the set.
 
 Nothing depends on colour alone: win/loss carries counts and a percentage,
-movement carries an arrow plus a number, the live indicator carries a label, and
-every rank carries its tier name.
+movement carries an arrow and a number, the live indicator carries a label.
 
-Type: Chakra Petch for display and UI labels, Inter for body, JetBrains Mono for
-every number so columns align.
+Role glyphs and ranked crests come from Community Dragon and are served from
+this site, not hot-linked. Crests live in `apps/web/public/icons/tiers/`; role
+glyphs are inlined in `src/components/icons.tsx` so they inherit `currentColor`.
 
-`.display`, `.eyebrow`, `.tabular` and `.neon` live inside `@layer components`
-so Tailwind utilities can still override them — without that, a `text-[0.62rem]`
-silently loses to the class's own `font-size`.
+`.display`, `.eyebrow`, `.tabular` and `.neon` live in `@layer components` so
+Tailwind utilities can override them.
 
-## Icons
-
-Role glyphs and ranked crests come from
-[Community Dragon](https://raw.communitydragon.org), and are **served from this
-site**, not hot-linked, so the page has no runtime dependency on anyone else's
-uptime.
-
-- Ranked crests: `public/icons/tiers/*.svg`, pulled from
-  `rcp-fe-lol-static-assets/.../ranked-mini-crests/`. Emerald is only published
-  as SVG there, which is why the whole set is SVG.
-- Role glyphs: redrawn inline in `src/components/icons.tsx` so they inherit
-  `currentColor` instead of Riot's client gold.
-
-To refresh them after a season art change, re-download the crests and bump
-`DDRAGON_VERSION` in `src/components/ui.tsx` for champion and profile art.
-
+---
 
 ## Legal
 
