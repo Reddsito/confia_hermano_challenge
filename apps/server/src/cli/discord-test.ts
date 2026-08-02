@@ -67,6 +67,7 @@ const samples = [
       firstBlood: true,
       surrendered: false,
       killParticipation: 0.68,
+      usedSmite: false,
     },
     rank,
     18,

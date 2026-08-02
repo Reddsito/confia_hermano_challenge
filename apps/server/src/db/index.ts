@@ -105,6 +105,63 @@ const MIGRATIONS: string[] = [
 
   CREATE INDEX idx_lp_history_player ON lp_history (player_id, recorded_at);
   `,
+
+  `
+  -- One row per shell earned. Kept as individual rows rather than a counter so
+  -- the panel can show what each shell was for, and so awarding is idempotent:
+  -- the unique key stops a re-processed match from paying twice.
+  CREATE TABLE blue_shells (
+    id         TEXT PRIMARY KEY,
+    player_id  TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    match_id   TEXT NOT NULL,
+    rule       TEXT NOT NULL,
+    amount     INTEGER NOT NULL,
+    detail     TEXT NOT NULL,
+    earned_at  INTEGER NOT NULL,
+    UNIQUE (player_id, match_id, rule)
+  );
+
+  CREATE INDEX idx_blue_shells_player ON blue_shells (player_id);
+
+  -- The wheel: what can land on someone when a shell is fired at them.
+  CREATE TABLE challenges (
+    id       TEXT PRIMARY KEY,
+    name     TEXT NOT NULL,
+    detail   TEXT NOT NULL DEFAULT '',
+    -- Relative weight, not a percentage. Percentages are derived so editing one
+    -- entry never forces the others to be rebalanced by hand.
+    weight   INTEGER NOT NULL DEFAULT 1,
+    enabled  INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE shell_throws (
+    id           TEXT PRIMARY KEY,
+    from_player  TEXT REFERENCES players (id) ON DELETE SET NULL,
+    to_player    TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    challenge_id TEXT REFERENCES challenges (id) ON DELETE SET NULL,
+    challenge_name TEXT NOT NULL,
+    thrown_at    INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+
+  CREATE INDEX idx_shell_throws_to ON shell_throws (to_player);
+
+  -- Discord identities, so a logged-in user can be matched to a roster entry.
+  CREATE TABLE discord_users (
+    discord_id   TEXT PRIMARY KEY,
+    username     TEXT NOT NULL,
+    avatar       TEXT,
+    player_id    TEXT REFERENCES players (id) ON DELETE SET NULL,
+    is_admin     INTEGER NOT NULL DEFAULT 0,
+    first_seen   INTEGER NOT NULL,
+    last_seen    INTEGER NOT NULL
+  );
+  `,
+
+  // Added after player_matches already existed, so it has to be an ALTER.
+  // Needed to count wins carrying Smite without re-reading every match.
+  `ALTER TABLE player_matches ADD COLUMN used_smite INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export function openDatabase(path: string): Db {

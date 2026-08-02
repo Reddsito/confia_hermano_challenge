@@ -1,0 +1,189 @@
+/**
+ * Blue shells: small rewards earned by doing something notable in a game, and
+ * spent by firing them at another participant.
+ *
+ * This module is deliberately pure. It takes a description of one finished game
+ * plus the running counters that span several games, and returns what was
+ * earned. No database, no Riot client — which is what makes every rule testable
+ * on its own.
+ */
+
+export const SHELL_RULES = [
+  'PENTAKILL',
+  'QUADRAKILL',
+  'KILLS_22',
+  'ASSISTS_30',
+  'WIN_STREAK_6',
+  'PERFECT_KDA_20',
+  'LONG_WIN_40',
+  'FIVE_CHAMPION_WINS',
+  'FIVE_SMITE_WINS',
+] as const;
+
+export type ShellRule = (typeof SHELL_RULES)[number];
+
+export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
+  PENTAKILL: 'Pentakill',
+  QUADRAKILL: 'Quadrakill',
+  KILLS_22: '22 kills in one game',
+  ASSISTS_30: '30 assists in one game',
+  WIN_STREAK_6: '6 wins in a row',
+  PERFECT_KDA_20: 'Perfect KDA above 20',
+  LONG_WIN_40: 'Won a 40 minute game',
+  FIVE_CHAMPION_WINS: '5 wins on 5 different champions',
+  FIVE_SMITE_WINS: '5 wins carrying Smite',
+};
+
+/**
+ * Nobody can sit on more than this many unspent shells. Earning is capped, not
+ * queued: reaching the cap means further achievements pay nothing until some
+ * are fired. It keeps hoarding from turning into an endgame barrage.
+ */
+export const MAX_HELD_SHELLS = 3;
+
+/** Riot's summoner spell id for Smite. */
+export const SMITE_SPELL_ID = 11;
+
+export interface ShellGame {
+  win: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  durationMinutes: number;
+  pentaKills: number;
+  quadraKills: number;
+  championId: number;
+  usedSmite: boolean;
+}
+
+/** Counters that only make sense across several games. */
+export interface ShellProgress {
+  /** Consecutive wins, including this game. */
+  winStreak: number;
+  /** Distinct champions the player has at least one win with, after this game. */
+  distinctChampionWins: number;
+  /** Total wins carrying Smite, after this game. */
+  smiteWins: number;
+}
+
+export interface EarnedShell {
+  rule: ShellRule;
+  /** Pentakills are worth two; everything else is worth one. */
+  amount: number;
+  /** Human-readable detail, e.g. "24 kills". */
+  detail: string;
+}
+
+const KILL_THRESHOLD = 22;
+const ASSIST_THRESHOLD = 30;
+const STREAK_THRESHOLD = 6;
+const PERFECT_KDA_THRESHOLD = 20;
+const LONG_GAME_MINUTES = 40;
+const MILESTONE_STEP = 5;
+
+/**
+ * Every rule that fired for one finished game.
+ *
+ * The milestone rules (5 champions, 5 smite wins) are awarded on the game that
+ * crosses the threshold, which is why they need the post-game counters rather
+ * than the game alone.
+ */
+export function earnedShells(
+  game: ShellGame,
+  progress: ShellProgress,
+): EarnedShell[] {
+  const earned: EarnedShell[] = [];
+
+  if (game.pentaKills > 0) {
+    earned.push({
+      rule: 'PENTAKILL',
+      amount: 2 * game.pentaKills,
+      detail: game.pentaKills > 1 ? `${game.pentaKills} pentakills` : 'Pentakill',
+    });
+  }
+
+  // A pentakill also increments the quadrakill counter, so only award the
+  // quadra when there were more quadras than pentas.
+  const standaloneQuadras = game.quadraKills - game.pentaKills;
+  if (standaloneQuadras > 0) {
+    earned.push({
+      rule: 'QUADRAKILL',
+      amount: standaloneQuadras,
+      detail: standaloneQuadras > 1 ? `${standaloneQuadras} quadrakills` : 'Quadrakill',
+    });
+  }
+
+  if (game.kills >= KILL_THRESHOLD) {
+    earned.push({ rule: 'KILLS_22', amount: 1, detail: `${game.kills} kills` });
+  }
+
+  if (game.assists >= ASSIST_THRESHOLD) {
+    earned.push({
+      rule: 'ASSISTS_30',
+      amount: 1,
+      detail: `${game.assists} assists`,
+    });
+  }
+
+  // Fires on the 6th win and again every 6 after that, so a long run keeps
+  // paying instead of rewarding only the first six.
+  if (
+    game.win &&
+    progress.winStreak >= STREAK_THRESHOLD &&
+    progress.winStreak % STREAK_THRESHOLD === 0
+  ) {
+    earned.push({
+      rule: 'WIN_STREAK_6',
+      amount: 1,
+      detail: `${progress.winStreak} wins in a row`,
+    });
+  }
+
+  // "Perfect" means untouched: zero deaths, not merely a high ratio.
+  if (game.deaths === 0 && game.kills + game.assists > PERFECT_KDA_THRESHOLD) {
+    earned.push({
+      rule: 'PERFECT_KDA_20',
+      amount: 1,
+      detail: `${game.kills}/0/${game.assists} without dying`,
+    });
+  }
+
+  if (game.win && game.durationMinutes >= LONG_GAME_MINUTES) {
+    earned.push({
+      rule: 'LONG_WIN_40',
+      amount: 1,
+      detail: `Won after ${Math.round(game.durationMinutes)} minutes`,
+    });
+  }
+
+  if (
+    game.win &&
+    progress.distinctChampionWins > 0 &&
+    progress.distinctChampionWins % MILESTONE_STEP === 0
+  ) {
+    earned.push({
+      rule: 'FIVE_CHAMPION_WINS',
+      amount: 1,
+      detail: `Won with ${progress.distinctChampionWins} different champions`,
+    });
+  }
+
+  if (
+    game.win &&
+    game.usedSmite &&
+    progress.smiteWins > 0 &&
+    progress.smiteWins % MILESTONE_STEP === 0
+  ) {
+    earned.push({
+      rule: 'FIVE_SMITE_WINS',
+      amount: 1,
+      detail: `${progress.smiteWins} wins with Smite`,
+    });
+  }
+
+  return earned;
+}
+
+export function totalShells(earned: EarnedShell[]): number {
+  return earned.reduce((sum, shell) => sum + shell.amount, 0);
+}

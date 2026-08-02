@@ -29,17 +29,23 @@ export interface PlayerMatchRow {
   firstBlood: boolean;
   surrendered: boolean;
   killParticipation: number | null;
+  usedSmite: boolean;
 }
 
-export function insertPlayerMatch(db: Db, row: PlayerMatchRow): void {
+export function insertPlayerMatch(
+  db: Db,
+  row: PlayerMatchRow,
+  replace = false,
+): void {
   db.prepare(
-    `INSERT OR IGNORE INTO player_matches (
+    `INSERT OR ${replace ? 'REPLACE' : 'IGNORE'} INTO player_matches (
        player_id, match_id, played_at, duration_minutes, team_id, win,
        champion_id, champion_name, kills, deaths, assists, creep_score,
        gold_earned, damage_to_champions, damage_taken, vision_score,
        time_dead_seconds, penta_kills, quadra_kills, triple_kills,
-       largest_spree, solo_kills, first_blood, surrendered, kill_participation
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       largest_spree, solo_kills, first_blood, surrendered, kill_participation,
+       used_smite
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     row.playerId,
     row.matchId,
@@ -66,6 +72,7 @@ export function insertPlayerMatch(db: Db, row: PlayerMatchRow): void {
     row.firstBlood ? 1 : 0,
     row.surrendered ? 1 : 0,
     row.killParticipation,
+    row.usedSmite ? 1 : 0,
   );
 }
 

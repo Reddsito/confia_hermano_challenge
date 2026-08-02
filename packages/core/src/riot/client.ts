@@ -52,6 +52,8 @@ export interface MatchParticipantDto {
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
   teamPosition: string;
+  summoner1Id: number;
+  summoner2Id: number;
   goldEarned: number;
   totalDamageDealtToChampions: number;
   totalDamageTaken: number;

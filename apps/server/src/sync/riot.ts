@@ -1,11 +1,19 @@
 import type { ChampionUsage, MatchTotals } from '@challenge/core/domain';
 import { RiotApiError, type MatchDto, type RiotClient } from '@challenge/core/riot';
 
-import { opggUrl, toLadderPoints, type Rank } from '@challenge/core/domain';
+import {
+  SMITE_SPELL_ID,
+  earnedShells,
+  opggUrl,
+  toLadderPoints,
+  totalShells,
+  type Rank,
+} from '@challenge/core/domain';
 
 import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import { insertPlayerMatch, recordRankSample, type PlayerMatchRow } from '../db/matches';
+import { awardShells, progressFor } from '../db/shells';
 import {
   inGameEmbed,
   matchFinishedEmbed,
@@ -22,7 +30,7 @@ import {
   upsertPlayerState,
   type PlayerRow,
 } from '../db/players';
-import { MAX_RECENT_RESULTS, toRank } from './helpers';
+import { MAX_RECENT_RESULTS, computeStreak, toRank } from './helpers';
 
 const MATCH_PAGE_SIZE = 20;
 
@@ -167,6 +175,36 @@ async function syncPlayer(
     if (row !== null) {
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
       insertPlayerMatch(db, row);
+
+      // Progress counters are read after the row is stored, so the milestone
+      // rules see the game that just crossed the threshold.
+      const earned = earnedShells(
+        {
+          win: row.win,
+          kills: row.kills,
+          deaths: row.deaths,
+          assists: row.assists,
+          durationMinutes: row.durationMinutes,
+          pentaKills: row.pentaKills,
+          quadraKills: row.quadraKills,
+          championId: row.championId,
+          usedSmite: row.usedSmite,
+        },
+        {
+          winStreak: Math.max(computeStreak(recentResults), 0),
+          ...progressFor(db, player.id),
+        },
+      );
+
+      if (earned.length > 0) {
+        const awarded = awardShells(db, player.id, matchId, earned);
+        if (awarded > 0) {
+          console.log(
+            `[shells] ${player.displayName} +${awarded} (${earned.map((e) => e.rule).join(', ')})`,
+          );
+        }
+      }
+      void totalShells;
 
       notifier.push(
         'match_finished',
@@ -325,6 +363,8 @@ function applyMatch(
     firstBlood: Boolean(me.firstBloodKill),
     surrendered: Boolean(me.gameEndedInSurrender),
     killParticipation: me.challenges?.killParticipation ?? null,
+    usedSmite:
+      me.summoner1Id === SMITE_SPELL_ID || me.summoner2Id === SMITE_SPELL_ID,
   };
 }
 
