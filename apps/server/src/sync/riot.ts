@@ -196,7 +196,7 @@ async function syncPlayer(
 
   for (const matchId of fresh) {
     const match = await client.getMatch(matchId);
-    const row = applyMatch(
+    const outcome = applyMatch(
       totals,
       championUsage,
       match,
@@ -205,6 +205,14 @@ async function syncPlayer(
       matchId,
       queues,
     );
+
+    // Left unmarked so a later cycle can retry it.
+    if (outcome.kind === 'unknown') {
+      console.warn(`[sync] could not read ${matchId} for ${player.displayName}`);
+      continue;
+    }
+
+    const row = outcome.kind === 'counted' ? outcome.row : null;
 
     if (row !== null) {
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
@@ -412,8 +420,20 @@ function announceRankChange(
 }
 
 /**
- * Folds one match into the running totals and returns the row to persist, or
- * null when the game should not count.
+ * The outcome of examining one match.
+ *
+ * "skip" and "unknown" look the same from the outside but must be treated
+ * differently: a remake or a wrong queue will never count and can be marked
+ * processed forever, whereas failing to find the player in the payload is a
+ * transient problem — marking it would discard the game permanently.
+ */
+type MatchOutcome =
+  | { kind: 'counted'; row: PlayerMatchRow }
+  | { kind: 'skip' }
+  | { kind: 'unknown' };
+
+/**
+ * Folds one match into the running totals and returns the row to persist.
  */
 function applyMatch(
   totals: MatchTotals,
@@ -423,21 +443,23 @@ function applyMatch(
   playerId: string,
   matchId: string,
   allowedQueues: number[],
-): PlayerMatchRow | null {
+): MatchOutcome {
   // Which queues count is a rule of the challenge, so it is enforced against
   // each match's own queueId rather than trusted from a query parameter.
   if (!allowedQueues.includes(match.info.queueId)) {
-    return null;
+    return { kind: 'skip' };
   }
 
   const me = match.info.participants.find(
     (participant) => participant.puuid === puuid,
   );
-  if (!me) return null;
+  // The player should always be in their own match. Not finding them means the
+  // PUUID does not belong to this key, so the game is left for a later cycle.
+  if (!me) return { kind: 'unknown' };
 
   // Remakes are not real games and would distort win rate.
   const durationMinutes = match.info.gameDuration / 60;
-  if (durationMinutes < 5) return null;
+  if (durationMinutes < 5) return { kind: 'skip' };
 
   totals.games += 1;
   totals.wins += me.win ? 1 : 0;
@@ -461,7 +483,7 @@ function applyMatch(
     wins: usage.wins + (me.win ? 1 : 0),
   };
 
-  return {
+  const counted: PlayerMatchRow = {
     playerId,
     matchId,
     playedAt: match.info.gameCreation,
@@ -491,6 +513,8 @@ function applyMatch(
       me.summoner1Id === SMITE_SPELL_ID || me.summoner2Id === SMITE_SPELL_ID,
     queueId: match.info.queueId,
   };
+
+  return { kind: 'counted', row: counted };
 }
 
 function recordFailure(db: Db, player: PlayerRow, error: unknown): void {
