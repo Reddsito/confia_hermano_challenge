@@ -127,3 +127,81 @@ export function removePlayer(code: string, id: string): Promise<{ ok: true }> {
   return request(code, `/api/admin/players/${id}`, { method: 'DELETE' });
 }
 
+
+export interface DiscordUser {
+  discordId: string;
+  username: string;
+  avatar: string | null;
+  playerId: string | null;
+  isAdmin: boolean;
+  lastSeen: number;
+}
+
+export function fetchDiscordUsers(code: string): Promise<DiscordUser[]> {
+  return request<{ users: DiscordUser[] }>(code, '/api/admin/discord-users').then(
+    (body) => body.users,
+  );
+}
+
+/** Passing null unlinks. The backend keeps the mapping one-to-one. */
+export function linkDiscordUser(
+  code: string,
+  discordId: string,
+  playerId: string | null,
+): Promise<{ ok: true }> {
+  return request(code, `/api/admin/discord-users/${discordId}/link`, {
+    method: 'POST',
+    body: JSON.stringify({ playerId }),
+  });
+}
+
+export interface AdminChallenge {
+  id: string;
+  name: string;
+  detail: string;
+  weight: number;
+  enabled: boolean;
+}
+
+export function fetchAdminChallenges(code: string): Promise<AdminChallenge[]> {
+  return request<{ challenges: AdminChallenge[] }>(code, '/api/admin/challenges').then(
+    (body) => body.challenges,
+  );
+}
+
+export function createChallenge(
+  code: string,
+  input: { name: string; detail?: string; weight?: number },
+): Promise<unknown> {
+  return request(code, '/api/admin/challenges', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchChallenge(
+  code: string,
+  id: string,
+  input: Partial<AdminChallenge>,
+): Promise<unknown> {
+  return request(code, `/api/admin/challenges/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeChallenge(code: string, id: string): Promise<unknown> {
+  return request(code, `/api/admin/challenges/${id}`, { method: 'DELETE' });
+}
+
+export function adjustShells(
+  code: string,
+  playerId: string,
+  amount: number,
+  reason: string,
+): Promise<{ available: number }> {
+  return request(code, `/api/admin/players/${playerId}/shells`, {
+    method: 'POST',
+    body: JSON.stringify({ amount, reason }),
+  });
+}

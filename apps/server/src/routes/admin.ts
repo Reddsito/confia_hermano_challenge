@@ -16,6 +16,7 @@ import {
   type PlayerStatus,
 } from '../db/players';
 import {
+  adjustShells,
   deleteChallenge,
   insertChallenge,
   listChallenges,
@@ -162,6 +163,30 @@ export function adminRoutes(
     return ok
       ? context.json({ ok: true })
       : context.json({ error: 'No such Discord user' }, 404);
+  });
+
+  /**
+   * Manual shell adjustment. Earning is automatic, but a challenge run by
+   * humans needs a way to correct a mistake or hand one out for something the
+   * rules cannot see.
+   */
+  app.post('/players/:id/shells', async (context) => {
+    const body = await context.req
+      .json<{ amount?: number; reason?: string }>()
+      .catch(() => ({}) as { amount?: number; reason?: string });
+
+    const amount = Math.trunc(Number(body.amount ?? 0));
+    if (!Number.isFinite(amount) || amount === 0) {
+      return context.json({ error: 'Pass a non-zero amount.' }, 400);
+    }
+
+    const playerId = context.req.param('id');
+    if (!listPlayers(db).some((player) => player.id === playerId)) {
+      return context.json({ error: 'No such player' }, 404);
+    }
+
+    const result = adjustShells(db, playerId, amount, body.reason ?? 'Manual adjustment');
+    return context.json(result);
   });
 
   app.get('/challenges', (context) =>

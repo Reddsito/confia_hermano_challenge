@@ -3,6 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildRanking } from '@challenge/core/domain';
 import { ROLES, type Role, type Snapshot } from '@challenge/core/domain';
 import { SNAPSHOT_ENDPOINT } from '../lib/api';
+import {
+  captureSessionFromUrl,
+  fetchMe,
+  loginUrl,
+  readToken,
+  signOut,
+  avatarUrl,
+  type SessionUser,
+} from '../lib/session';
+import { BlueShells, ShellMark } from './BlueShells';
 import { Filters, type FilterState, type SortKey } from './Filters';
 import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
@@ -15,7 +25,7 @@ import { TournamentClock, TournamentProgress } from './TournamentClock';
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-type Section = 'ranking' | 'stats';
+type Section = 'ranking' | 'stats' | 'shells';
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -23,6 +33,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [error, setError] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('ranking');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     role: 'ALL',
     query: '',
@@ -32,6 +44,16 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
   // Guards against overlapping fetches when a slow request meets the interval.
   const inFlight = useRef(false);
+
+  const loadSession = useCallback(async () => {
+    const stored = captureSessionFromUrl() ?? readToken();
+    setToken(stored);
+    setUser(stored ? await fetchMe(stored) : null);
+  }, []);
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
 
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
@@ -111,6 +133,9 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const sections = [
     { id: 'ranking' as const, label: 'Ranking' },
     { id: 'stats' as const, label: 'Statistics' },
+    // Signing in is what unlocks the tab; showing it while signed out would
+    // only lead to a dead end.
+    ...(user ? [{ id: 'shells' as const, label: 'Blue Shells' }] : []),
   ];
 
   return (
@@ -139,7 +164,18 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           />
         </div>
 
-        <TournamentClock tournament={snapshot.tournament} />
+        <div className="flex items-center gap-2">
+          <TournamentClock tournament={snapshot.tournament} />
+          <AccountChip
+            user={user}
+            onSignOut={() => {
+              signOut();
+              setToken(null);
+              setUser(null);
+              setSection('ranking');
+            }}
+          />
+        </div>
       </nav>
 
       <TournamentProgress tournament={snapshot.tournament} />
@@ -175,6 +211,15 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         <TabPanel id="stats" active={section === 'stats'}>
           <StatsPanel players={ranking} />
         </TabPanel>
+
+        <TabPanel id="shells" active={section === 'shells'}>
+          <BlueShells
+            user={user}
+            token={token}
+            players={ranking}
+            onBalanceChange={() => void loadSession()}
+          />
+        </TabPanel>
       </div>
 
       {selected && (
@@ -186,6 +231,74 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         />
       )}
     </div>
+  );
+}
+
+/** Signed-out shows a login button; signed-in shows who you are. */
+function AccountChip({
+  user,
+  onSignOut,
+}: {
+  user: SessionUser | null;
+  onSignOut: () => void;
+}) {
+  if (!user) {
+    return (
+      <a
+        href={loginUrl()}
+        className="eyebrow inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-ink-2 transition-colors hover:border-[color:var(--color-accent)] hover:text-ink"
+      >
+        <ShellMark size={14} />
+        Sign in
+      </a>
+    );
+  }
+
+  const avatar = avatarUrl(user);
+
+  return (
+    <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-line bg-carbon/80 py-1 pr-1 pl-1.5 backdrop-blur">
+      {avatar ? (
+        <img
+          src={avatar}
+          alt=""
+          width={26}
+          height={26}
+          className="h-[26px] w-[26px] rounded-full"
+        />
+      ) : (
+        <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-carbon-3 text-[0.65rem]">
+          {user.username.slice(0, 2).toUpperCase()}
+        </span>
+      )}
+
+      <span className="hidden max-w-[9rem] truncate text-fluid-xs sm:inline">
+        {user.username}
+      </span>
+
+      {user.shells && (
+        <span
+          className="tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold"
+          style={{
+            color: 'var(--color-accent)',
+            background: 'color-mix(in oklab, var(--color-accent) 14%, transparent)',
+          }}
+          title="Blue shells available"
+        >
+          <ShellMark size={11} />
+          {user.shells.available}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={onSignOut}
+        className="eyebrow rounded-full px-2 py-1 text-ink-3 transition-colors hover:text-ink"
+        aria-label="Sign out"
+      >
+        Out
+      </button>
+    </span>
   );
 }
 

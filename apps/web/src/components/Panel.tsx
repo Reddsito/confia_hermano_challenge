@@ -16,6 +16,7 @@ import {
   type PanelInfo,
   type RosterPlayer,
 } from '../lib/admin';
+import { PanelLinks } from './PanelLinks';
 import { RoleIcon } from './icons';
 import { OpggLink, ROLE_LABEL, classNames } from './ui';
 
@@ -183,6 +184,8 @@ export function Panel() {
           Nobody on the roster yet. Add the first player above.
         </p>
       )}
+
+      <PanelLinks code={code} roster={roster} onError={setError} />
     </div>
   );
 }

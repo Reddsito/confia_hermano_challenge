@@ -289,3 +289,42 @@ export function seedDefaultChallenges(db: Db): void {
 
   for (const challenge of defaults) insertChallenge(db, challenge);
 }
+
+/**
+ * Hands out or takes back shells outside the rules.
+ *
+ * Positive amounts still respect the holding cap; negative amounts are recorded
+ * as a correction row rather than deleting history, so the ledger stays
+ * readable — you can always see why a balance changed.
+ */
+export function adjustShells(
+  db: Db,
+  playerId: string,
+  amount: number,
+  reason: string,
+): ShellBalance {
+  const before = balanceFor(db, playerId);
+
+  const capped =
+    amount > 0
+      ? Math.min(amount, MAX_HELD_SHELLS - before.available)
+      : Math.max(amount, -before.available);
+
+  if (capped !== 0) {
+    db.prepare(
+      `INSERT INTO blue_shells
+         (id, player_id, match_id, rule, amount, detail, earned_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      randomUUID(),
+      playerId,
+      `manual-${Date.now()}`,
+      'MANUAL',
+      capped,
+      reason,
+      Date.now(),
+    );
+  }
+
+  return balanceFor(db, playerId);
+}
