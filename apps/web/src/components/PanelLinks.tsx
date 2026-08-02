@@ -27,6 +27,9 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
   const [users, setUsers] = useState<DiscordUser[]>([]);
   const [challenges, setChallenges] = useState<AdminChallenge[]>([]);
   const [busy, setBusy] = useState(false);
+  // Selecting from a dropdown saves immediately, which is fine, but silent.
+  // This is the acknowledgement that the change actually landed.
+  const [saved, setSaved] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -45,11 +48,15 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
     void reload();
   }, [reload]);
 
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<unknown>, savedKey?: string) => {
     setBusy(true);
     try {
       await action();
       await reload();
+      if (savedKey) {
+        setSaved(savedKey);
+        setTimeout(() => setSaved((current) => (current === savedKey ? null : current)), 2500);
+      }
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -100,8 +107,27 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                   </span>
                 )}
 
-                <span className="min-w-0 flex-1 truncate text-fluid-sm">
-                  {user.username}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-fluid-sm">
+                    {user.username}
+                  </span>
+                  <span className="block truncate text-[0.68rem]">
+                    {saved === user.discordId ? (
+                      <span style={{ color: 'var(--color-mark-teal)' }}>
+                        Saved
+                      </span>
+                    ) : user.playerId ? (
+                      <span className="text-ink-3">
+                        linked to{' '}
+                        <span style={{ color: 'var(--color-accent)' }}>
+                          {roster.find((player) => player.id === user.playerId)
+                            ?.displayName ?? 'unknown player'}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-ink-3">not linked</span>
+                    )}
+                  </span>
                 </span>
 
                 <label className="flex items-center gap-2">
@@ -112,12 +138,14 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                     value={user.playerId ?? ''}
                     disabled={busy}
                     onChange={(event) =>
-                      void run(() =>
-                        linkDiscordUser(
-                          code,
-                          user.discordId,
-                          event.target.value || null,
-                        ),
+                      void run(
+                        () =>
+                          linkDiscordUser(
+                            code,
+                            user.discordId,
+                            event.target.value || null,
+                          ),
+                        user.discordId,
                       )
                     }
                     className="min-h-10 rounded-lg border border-line bg-carbon px-3 text-fluid-sm text-ink"
