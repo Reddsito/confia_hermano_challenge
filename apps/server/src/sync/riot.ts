@@ -18,9 +18,11 @@ import {
 import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import {
+  cacheRank,
   insertPlayerMatch,
   recordRankSample,
   setActiveGame,
+  staleRankPuuids,
   type PlayerMatchRow,
 } from '../db/matches';
 import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
@@ -103,6 +105,48 @@ export async function runRiotCycle(
     newMatches,
     durationMs: Date.now() - started,
   };
+}
+
+/**
+ * How long a cached rank is trusted. Nobody's rank moves during a game, and a
+ * tier shown a few hours late is still the right tier — whereas asking on every
+ * cycle would spend ten requests a minute per live game on people who are not
+ * even in the challenge.
+ */
+const RANK_CACHE_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Ranks for everyone in a live game, roster or not, so the live board can show
+ * what it is worth. Failures are swallowed per player: a missing tier costs a
+ * line of text, and must never take down the sync cycle around it.
+ */
+async function cacheParticipantRanks(
+  db: Db,
+  client: RiotClient,
+  game: ActiveGameDto,
+  queueType: string,
+): Promise<void> {
+  const missing = staleRankPuuids(
+    db,
+    game.participants.map((participant) => participant.puuid),
+    RANK_CACHE_MS,
+  );
+
+  for (const puuid of missing) {
+    try {
+      const entries = await client.getLeagueEntriesByPuuid(puuid);
+      const solo = entries.find((entry) => entry.queueType === queueType);
+      // Unranked is cached too, otherwise every cycle would retry the same
+      // players forever for an answer that is not going to change today.
+      cacheRank(db, puuid, {
+        tier: solo?.tier ?? null,
+        division: solo?.rank ?? null,
+        lp: solo?.leaguePoints ?? null,
+      });
+    } catch {
+      // Leave it uncached so a later cycle can try again.
+    }
+  }
 }
 
 async function syncPlayer(
@@ -323,15 +367,27 @@ async function syncPlayer(
           gameId: activeGame.gameId,
           queueId: activeGame.gameQueueConfigId,
           gameLength: activeGame.gameLength,
+          startedAt: activeGame.gameStartTime || null,
+          bans: (activeGame.bannedChampions ?? [])
+            // -1 is Riot's marker for a skipped ban; it has no champion.
+            .filter((ban) => ban.championId > 0)
+            .map((ban) => ({ championId: ban.championId, teamId: ban.teamId })),
           participants: activeGame.participants.map((participant) => ({
             puuid: participant.puuid,
             championId: participant.championId,
             teamId: participant.teamId,
             riotId: participant.riotId ?? participant.summonerName ?? null,
+            spellIds: [participant.spell1Id ?? 0, participant.spell2Id ?? 0],
+            perkStyle: participant.perks?.perkStyle ?? null,
+            perkSubStyle: participant.perks?.perkSubStyle ?? null,
           })),
         }
       : null,
   );
+
+  if (activeGame && queues.includes(activeGame.gameQueueConfigId)) {
+    await cacheParticipantRanks(db, client, activeGame, queueType);
+  }
 
   // Only the transition is interesting; re-announcing every cycle while someone
   // sits in a 40-minute game would be spam.

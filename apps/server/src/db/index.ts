@@ -216,6 +216,20 @@ const MIGRATIONS: string[] = [
     )
   ) / 4;
   `,
+
+  // Ranks of people in a live game who are not on the roster. LEAGUE-V4 has to
+  // be asked per player and a live game has ten of them, so asking every sync
+  // cycle would spend the whole rate limit on strangers. Nobody's rank moves
+  // mid-game, so one lookup per puuid is cached and reused.
+  `
+  CREATE TABLE rank_cache (
+    puuid      TEXT PRIMARY KEY,
+    tier       TEXT,
+    division   TEXT,
+    lp         INTEGER,
+    fetched_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function openDatabase(path: string): Db {

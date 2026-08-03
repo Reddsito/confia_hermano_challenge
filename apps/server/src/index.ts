@@ -72,7 +72,7 @@ app.route('/api/auth', authRoutes(db, config));
 app.route('/api/shells', shellRoutes(db, config));
 app.route(
   '/api/live',
-  liveRoutes(db, QUEUE_IDS[config.tournament.queue] ?? 420),
+  liveRoutes(db, QUEUE_IDS[config.tournament.queue] ?? 420, config.platform),
 );
 app.route('/api/admin', adminRoutes(db, config, scheduler));
 

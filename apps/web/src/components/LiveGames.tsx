@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { RankedPlayer } from '@challenge/core/domain';
+import type { Division, Rank, RankedPlayer, Tier } from '@challenge/core/domain';
 
 import { API_URL } from '../lib/api';
+import { TierCrest } from './icons';
 import { Avatar, classNames, tierColor } from './ui';
+
+interface LiveRank {
+  tier: string | null;
+  division: string | null;
+  lp: number | null;
+}
 
 interface LiveParticipant {
   championId: number;
@@ -13,6 +20,16 @@ interface LiveParticipant {
   riotId: string | null;
   playerId: string | null;
   displayName: string | null;
+  spellIcons: string[];
+  perkIcons: string[];
+  rank: LiveRank | null;
+  opggUrl: string | null;
+}
+
+interface LiveBan {
+  teamId: number;
+  icon: string;
+  name: string;
 }
 
 interface LiveGame {
@@ -20,6 +37,8 @@ interface LiveGame {
   queueId: number;
   queueLabel: string;
   gameLength: number;
+  startedAt: number | null;
+  bans: LiveBan[];
   trackedPlayerIds: string[];
   inChampSelect: boolean;
   countsForChallenge: boolean;
@@ -30,7 +49,13 @@ interface LiveGame {
 /** Matches the sync cadence: fetching faster would only show the same answer. */
 const POLL_MS = 30_000;
 
-export function LiveGames({ players }: { players: RankedPlayer[] }) {
+export function LiveGames({
+  players,
+  onSelect,
+}: {
+  players: RankedPlayer[];
+  onSelect?: (playerId: string) => void;
+}) {
   const [games, setGames] = useState<LiveGame[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -76,149 +101,303 @@ export function LiveGames({ players }: { players: RankedPlayer[] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid gap-3 xl:grid-cols-2">
       {games.map((game) => (
-        <GameCard key={game.gameId} game={game} players={players} />
+        <GameCard
+          key={game.gameId}
+          game={game}
+          players={players}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );
 }
 
+/**
+ * Seconds elapsed, counted locally.
+ *
+ * The stored length is only true at the instant the sync cycle read it, and the
+ * cycle runs a minute apart — so a clock driven by it would sit still and then
+ * jump a minute. Riot also hands back an absolute start time; when it is there
+ * the clock is exact, and gameLength is only the fallback for champion select.
+ */
+function useElapsed(startedAt: number | null, fallbackSeconds: number): number {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!startedAt) return Math.max(fallbackSeconds, 0);
+  return Math.max(Math.floor((now - startedAt) / 1000), 0);
+}
+
+function clock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 function GameCard({
   game,
   players,
+  onSelect,
 }: {
   game: LiveGame;
   players: RankedPlayer[];
+  onSelect?: (playerId: string) => void;
 }) {
+  const elapsed = useElapsed(game.startedAt, game.gameLength);
   const tracked = players.filter((player) =>
     game.trackedPlayerIds.includes(player.id),
   );
 
+  // "Ours" is whichever side a tracked player is on, so blue/red stays stable
+  // rather than flipping with Riot's participant order.
+  const blueId = game.allies[0]?.teamId ?? 100;
+
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-carbon">
-      <header className="flex flex-wrap items-center gap-3 border-b border-line p-4">
-        <span
-          aria-hidden="true"
-          className="live-dot h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ background: 'var(--color-mark-teal)' }}
-        />
-
-        <div className="min-w-0 flex-1">
-          <p className="display truncate text-fluid-sm">
-            {tracked.map((player) => player.displayName).join(' · ') ||
-              'Jugador seguido'}
-          </p>
-          <p className="flex flex-wrap items-center gap-1.5 text-[0.68rem] text-ink-3">
-            {game.queueLabel}
-            {!game.countsForChallenge && (
-              <span
-                className="rounded px-1 py-px"
-                style={{
-                  color: 'var(--color-mark-amber)',
-                  background:
-                    'color-mix(in oklab, var(--color-mark-amber) 16%, transparent)',
-                }}
-                title="Esta cola no cuenta para el challenge"
-              >
-                no cuenta
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {tracked.map((player) => (
+      <header className="flex items-center gap-3 border-b border-line px-3 py-2">
+        <span className="flex -space-x-2">
+          {tracked.slice(0, 3).map((player) => (
             <Avatar
               key={player.id}
               name={player.displayName}
               iconId={player.profileIconId}
-              size={30}
+              size={26}
               ring={tierColor(player.rank)}
             />
           ))}
-        </div>
+        </span>
 
-        <span className="tabular text-fluid-sm text-ink-2">
-          {game.inChampSelect ? 'Selección de campeón' : formatLength(game.gameLength)}
+        <span className="tabular mx-auto text-fluid-lg leading-none font-semibold">
+          {game.inChampSelect ? 'Selección' : clock(elapsed)}
+        </span>
+
+        <span
+          className="eyebrow flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6rem]"
+          style={{
+            color: 'var(--color-mark-red)',
+            borderColor:
+              'color-mix(in oklab, var(--color-mark-red) 45%, transparent)',
+          }}
+        >
+          <span
+            className="live-dot h-1.5 w-1.5 rounded-full"
+            style={{ background: 'var(--color-mark-red)' }}
+          />
+          EN VIVO
         </span>
       </header>
 
-      <div className="grid gap-px bg-line sm:grid-cols-2">
-        <Side title="Their team" participants={game.allies} highlight />
-        <Side title="Enemies" participants={game.enemies} />
+      {!game.countsForChallenge && (
+        <p
+          className="px-3 py-1 text-[0.65rem]"
+          style={{ color: 'var(--color-mark-amber)' }}
+        >
+          {game.queueLabel} — no cuenta para el challenge
+        </p>
+      )}
+
+      <div className="grid gap-px bg-line md:grid-cols-2">
+        <Side
+          label="LADO AZUL"
+          accent="var(--color-mark-teal)"
+          participants={game.allies}
+          bans={game.bans.filter((ban) => ban.teamId === blueId)}
+          onSelect={onSelect}
+        />
+        <Side
+          label="LADO ROJO"
+          accent="var(--color-mark-red)"
+          participants={game.enemies}
+          bans={game.bans.filter((ban) => ban.teamId !== blueId)}
+          onSelect={onSelect}
+        />
       </div>
     </section>
   );
 }
 
 function Side({
-  title,
+  label,
+  accent,
   participants,
-  highlight,
+  bans,
+  onSelect,
 }: {
-  title: string;
+  label: string;
+  accent: string;
   participants: LiveParticipant[];
-  highlight?: boolean;
+  bans: LiveBan[];
+  onSelect?: (playerId: string) => void;
 }) {
   return (
-    <div className="bg-carbon p-4">
-      <h4
-        className="eyebrow"
-        style={{
-          color: highlight ? 'var(--color-mark-teal)' : 'var(--color-mark-red)',
-        }}
-      >
-        {title}
-      </h4>
+    <div className="bg-carbon p-2">
+      <div className="mb-1.5 flex items-center gap-2 px-1">
+        <span className="eyebrow text-[0.6rem]" style={{ color: accent }}>
+          {label}
+        </span>
 
-      <ul className="mt-3 space-y-1.5">
+        {bans.length > 0 && (
+          <span className="ml-auto flex items-center gap-1">
+            <span className="eyebrow text-[0.55rem] text-ink-3">BANS</span>
+            {bans.map((ban, index) => (
+              <img
+                key={`${ban.name}-${index}`}
+                src={ban.icon}
+                alt={ban.name}
+                title={ban.name}
+                loading="lazy"
+                className="h-3.5 w-3.5 rounded opacity-40 grayscale"
+              />
+            ))}
+          </span>
+        )}
+      </div>
+
+      <ul>
         {participants.map((participant) => (
-          <li
-            key={`${participant.championId}-${participant.riotId ?? Math.random()}`}
-            className={classNames(
-              'flex items-center gap-2.5 rounded-lg p-1.5',
-              // A tracked player is the reason anyone opened this tab, so they
-              // get the only emphasis on the card.
-              participant.playerId ? 'bg-carbon-2' : '',
-            )}
-            style={
-              participant.playerId
-                ? { boxShadow: 'inset 0 0 0 1px var(--color-accent)' }
-                : undefined
-            }
-          >
-            <img
-              src={participant.championIcon}
-              alt=""
-              width={30}
-              height={30}
-              loading="lazy"
-              className="h-[30px] w-[30px] shrink-0 rounded-md bg-carbon-3 ring-1 ring-line"
-            />
-
-            <span className="min-w-0 flex-1">
-              <span
-                className={classNames(
-                  'block truncate text-fluid-sm',
-                  participant.playerId && 'display',
-                )}
-                style={
-                  participant.playerId
-                    ? { color: 'var(--color-accent)' }
-                    : undefined
-                }
-              >
-                {participant.displayName ?? participant.riotId ?? 'Unknown'}
-              </span>
-              <span className="block truncate text-[0.68rem] text-ink-3">
-                {participant.championName}
-              </span>
-            </span>
-          </li>
+          <Row
+            key={participant.riotId ?? participant.championId}
+            participant={participant}
+            onSelect={onSelect}
+          />
         ))}
       </ul>
     </div>
+  );
+}
+
+function Row({
+  participant,
+  onSelect,
+}: {
+  participant: LiveParticipant;
+  onSelect?: (playerId: string) => void;
+}) {
+  const tracked = participant.playerId !== null;
+  // Tracked players open their profile in this app; everyone else has no page
+  // here, so the honest destination is their public one.
+  const clickable = (tracked && onSelect) || participant.opggUrl;
+
+  const name = participant.displayName ?? participant.riotId?.split('#')[0] ?? '—';
+  // The API hands back loose strings; the crest wants the domain shape.
+  const rank: Rank | null = participant.rank?.tier
+    ? {
+        tier: participant.rank.tier as Tier,
+        division: (participant.rank.division as Division | null) ?? null,
+        leaguePoints: participant.rank.lp ?? 0,
+      }
+    : null;
+  const tag = participant.riotId?.split('#')[1] ?? null;
+
+  const body = (
+    <>
+      <img
+        src={participant.championIcon}
+        alt={participant.championName}
+        title={participant.championName}
+        loading="lazy"
+        className="h-8 w-8 shrink-0 rounded"
+      />
+
+      <span className="flex shrink-0 flex-col gap-px">
+        {participant.spellIcons.map((icon, index) => (
+          <img
+            key={index}
+            src={icon}
+            alt=""
+            loading="lazy"
+            className="h-[15px] w-[15px] rounded-sm"
+          />
+        ))}
+      </span>
+
+      <span className="flex shrink-0 flex-col gap-px">
+        {participant.perkIcons.map((icon, index) => (
+          <img
+            key={index}
+            src={icon}
+            alt=""
+            loading="lazy"
+            className="h-[15px] w-[15px]"
+          />
+        ))}
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-1">
+          <span
+            className="truncate text-fluid-xs font-medium"
+            style={tracked ? { color: 'var(--color-accent)' } : undefined}
+          >
+            {name}
+          </span>
+          {tag && (
+            <span className="shrink-0 text-[0.6rem] text-ink-3">#{tag}</span>
+          )}
+        </span>
+
+        <span className="flex items-center gap-1 text-[0.62rem] text-ink-3">
+          {rank ? (
+            <>
+              <TierCrest rank={rank} size={11} />
+              <span className="truncate">
+                {rank.tier.charAt(0) + rank.tier.slice(1).toLowerCase()}
+                {rank.division ? ` ${rank.division}` : ''}
+                {` · ${rank.leaguePoints} LP`}
+              </span>
+            </>
+          ) : (
+            <span>Sin clasificar</span>
+          )}
+        </span>
+      </span>
+    </>
+  );
+
+  const className = classNames(
+    'flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-left',
+    clickable && 'transition-colors hover:bg-carbon-2',
+  );
+  const style = tracked
+    ? {
+        background:
+          'color-mix(in oklab, var(--color-accent) 10%, transparent)',
+      }
+    : undefined;
+
+  return (
+    <li>
+      {tracked && onSelect ? (
+        <button
+          type="button"
+          className={className}
+          style={style}
+          onClick={() => onSelect(participant.playerId!)}
+        >
+          {body}
+        </button>
+      ) : participant.opggUrl ? (
+        <a
+          href={participant.opggUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className={className}
+          style={style}
+          title="Ver en OP.GG"
+        >
+          {body}
+        </a>
+      ) : (
+        <span className={className} style={style}>
+          {body}
+        </span>
+      )}
+    </li>
   );
 }
 
@@ -226,13 +405,7 @@ function Empty({ title, detail }: { title: string; detail: string }) {
   return (
     <div className="rounded-2xl border border-line bg-carbon p-10 text-center">
       <p className="display text-fluid-lg">{title}</p>
-      <p className="mx-auto mt-2 max-w-md text-fluid-sm text-ink-2">{detail}</p>
+      <p className="mx-auto mt-2 max-w-md text-fluid-sm text-ink-3">{detail}</p>
     </div>
   );
-}
-
-function formatLength(seconds: number): string {
-  const safe = Math.max(seconds, 0);
-  const minutes = Math.floor(safe / 60);
-  return `${minutes}:${String(Math.floor(safe % 60)).padStart(2, '0')}`;
 }

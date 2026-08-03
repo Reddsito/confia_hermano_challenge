@@ -93,12 +93,27 @@ export interface ActiveGameParticipantDto {
   /** Riot ID. `summonerName` is deprecated and now comes back empty. */
   riotId?: string;
   summonerName?: string;
+  spell1Id?: number;
+  spell2Id?: number;
+  profileIconId?: number;
+  perks?: { perkIds: number[]; perkStyle: number; perkSubStyle: number };
 }
 
 export interface ActiveGameDto {
   gameId: number;
   gameQueueConfigId: number;
   gameLength: number;
+  /**
+   * Epoch milliseconds. Zero during champion select, before the clock starts.
+   * Preferred over gameLength for anything user-facing: gameLength is only
+   * accurate at the instant it was fetched, while this keeps ticking on its own.
+   */
+  gameStartTime?: number;
+  bannedChampions?: Array<{
+    championId: number;
+    teamId: number;
+    pickTurn: number;
+  }>;
   participants: ActiveGameParticipantDto[];
 }
 

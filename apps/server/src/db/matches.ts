@@ -311,12 +311,83 @@ export interface StoredActiveGame {
   gameId: number;
   queueId: number;
   gameLength: number;
+  /**
+   * Epoch milliseconds, or null in champion select. Kept alongside gameLength
+   * because gameLength is only true at the moment it was fetched, while this
+   * lets the page run its own clock between sync cycles.
+   */
+  startedAt?: number | null;
+  bans?: Array<{ championId: number; teamId: number }>;
   participants: Array<{
     puuid: string;
     championId: number;
     teamId: number;
     riotId: string | null;
+    /** [spell1, spell2]. Absent on games stored before these were kept. */
+    spellIds?: number[];
+    perkStyle?: number | null;
+    perkSubStyle?: number | null;
   }>;
+}
+
+export interface CachedRank {
+  tier: string | null;
+  division: string | null;
+  lp: number | null;
+}
+
+/**
+ * Ranks already looked up for people outside the roster.
+ *
+ * Ranks are read back regardless of age: a stale tier is still worth showing,
+ * and refreshing is what {@link staleRankPuuids} decides, not this.
+ */
+export function cachedRanks(
+  db: Db,
+  puuids: string[],
+): Map<string, CachedRank> {
+  if (puuids.length === 0) return new Map();
+
+  const rows = db
+    .prepare(
+      `SELECT puuid, tier, division, lp FROM rank_cache
+       WHERE puuid IN (${puuids.map(() => '?').join(',')})`,
+    )
+    .all(...puuids) as Array<{ puuid: string } & CachedRank>;
+
+  return new Map(rows.map((row) => [row.puuid, row]));
+}
+
+/** Which of these have no entry, or one older than the given age. */
+export function staleRankPuuids(
+  db: Db,
+  puuids: string[],
+  maxAgeMs: number,
+): string[] {
+  if (puuids.length === 0) return [];
+
+  const fresh = new Set(
+    (
+      db
+        .prepare(
+          `SELECT puuid FROM rank_cache
+           WHERE fetched_at > ? AND puuid IN (${puuids.map(() => '?').join(',')})`,
+        )
+        .all(Date.now() - maxAgeMs, ...puuids) as Array<{ puuid: string }>
+    ).map((row) => row.puuid),
+  );
+
+  return puuids.filter((puuid) => !fresh.has(puuid));
+}
+
+export function cacheRank(db: Db, puuid: string, rank: CachedRank): void {
+  db.prepare(
+    `INSERT INTO rank_cache (puuid, tier, division, lp, fetched_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (puuid) DO UPDATE SET
+       tier = excluded.tier, division = excluded.division,
+       lp = excluded.lp, fetched_at = excluded.fetched_at`,
+  ).run(puuid, rank.tier, rank.division, rank.lp, Date.now());
 }
 
 export function setActiveGame(
