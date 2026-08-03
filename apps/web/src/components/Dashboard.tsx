@@ -19,6 +19,7 @@ import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
 import { RankingTable } from './RankingTable';
 import { RefreshMeter } from './RefreshMeter';
+import { BestDays, EloEvolution } from './EloCharts';
 import { StatsPanel } from './StatsPanel';
 import { Tabs, TabPanel } from './Tabs';
 import { TournamentClock, TournamentProgress } from './TournamentClock';
@@ -228,7 +229,14 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         </TabPanel>
 
         <TabPanel id="stats" active={section === 'stats'}>
-          <StatsPanel players={ranking} duos={snapshot.duos} />
+          <div className="space-y-4">
+            <StatsPanel players={ranking} duos={snapshot.duos} />
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,24rem)_1fr]">
+              <BestDays players={ranking} dailyDeltas={snapshot.dailyDeltas} />
+              <EloEvolution players={ranking} lpSeries={snapshot.lpSeries} />
+            </div>
+          </div>
         </TabPanel>
 
         <TabPanel id="shells" active={section === 'shells'}>

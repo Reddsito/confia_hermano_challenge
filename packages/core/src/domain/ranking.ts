@@ -21,6 +21,14 @@ export function isApex(tier: Tier): boolean {
 }
 
 /**
+ * Ladder points at the bottom of a tier, so a chart can draw the tier bands on
+ * the same scale the ranking sorts by rather than re-deriving the arithmetic.
+ */
+export function tierFloor(tier: Tier): number {
+  return TIERS.indexOf(tier) * POINTS_PER_TIER;
+}
+
+/**
  * Collapses tier + division + LP into a single comparable number, so two
  * players in different tiers can be sorted against each other.
  */
