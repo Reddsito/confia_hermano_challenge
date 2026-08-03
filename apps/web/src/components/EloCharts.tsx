@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 
 import {
-  TIERS,
-  tierFloor,
+  formatRank,
+  formatRankShort,
+  ladderPointsToRank,
   type DayDelta,
   type LpPoint,
   type RankedPlayer,
-  type Tier,
 } from '@challenge/core/domain';
 
 import { Avatar, classNames } from './ui';
@@ -108,7 +108,9 @@ export function EloEvolution({
 
   const W = 760;
   const H = 300;
-  const PAD = { top: 14, right: 16, bottom: 26, left: 46 };
+  // Left margin sized for the longest label the scale can produce ("Gran
+  // Maestro"), not for the range that happens to be on screen today.
+  const PAD = { top: 14, right: 16, bottom: 26, left: 68 };
 
   const x = (at: number) =>
     bounds
@@ -123,14 +125,25 @@ export function EloEvolution({
           (H - PAD.top - PAD.bottom)
       : 0;
 
-  // Only the tiers the data actually crosses; drawing all ten would be a grid
-  // of labels nobody is inside.
-  const bands = bounds
-    ? TIERS.filter((tier) => {
-        const floor = tierFloor(tier);
-        return floor >= bounds.minValue && floor <= bounds.maxValue;
-      })
-    : [];
+  /**
+   * Gridlines every division rather than every tier: a whole tier is 400 points
+   * wide, so a Bronze-to-Silver range would draw a single line and leave the
+   * axis unreadable. Labelled with the rank a player would recognise — the
+   * underlying number is a sorting device nobody has ever been.
+   */
+  const bands = (() => {
+    if (!bounds) return [];
+
+    const STEP = 100;
+    const first = Math.ceil(bounds.minValue / STEP) * STEP;
+    const lines: number[] = [];
+    for (let value = first; value <= bounds.maxValue; value += STEP) {
+      lines.push(value);
+    }
+    // Past a handful the axis turns into stripes; thin it out evenly instead.
+    const every = Math.ceil(lines.length / 6);
+    return lines.filter((_, index) => index % every === 0);
+  })();
 
   const times = [...new Set(shown.flatMap((s) => s.points.map((p) => p.at)))].sort(
     (a, b) => a - b,
@@ -179,23 +192,23 @@ export function EloEvolution({
               );
             }}
           >
-            {bands.map((tier) => (
-              <g key={tier}>
+            {bands.map((value) => (
+              <g key={value}>
                 <line
                   x1={PAD.left}
                   x2={W - PAD.right}
-                  y1={y(tierFloor(tier))}
-                  y2={y(tierFloor(tier))}
+                  y1={y(value)}
+                  y2={y(value)}
                   stroke="var(--color-line)"
                   strokeDasharray="2 4"
                 />
                 <text
                   x={PAD.left - 6}
-                  y={y(tierFloor(tier)) + 3}
+                  y={y(value) + 3}
                   textAnchor="end"
                   className="fill-[var(--color-ink-3)] text-[9px]"
                 >
-                  {tier.charAt(0) + tier.slice(1, 3).toLowerCase()}
+                  {formatRankShort(ladderPointsToRank(value))}
                 </text>
               </g>
             ))}
@@ -285,7 +298,9 @@ export function EloEvolution({
                     >
                       <Swatch color={series.color} dashed={series.dashed} />
                       <span className="text-ink-2">{series.name}</span>
-                      <span className="tabular font-medium">{point!.value}</span>
+                      <span className="tabular font-medium">
+                        {formatRank(ladderPointsToRank(point!.value))}
+                      </span>
                     </li>
                   ))}
               </ul>
@@ -370,8 +385,12 @@ function Table({ series }: { series: Series[] }) {
           {rows.map((row) => (
             <tr key={row.name} className="border-t border-line">
               <td className="py-1">{row.name}</td>
-              <td className="tabular py-1 text-right">{row.first}</td>
-              <td className="tabular py-1 text-right">{row.last}</td>
+              <td className="py-1 text-right">
+                {formatRank(ladderPointsToRank(row.first))}
+              </td>
+              <td className="py-1 text-right">
+                {formatRank(ladderPointsToRank(row.last))}
+              </td>
               <td
                 className="tabular py-1 text-right"
                 style={{

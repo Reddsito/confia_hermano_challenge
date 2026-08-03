@@ -29,6 +29,67 @@ export function tierFloor(tier: Tier): number {
 }
 
 /**
+ * The inverse of {@link toLadderPoints}: a ladder number back into the rank a
+ * player would recognise.
+ *
+ * A ladder point total is an internal sorting device — nobody has ever been
+ * "687". Anything shown to a person goes through here first.
+ */
+export function ladderPointsToRank(points: number): Rank {
+  const clamped = Math.max(0, points);
+
+  if (clamped >= APEX_FLOOR) {
+    const lp = clamped - APEX_FLOOR;
+    const tier: Tier =
+      lp >= 1000 ? 'CHALLENGER' : lp >= 500 ? 'GRANDMASTER' : 'MASTER';
+    return { tier, division: null, leaguePoints: Math.round(lp) };
+  }
+
+  const tierIndex = Math.min(
+    Math.floor(clamped / POINTS_PER_TIER),
+    TIERS.length - 1,
+  );
+  const withinTier = clamped - tierIndex * POINTS_PER_TIER;
+  const divisionIndex = Math.min(
+    Math.floor(withinTier / POINTS_PER_DIVISION),
+    DIVISIONS_PER_TIER - 1,
+  );
+
+  return {
+    tier: TIERS[tierIndex]!,
+    division: DIVISIONS[divisionIndex]!,
+    leaguePoints: Math.round(withinTier - divisionIndex * POINTS_PER_DIVISION),
+  };
+}
+
+export const TIER_LABEL: Record<Tier, string> = {
+  IRON: 'Hierro',
+  BRONZE: 'Bronce',
+  SILVER: 'Plata',
+  GOLD: 'Oro',
+  PLATINUM: 'Platino',
+  EMERALD: 'Esmeralda',
+  DIAMOND: 'Diamante',
+  MASTER: 'Maestro',
+  GRANDMASTER: 'Gran Maestro',
+  CHALLENGER: 'Retador',
+};
+
+/** Divisions read as numbers in Spanish: "Oro 4", not "Oro IV". */
+const DIVISION_LABEL: Record<string, string> = {
+  IV: '4',
+  III: '3',
+  II: '2',
+  I: '1',
+};
+
+/** Shorthand for axes, where there is no room for the LP. */
+export function formatRankShort(rank: Rank | null): string {
+  if (!rank) return '—';
+  return `${TIER_LABEL[rank.tier]}${rank.division ? ` ${DIVISION_LABEL[rank.division]}` : ''}`;
+}
+
+/**
  * Collapses tier + division + LP into a single comparable number, so two
  * players in different tiers can be sorted against each other.
  */
@@ -51,11 +112,11 @@ export function toLadderPoints(rank: Rank | null): number {
 }
 
 export function formatRank(rank: Rank | null): string {
-  if (!rank) return 'Unranked';
+  if (!rank) return 'Sin clasificar';
   if (isApex(rank.tier)) {
-    return `${titleCase(rank.tier)} ${rank.leaguePoints} LP`;
+    return `${TIER_LABEL[rank.tier]} ${rank.leaguePoints} pts`;
   }
-  return `${titleCase(rank.tier)} ${rank.division} · ${rank.leaguePoints} LP`;
+  return `${TIER_LABEL[rank.tier]} ${DIVISION_LABEL[rank.division!]} · ${rank.leaguePoints} pts`;
 }
 
 export function titleCase(value: string): string {

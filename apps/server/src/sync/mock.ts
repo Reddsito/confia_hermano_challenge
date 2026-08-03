@@ -1,9 +1,6 @@
 import {
-  DIVISIONS,
-  TIERS,
+  ladderPointsToRank,
   toLadderPoints,
-  type Rank,
-  type Tier,
 } from '@challenge/core/domain';
 
 import type { Db } from '../db/index';
@@ -16,7 +13,6 @@ import {
 import { MAX_RECENT_RESULTS } from './helpers';
 import type { CycleReport } from './riot';
 
-const APEX_FLOOR = TIERS.indexOf('MASTER') * 400;
 
 const CHAMPION_POOL = [
   { id: 157, name: 'Yasuo' },
@@ -30,26 +26,6 @@ const CHAMPION_POOL = [
   { id: 875, name: 'Sett' },
   { id: 202, name: 'Jhin' },
 ];
-
-export function ladderPointsToRank(points: number): Rank {
-  const clamped = Math.max(0, points);
-  if (clamped >= APEX_FLOOR) {
-    const lp = clamped - APEX_FLOOR;
-    const tier: Tier =
-      lp >= 1000 ? 'CHALLENGER' : lp >= 500 ? 'GRANDMASTER' : 'MASTER';
-    return { tier, division: null, leaguePoints: Math.round(lp) };
-  }
-
-  const tierIndex = Math.min(Math.floor(clamped / 400), TIERS.length - 1);
-  const withinTier = clamped - tierIndex * 400;
-  const divisionIndex = Math.min(Math.floor(withinTier / 100), 3);
-
-  return {
-    tier: TIERS[tierIndex]!,
-    division: DIVISIONS[divisionIndex]!,
-    leaguePoints: Math.round(withinTier - divisionIndex * 100),
-  };
-}
 
 /** Deterministic PRNG so a given player always starts from the same profile. */
 function createRandom(seed: string): () => number {
