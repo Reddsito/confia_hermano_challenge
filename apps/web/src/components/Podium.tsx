@@ -151,7 +151,7 @@ function PodiumCard({
           value={`${player.totals.wins}W ${player.totals.losses}L`}
         />
         <Stat label="Winrate" value={formatPercent(player.winRate)} />
-        <Stat label="LP gained" value={formatSigned(player.ladderPointsGained)} />
+        <Stat label="LP ganados" value={formatSigned(player.ladderPointsGained)} />
       </dl>
 
       <div className="relative mt-3 flex items-center justify-between gap-2">

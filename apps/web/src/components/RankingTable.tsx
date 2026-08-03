@@ -65,22 +65,22 @@ export function RankingTable({
                 #
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
-                Player
+                Jugador
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
-                Role
+                Rol
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
                 Elo
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
-                Win / Loss
+                Victorias / Derrotas
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
-                Form
+                Forma
               </th>
               <th scope="col" className="px-2 pb-1 text-center font-semibold">
-                Shells
+                Conchas
               </th>
               <th scope="col" className="px-2 pb-1 text-right font-semibold">
                 LP
@@ -92,7 +92,7 @@ export function RankingTable({
                 Campeones
               </th>
               <th scope="col" className="px-4 pb-1 font-semibold">
-                <span className="sr-only">External profile</span>
+                <span className="sr-only">Perfil externo</span>
               </th>
             </tr>
           </thead>

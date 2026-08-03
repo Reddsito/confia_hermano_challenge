@@ -134,7 +134,7 @@ export function PlayerDetail({
             aria-label="Cerrar"
             className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
           >
-            Close
+            Cerrar
           </button>
         </header>
 
@@ -160,21 +160,21 @@ export function PlayerDetail({
           </section>
 
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Record" value={`${player.totals.wins}W ${player.totals.losses}L`} />
+            <Stat label="Récord" value={`${player.totals.wins}V ${player.totals.losses}D`} />
             <Stat label="Winrate" value={formatPercent(player.winRate, 1)} />
             <Stat label="KDA" value={player.kda.toFixed(2)} />
-            <Stat label="LP gained" value={formatSigned(player.ladderPointsGained)} />
+            <Stat label="LP ganados" value={formatSigned(player.ladderPointsGained)} />
             <Stat
               label="K / D / A"
               value={`${player.totals.kills} / ${player.totals.deaths} / ${player.totals.assists}`}
             />
-            <Stat label="CS per min" value={player.csPerMinute.toFixed(1)} />
+            <Stat label="CS por min" value={player.csPerMinute.toFixed(1)} />
             <Stat
               label="Horas jugadas"
               value={(player.totals.minutesPlayed / 60).toFixed(1)}
             />
             <Stat
-              label="Kill participation"
+              label="Participación en asesinatos"
               value={
                 extras?.killParticipation !== null && extras?.killParticipation !== undefined
                   ? formatPercent(extras.killParticipation)
@@ -187,25 +187,25 @@ export function PlayerDetail({
             <section>
               <h3 className="eyebrow mb-2 text-ink-3">The details</h3>
               <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Stat label="Time spent dead" value={formatDuration(extras.timeDeadSeconds)} />
-                <Stat label="Damage dealt" value={formatCompact(extras.damageToChampions)} />
-                <Stat label="Damage taken" value={formatCompact(extras.damageTaken)} />
-                <Stat label="Gold earned" value={formatCompact(extras.goldEarned)} />
-                <Stat label="Vision score" value={String(extras.visionScore)} />
-                <Stat label="Solo kills" value={String(extras.soloKills)} />
-                <Stat label="First bloods" value={String(extras.firstBloods)} />
-                <Stat label="Longest spree" value={String(extras.largestSpree)} />
+                <Stat label="Tiempo muerto" value={formatDuration(extras.timeDeadSeconds)} />
+                <Stat label="Daño infligido" value={formatCompact(extras.damageToChampions)} />
+                <Stat label="Daño recibido" value={formatCompact(extras.damageTaken)} />
+                <Stat label="Oro ganado" value={formatCompact(extras.goldEarned)} />
+                <Stat label="Puntaje de visión" value={String(extras.visionScore)} />
+                <Stat label="Asesinatos en solitario" value={String(extras.soloKills)} />
+                <Stat label="Primera sangre" value={String(extras.firstBloods)} />
+                <Stat label="Mayor racha de asesinatos" value={String(extras.largestSpree)} />
                 <Stat
                   label="Multikills"
                   value={`${extras.pentaKills}P · ${extras.quadraKills}Q · ${extras.tripleKills}T`}
                 />
-                <Stat label="Surrenders" value={String(extras.surrenders)} />
+                <Stat label="Rendiciones" value={String(extras.surrenders)} />
                 <Stat
                   label="Mejor KDA en una partida"
                   value={extras.bestKdaGame ? extras.bestKdaGame.toFixed(2) : '—'}
                 />
                 <Stat
-                  label="Usual hour (UTC)"
+                  label="Hora habitual (UTC)"
                   value={
                     extras.favouriteHour !== null
                       ? `${String(extras.favouriteHour).padStart(2, '0')}:00`

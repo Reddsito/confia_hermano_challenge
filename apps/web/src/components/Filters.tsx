@@ -111,7 +111,7 @@ export function Filters({
                 : 'var(--color-mark-teal)',
             }}
           />
-          In game
+          En partida
           <span
             className={classNames(
               'tabular text-[0.65rem]',

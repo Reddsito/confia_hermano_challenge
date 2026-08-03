@@ -18,8 +18,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   TOP: 'Top',
   JUNGLE: 'Jungla',
   MID: 'Mid',
-  ADC: 'Bot',
-  SUPPORT: 'Support',
+  ADC: 'ADC',
+  SUPPORT: 'Soporte',
 };
 
 export function classNames(...values: Array<string | false | null | undefined>) {

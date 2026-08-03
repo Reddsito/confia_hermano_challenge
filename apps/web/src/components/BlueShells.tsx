@@ -116,8 +116,6 @@ export function BlueShells({
         />
       </div>
 
-      <Earn shells={mine?.shells ?? []} />
-
       <section className="rounded-2xl border border-line bg-carbon p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="display text-fluid-lg">Elegí una víctima</h3>
@@ -387,10 +385,7 @@ function Inventory({
           ? 'Cargada. Nada más cuenta hasta que la tires.'
           : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
       </p>
-      <p className="mt-1 text-fluid-xs text-ink-3">
-        Ganale una partida a otro participante y su concha es tuya — o se
-        pierde, si ya estabas cargado.
-      </p>
+      <Earn shells={shells} />
 
       {shells.length > 0 && (
         <ul className="mt-4 space-y-2 border-t border-line pt-3">
@@ -420,9 +415,9 @@ function Inventory({
 }
 
 /**
- * Every way to earn a shell, always all of them. The inventory above only ever
- * shows what you already did, which leaves the rest of the list invisible —
- * and nobody chases a target they cannot see.
+ * Every way to earn a shell, always all of them. It lives inside the arsenal
+ * card, which is where the player is told to go earn one — listing the rules
+ * anywhere else leaves eight of the nine invisible until they happen by luck.
  */
 function Earn({
   shells,
@@ -432,33 +427,17 @@ function Earn({
   const done = new Set(shells.map((shell) => shell.rule));
 
   return (
-    <section className="rounded-2xl border border-line bg-carbon p-5">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="display text-fluid-lg">Cómo ganar una</h3>
-        <p className="text-fluid-xs text-ink-3">
-          Las rachas y los hitos vuelven a pagar cada vez que los cumplís.
-        </p>
-      </header>
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="eyebrow text-ink-3">Cómo ganar una</p>
 
-      <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <ul className="mt-2 space-y-1">
         {SHELL_RULES.map((rule) => {
           const earned = done.has(rule);
 
           return (
-            <li
-              key={rule}
-              className="flex items-center gap-3 rounded-xl border border-line p-3"
-              style={
-                earned
-                  ? {
-                      borderColor:
-                        'color-mix(in oklab, var(--color-accent) 40%, transparent)',
-                    }
-                  : undefined
-              }
-            >
+            <li key={rule} className="flex items-baseline gap-2">
               <span
-                className="tabular text-fluid-xs font-semibold"
+                className="tabular shrink-0 text-fluid-xs font-semibold"
                 style={{
                   color: earned
                     ? 'var(--color-accent)'
@@ -467,19 +446,22 @@ function Earn({
               >
                 +{SHELL_RULE_AWARD[rule]}
               </span>
-              <span className="min-w-0 text-fluid-xs">
+              <span
+                className="min-w-0 text-fluid-xs"
+                style={earned ? { color: 'var(--color-accent)' } : undefined}
+              >
                 {SHELL_RULE_LABEL[rule]}
               </span>
-              {earned && (
-                <span className="ml-auto shrink-0" title="Ya la ganaste">
-                  <ShellMark size={16} filled />
-                </span>
-              )}
             </li>
           );
         })}
       </ul>
-    </section>
+
+      <p className="mt-3 text-[0.68rem] text-ink-3">
+        Las rachas y los hitos vuelven a pagar cada vez que los cumplís. También
+        podés robarle la concha a otro participante ganándole una partida.
+      </p>
+    </div>
   );
 }
 

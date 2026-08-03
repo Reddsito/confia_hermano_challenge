@@ -140,7 +140,7 @@ function GameCard({
         </div>
 
         <span className="tabular text-fluid-sm text-ink-2">
-          {game.inChampSelect ? 'Champ select' : formatLength(game.gameLength)}
+          {game.inChampSelect ? 'Selección de campeón' : formatLength(game.gameLength)}
         </span>
       </header>
 

@@ -38,13 +38,13 @@ export function RefreshMeter({
 
       <div className="min-w-0 leading-tight">
         <p className="eyebrow truncate text-ink-3">
-          Last update{' '}
+          Última actualización{' '}
           <span className="text-ink-2">
             {!mounted
               ? '…'
               : ageMinutes === 0
                 ? 'recién'
-                : `${ageMinutes} min ago`}
+                : `hace ${ageMinutes} min`}
           </span>
           {source === 'mock' && (
             <span
@@ -66,7 +66,7 @@ export function RefreshMeter({
             <span className="text-ink-2">Refreshing…</span>
           ) : (
             <>
-              <span className="text-ink-3">Next in </span>
+              <span className="text-ink-3">Próxima en </span>
               <span className="font-semibold">{formatDuration(countdown)}</span>
             </>
           )}

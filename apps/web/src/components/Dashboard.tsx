@@ -268,7 +268,7 @@ function AccountChip({
         className="eyebrow inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-ink-2 transition-colors hover:border-[color:var(--color-accent)] hover:text-ink"
       >
         <ShellMark size={14} />
-        Sign in
+        Entrar
       </a>
     );
   }
