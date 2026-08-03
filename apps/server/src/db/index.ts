@@ -187,6 +187,35 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (match_id, winner_id, loser_id)
   );
   `,
+
+  // The win streak the shell rules read. recent_results cannot serve here: it
+  // is capped for the form graph and ships to every browser, so a streak taken
+  // from it silently froze at that cap and stopped paying past it. This column
+  // is a plain counter with no ceiling.
+  //
+  // Seeded from recent_results, which is exact for any streak still inside the
+  // cap — that is every streak on record when this shipped.
+  `
+  ALTER TABLE player_state ADD COLUMN win_streak INTEGER NOT NULL DEFAULT 0;
+
+  -- Counts the leading run of "true" in the stored JSON, stopping at the first
+  -- "false". Done as string work because it must run inside the migration, and
+  -- "false" never contains "true" so the count cannot drift.
+  UPDATE player_state SET win_streak = (
+    length(
+      CASE WHEN instr(recent_results, 'false') > 0
+           THEN substr(recent_results, 1, instr(recent_results, 'false') - 1)
+           ELSE recent_results END
+    ) - length(
+      replace(
+        CASE WHEN instr(recent_results, 'false') > 0
+             THEN substr(recent_results, 1, instr(recent_results, 'false') - 1)
+             ELSE recent_results END,
+        'true', ''
+      )
+    )
+  ) / 4;
+  `,
 ];
 
 export function openDatabase(path: string): Db {

@@ -28,6 +28,11 @@ export interface PlayerStateRow {
   totals: MatchTotals;
   championUsage: Record<string, ChampionUsage>;
   recentResults: boolean[];
+  /**
+   * Consecutive wins, uncapped. Separate from recentResults, which is trimmed
+   * for the form graph and so cannot carry a streak past its own limit.
+   */
+  winStreak: number;
   startRank: Rank | null;
   currentRank: Rank | null;
   profileIconId: number | null;
@@ -213,6 +218,7 @@ interface RawState {
   totals: string;
   champion_usage: string;
   recent_results: string;
+  win_streak: number;
   start_rank: string | null;
   current_rank: string | null;
   profile_icon_id: number | null;
@@ -233,6 +239,7 @@ function toState(row: RawState): PlayerStateRow {
       ChampionUsage
     >,
     recentResults: JSON.parse(row.recent_results) as boolean[],
+    winStreak: row.win_streak,
     startRank: row.start_rank ? (JSON.parse(row.start_rank) as Rank) : null,
     currentRank: row.current_rank
       ? (JSON.parse(row.current_rank) as Rank)
@@ -261,15 +268,16 @@ export function listPlayerStates(db: Db): Map<string, PlayerStateRow> {
 export function upsertPlayerState(db: Db, state: PlayerStateRow): void {
   db.prepare(
     `INSERT INTO player_state (
-       player_id, puuid, totals, champion_usage, recent_results, start_rank,
-       current_rank, profile_icon_id, summoner_level, in_game, last_position,
-       last_error, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       player_id, puuid, totals, champion_usage, recent_results, win_streak,
+       start_rank, current_rank, profile_icon_id, summoner_level, in_game,
+       last_position, last_error, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (player_id) DO UPDATE SET
        puuid           = excluded.puuid,
        totals          = excluded.totals,
        champion_usage  = excluded.champion_usage,
        recent_results  = excluded.recent_results,
+       win_streak      = excluded.win_streak,
        -- start_rank is captured once and never overwritten, so "LP gained"
        -- keeps measuring from the real starting point.
        start_rank      = COALESCE(player_state.start_rank, excluded.start_rank),
@@ -286,6 +294,7 @@ export function upsertPlayerState(db: Db, state: PlayerStateRow): void {
     JSON.stringify(state.totals),
     JSON.stringify(state.championUsage),
     JSON.stringify(state.recentResults),
+    state.winStreak,
     state.startRank ? JSON.stringify(state.startRank) : null,
     state.currentRank ? JSON.stringify(state.currentRank) : null,
     state.profileIconId,

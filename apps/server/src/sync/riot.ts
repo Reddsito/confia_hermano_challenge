@@ -155,6 +155,10 @@ async function syncPlayer(
     ...(existing?.championUsage ?? {}),
   };
   let recentResults = [...(existing?.recentResults ?? [])];
+  // Kept alongside recentResults rather than derived from it: that array is
+  // trimmed for the form graph, so a streak read off it stops growing at the
+  // trim point and the streak rule quietly stops paying.
+  let winStreak = existing?.winStreak ?? 0;
 
   // Seed the state row before ingesting so the start rank is captured even if a
   // later request for this player fails.
@@ -164,6 +168,7 @@ async function syncPlayer(
     totals,
     championUsage,
     recentResults,
+    winStreak,
     startRank: existing?.startRank ?? currentRank,
     currentRank,
     profileIconId: summoner.profileIconId,
@@ -217,6 +222,7 @@ async function syncPlayer(
 
     if (row !== null) {
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
+      winStreak = row.win ? winStreak + 1 : 0;
       insertPlayerMatch(db, row);
 
       // Progress counters are read after the row is stored, so the milestone
@@ -234,7 +240,7 @@ async function syncPlayer(
           usedSmite: row.usedSmite,
         },
         {
-          winStreak: Math.max(computeStreak(recentResults), 0),
+          winStreak,
           ...progressFor(db, player.id),
         },
       );
@@ -286,6 +292,7 @@ async function syncPlayer(
         totals,
         championUsage,
         recentResults,
+        winStreak,
         startRank: existing?.startRank ?? currentRank,
         currentRank,
         profileIconId: summoner.profileIconId,
@@ -538,6 +545,7 @@ function recordFailure(db: Db, player: PlayerRow, error: unknown): void {
       totals: emptyTotals(),
       championUsage: {},
       recentResults: [],
+      winStreak: 0,
       startRank: null,
       currentRank: null,
       profileIconId: null,

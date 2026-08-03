@@ -88,6 +88,7 @@ export function runMockCycle(db: Db): CycleReport {
         totals: emptyTotals(),
         championUsage: {},
         recentResults: [],
+        winStreak: 0,
         startRank: ladderPointsToRank(startPoints),
         currentRank: ladderPointsToRank(startPoints),
         profileIconId: 500 + Math.floor(random() * 100),
@@ -136,6 +137,7 @@ export function runMockCycle(db: Db): CycleReport {
         0,
         MAX_RECENT_RESULTS,
       );
+      state.winStreak = won ? state.winStreak + 1 : 0;
 
       const points =
         toLadderPoints(state.currentRank) +
