@@ -11,7 +11,7 @@
 export const SHELL_RULES = [
   'PENTAKILL',
   'QUADRAKILL',
-  'KILLS_22',
+  'KILLS_20',
   'ASSISTS_30',
   'WIN_STREAK_6',
   'PERFECT_KDA_20',
@@ -25,7 +25,7 @@ export type ShellRule = (typeof SHELL_RULES)[number];
 export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
   PENTAKILL: 'Pentakill',
   QUADRAKILL: 'Cuádruple',
-  KILLS_22: '22 asesinatos en una partida',
+  KILLS_20: '20 asesinatos en una partida',
   ASSISTS_30: '30 asistencias en una partida',
   WIN_STREAK_6: '6 victorias seguidas',
   PERFECT_KDA_20: 'KDA perfecto arriba de 20',
@@ -42,7 +42,7 @@ export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
 export const SHELL_RULE_AWARD: Record<ShellRule, number> = {
   PENTAKILL: 2,
   QUADRAKILL: 1,
-  KILLS_22: 1,
+  KILLS_20: 1,
   ASSISTS_30: 1,
   WIN_STREAK_6: 1,
   PERFECT_KDA_20: 1,
@@ -91,7 +91,7 @@ export interface EarnedShell {
   detail: string;
 }
 
-const KILL_THRESHOLD = 22;
+const KILL_THRESHOLD = 20;
 const ASSIST_THRESHOLD = 30;
 const STREAK_THRESHOLD = 6;
 const PERFECT_KDA_THRESHOLD = 20;
@@ -99,7 +99,12 @@ const LONG_GAME_MINUTES = 40;
 const MILESTONE_STEP = 5;
 
 /**
- * Every rule that fired for one finished game.
+ * What one finished game pays: at most one rule, however many it satisfied.
+ *
+ * A single game can easily clear several rules at once — a flawless win that
+ * also lands on the sixth of a streak clears two — and paying for each would
+ * let one good game fill the whole arsenal. The rarest rule wins, ranked by
+ * position in SHELL_RULES, so the game is remembered for its best moment.
  *
  * The milestone rules (5 champions, 5 smite wins) are awarded on the game that
  * crosses the threshold, which is why they need the post-game counters rather
@@ -134,7 +139,7 @@ export function earnedShells(
   }
 
   if (game.kills >= KILL_THRESHOLD) {
-    earned.push({ rule: 'KILLS_22', amount: 1, detail: `${game.kills} asesinatos` });
+    earned.push({ rule: 'KILLS_20', amount: 1, detail: `${game.kills} asesinatos` });
   }
 
   if (game.assists >= ASSIST_THRESHOLD) {
@@ -201,7 +206,12 @@ export function earnedShells(
     });
   }
 
-  return earned;
+  // Sorted rather than trusted to arrive in order: the checks above happen to
+  // run in SHELL_RULES order today, and reordering them for any reason must not
+  // quietly change which rule a game pays.
+  return earned
+    .sort((a, b) => SHELL_RULES.indexOf(a.rule) - SHELL_RULES.indexOf(b.rule))
+    .slice(0, 1);
 }
 
 export function totalShells(earned: EarnedShell[]): number {

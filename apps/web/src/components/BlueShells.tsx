@@ -444,8 +444,9 @@ function Earn({
       </ul>
 
       <p className="mt-3 text-[0.68rem] text-ink-3">
-        Todas se pueden volver a cumplir. También podés robarle la concha a otro
-        participante ganándole una partida.
+        Una concha por partida: si cumplís varias, cobrás solo la más difícil.
+        Todas se pueden volver a cumplir, y también podés robarle la concha a
+        otro participante ganándole una partida.
       </p>
     </div>
   );
