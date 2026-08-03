@@ -126,19 +126,22 @@ export function earnedShells(
     earned.push({
       rule: 'QUADRAKILL',
       amount: standaloneQuadras,
-      detail: standaloneQuadras > 1 ? `${standaloneQuadras} quadrakills` : 'Quadrakill',
+      detail:
+        standaloneQuadras > 1
+          ? `${standaloneQuadras} cuádruples`
+          : 'Cuádruple',
     });
   }
 
   if (game.kills >= KILL_THRESHOLD) {
-    earned.push({ rule: 'KILLS_22', amount: 1, detail: `${game.kills} kills` });
+    earned.push({ rule: 'KILLS_22', amount: 1, detail: `${game.kills} asesinatos` });
   }
 
   if (game.assists >= ASSIST_THRESHOLD) {
     earned.push({
       rule: 'ASSISTS_30',
       amount: 1,
-      detail: `${game.assists} assists`,
+      detail: `${game.assists} asistencias`,
     });
   }
 
@@ -152,7 +155,7 @@ export function earnedShells(
     earned.push({
       rule: 'WIN_STREAK_6',
       amount: 1,
-      detail: `${progress.winStreak} wins in a row`,
+      detail: `${progress.winStreak} victorias seguidas`,
     });
   }
 
@@ -161,7 +164,7 @@ export function earnedShells(
     earned.push({
       rule: 'PERFECT_KDA_20',
       amount: 1,
-      detail: `${game.kills}/0/${game.assists} without dying`,
+      detail: `${game.kills}/0/${game.assists} sin morir`,
     });
   }
 
@@ -169,7 +172,7 @@ export function earnedShells(
     earned.push({
       rule: 'LONG_WIN_40',
       amount: 1,
-      detail: `Won after ${Math.round(game.durationMinutes)} minutes`,
+      detail: `Ganada a los ${Math.round(game.durationMinutes)} minutos`,
     });
   }
 
@@ -181,7 +184,7 @@ export function earnedShells(
     earned.push({
       rule: 'FIVE_CHAMPION_WINS',
       amount: 1,
-      detail: `Won with ${progress.distinctChampionWins} different champions`,
+      detail: `Ganó con ${progress.distinctChampionWins} campeones distintos`,
     });
   }
 
@@ -194,7 +197,7 @@ export function earnedShells(
     earned.push({
       rule: 'FIVE_SMITE_WINS',
       amount: 1,
-      detail: `${progress.smiteWins} wins with Smite`,
+      detail: `${progress.smiteWins} victorias con Castigo`,
     });
   }
 

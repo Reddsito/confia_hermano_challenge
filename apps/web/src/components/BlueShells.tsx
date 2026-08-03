@@ -106,7 +106,7 @@ export function BlueShells({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <Inventory available={available} shells={mine?.shells ?? []} />
+        <Inventory available={available} />
 
         <Wheel
           odds={odds}
@@ -354,13 +354,7 @@ function arc(
   return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
-function Inventory({
-  available,
-  shells,
-}: {
-  available: number;
-  shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
-}) {
+function Inventory({ available }: { available: number }) {
   const full = available >= MAX_HELD_SHELLS;
 
   return (
@@ -385,31 +379,7 @@ function Inventory({
           ? 'Cargada. Nada más cuenta hasta que la tires.'
           : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
       </p>
-      <Earn shells={shells} />
-
-      {shells.length > 0 && (
-        <ul className="mt-4 space-y-2 border-t border-line pt-3">
-          {shells.slice(0, 5).map((shell) => (
-            <li key={shell.id} className="flex items-start gap-2">
-              <span
-                className="tabular mt-px text-fluid-xs font-semibold"
-                style={{ color: 'var(--color-accent)' }}
-              >
-                +{shell.amount}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-fluid-xs">
-                  {SHELL_RULE_LABEL[shell.rule as keyof typeof SHELL_RULE_LABEL] ??
-                    'Ajuste'}
-                </span>
-                <span className="block truncate text-[0.68rem] text-ink-3">
-                  {shell.detail}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Earn />
     </section>
   );
 }
@@ -418,48 +388,34 @@ function Inventory({
  * Every way to earn a shell, always all of them. It lives inside the arsenal
  * card, which is where the player is told to go earn one — listing the rules
  * anywhere else leaves eight of the nine invisible until they happen by luck.
+ *
+ * Nothing here is marked as already earned. Every rule can pay again, so
+ * greying one out would claim it is spent when it is not.
  */
-function Earn({
-  shells,
-}: {
-  shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
-}) {
-  const done = new Set(shells.map((shell) => shell.rule));
-
+function Earn() {
   return (
     <div className="mt-4 border-t border-line pt-3">
       <p className="eyebrow text-ink-3">Cómo ganar una</p>
 
       <ul className="mt-2 space-y-1">
-        {SHELL_RULES.map((rule) => {
-          const earned = done.has(rule);
-
-          return (
-            <li key={rule} className="flex items-baseline gap-2">
-              <span
-                className="tabular shrink-0 text-fluid-xs font-semibold"
-                style={{
-                  color: earned
-                    ? 'var(--color-accent)'
-                    : 'var(--color-ink-3)',
-                }}
-              >
-                +{SHELL_RULE_AWARD[rule]}
-              </span>
-              <span
-                className="min-w-0 text-fluid-xs"
-                style={earned ? { color: 'var(--color-accent)' } : undefined}
-              >
-                {SHELL_RULE_LABEL[rule]}
-              </span>
-            </li>
-          );
-        })}
+        {SHELL_RULES.map((rule) => (
+          <li key={rule} className="flex items-baseline gap-2">
+            <span
+              className="tabular shrink-0 text-fluid-xs font-semibold"
+              style={{ color: 'var(--color-accent)' }}
+            >
+              +{SHELL_RULE_AWARD[rule]}
+            </span>
+            <span className="min-w-0 text-fluid-xs">
+              {SHELL_RULE_LABEL[rule]}
+            </span>
+          </li>
+        ))}
       </ul>
 
       <p className="mt-3 text-[0.68rem] text-ink-3">
-        Las rachas y los hitos vuelven a pagar cada vez que los cumplís. También
-        podés robarle la concha a otro participante ganándole una partida.
+        Todas se pueden volver a cumplir. También podés robarle la concha a otro
+        participante ganándole una partida.
       </p>
     </div>
   );
