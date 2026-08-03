@@ -106,7 +106,7 @@ export function BlueShells({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <Inventory available={available} />
+        <Inventory available={available} shells={mine?.shells ?? []} />
 
         <Wheel
           odds={odds}
@@ -354,8 +354,17 @@ function arc(
   return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
 }
 
-function Inventory({ available }: { available: number }) {
+function Inventory({
+  available,
+  shells,
+}: {
+  available: number;
+  shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
+}) {
   const full = available >= MAX_HELD_SHELLS;
+  // Newest first, straight from the query, so this is the shell most recently
+  // earned — the reason the counter above moved.
+  const latest = shells[0] ?? null;
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-5">
@@ -363,7 +372,7 @@ function Inventory({ available }: { available: number }) {
 
       <div className="mt-3 flex items-center gap-2">
         {Array.from({ length: MAX_HELD_SHELLS }, (_, index) => (
-          <ShellMark key={index} size={44} filled={index < available} />
+          <ShellMark key={index} size={36} filled={index < available} />
         ))}
         <span className="tabular ml-auto text-[2.5rem] leading-none font-semibold">
           {available}
@@ -376,10 +385,12 @@ function Inventory({ available }: { available: number }) {
         style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
       >
         {full
-          ? 'Cargada. Nada más cuenta hasta que la tires.'
-          : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
+          ? 'Llena. Nada más cuenta hasta que tires una.'
+          : available > 0
+            ? `Te queda${available > 1 ? 'n' : ''} ${available} para tirar.`
+            : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
       </p>
-      <Earn />
+      <Earn latest={latest} />
     </section>
   );
 }
@@ -389,28 +400,47 @@ function Inventory({ available }: { available: number }) {
  * card, which is where the player is told to go earn one — listing the rules
  * anywhere else leaves eight of the nine invisible until they happen by luck.
  *
- * Nothing here is marked as already earned. Every rule can pay again, so
- * greying one out would claim it is spent when it is not.
+ * Only the most recently earned rule is marked, and it is marked as an event
+ * rather than as progress: every rule can pay again, so a permanent tick would
+ * claim a rule is spent when it is not.
  */
-function Earn() {
+function Earn({
+  latest,
+}: {
+  latest: { rule: string; amount: number; detail: string } | null;
+}) {
   return (
     <div className="mt-4 border-t border-line pt-3">
       <p className="eyebrow text-ink-3">Cómo ganar una</p>
 
       <ul className="mt-2 space-y-1">
-        {SHELL_RULES.map((rule) => (
-          <li key={rule} className="flex items-baseline gap-2">
-            <span
-              className="tabular shrink-0 text-fluid-xs font-semibold"
-              style={{ color: 'var(--color-accent)' }}
-            >
-              +{SHELL_RULE_AWARD[rule]}
-            </span>
-            <span className="min-w-0 text-fluid-xs">
-              {SHELL_RULE_LABEL[rule]}
-            </span>
-          </li>
-        ))}
+        {SHELL_RULES.map((rule) => {
+          const isLatest = latest?.rule === rule;
+
+          return (
+            <li key={rule} className="flex items-baseline gap-2">
+              <span
+                className="tabular shrink-0 text-fluid-xs font-semibold"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                +{SHELL_RULE_AWARD[rule]}
+              </span>
+              <span
+                className="min-w-0 text-fluid-xs"
+                style={
+                  isLatest ? { color: 'var(--color-accent)' } : undefined
+                }
+              >
+                {SHELL_RULE_LABEL[rule]}
+                {isLatest && (
+                  <span className="block text-[0.68rem] text-ink-3">
+                    ← la última que ganaste · {latest.detail}
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
       </ul>
 
       <p className="mt-3 text-[0.68rem] text-ink-3">
