@@ -75,16 +75,16 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-line bg-carbon p-4">
-        <h3 className="display text-fluid-lg">Discord accounts</h3>
+        <h3 className="display text-fluid-lg">Cuentas de Discord</h3>
         <p className="mt-1 text-fluid-xs text-ink-3">
-          Link each account to one roster player. One account, one player —
-          picking someone already linked moves them.
+          Vinculá cada cuenta con un jugador del roster. Una cuenta, un jugador —
+          si elegís a alguien ya vinculado, se lo mueve.
         </p>
 
         {users.length === 0 ? (
           <p className="mt-4 text-fluid-sm text-ink-2">
-            Nobody has signed in yet. Share the site and ask them to hit “Sign
-            in with Discord”.
+            Todavía no entró nadie. Compartí el sitio y pediles que toquen
+            “Entrar con Discord”.
           </p>
         ) : (
           <ul className="mt-4 space-y-2">
@@ -114,25 +114,25 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                   <span className="block truncate text-[0.68rem]">
                     {saved === user.discordId ? (
                       <span style={{ color: 'var(--color-mark-teal)' }}>
-                        Saved
+                        Guardado
                       </span>
                     ) : user.playerId ? (
                       <span className="text-ink-3">
-                        linked to{' '}
+                        vinculado a{' '}
                         <span style={{ color: 'var(--color-accent)' }}>
                           {roster.find((player) => player.id === user.playerId)
-                            ?.displayName ?? 'unknown player'}
+                            ?.displayName ?? 'jugador desconocido'}
                         </span>
                       </span>
                     ) : (
-                      <span className="text-ink-3">not linked</span>
+                      <span className="text-ink-3">sin vincular</span>
                     )}
                   </span>
                 </span>
 
                 <label className="flex items-center gap-2">
                   <span className="sr-only">
-                    Roster player for {user.username}
+                    Jugador del roster para {user.username}
                   </span>
                   <select
                     value={user.playerId ?? ''}
@@ -235,12 +235,12 @@ function ChallengeRow({
             if (!trimmed) return setName(challenge.name);
             if (trimmed !== challenge.name) onPatch({ name: trimmed });
           }}
-          placeholder="Challenge"
+          placeholder="Reto"
           className="min-h-9 min-w-0 flex-[2] rounded-lg border border-line bg-carbon px-2 text-fluid-sm"
         />
 
         <label className="flex shrink-0 items-center gap-1.5">
-          <span className="eyebrow text-ink-3">Weight</span>
+          <span className="eyebrow text-ink-3">Peso</span>
           <input
             type="number"
             min={1}
@@ -262,7 +262,7 @@ function ChallengeRow({
           onClick={() => onPatch({ enabled: !challenge.enabled })}
           className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-2 hover:text-ink"
         >
-          {challenge.enabled ? 'Disable' : 'Enable'}
+          {challenge.enabled ? 'Desactivar' : 'Activar'}
         </button>
 
         {confirming ? (
@@ -274,14 +274,14 @@ function ChallengeRow({
               className="eyebrow min-h-9 rounded-full px-3 text-void"
               style={{ background: 'var(--color-mark-red)' }}
             >
-              Delete
+              Eliminar
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
               className="eyebrow min-h-9 px-2 text-ink-3"
             >
-              Cancel
+              Cancelar
             </button>
           </span>
         ) : (
@@ -290,7 +290,7 @@ function ChallengeRow({
             onClick={() => setConfirming(true)}
             className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-3 hover:text-ink"
           >
-            Delete
+            Eliminar
           </button>
         )}
       </div>
@@ -302,7 +302,7 @@ function ChallengeRow({
         onBlur={() => {
           if (detail !== challenge.detail) onPatch({ detail });
         }}
-        placeholder="Detail (optional)"
+        placeholder="Detalle (opcional)"
         className="mt-1.5 min-h-8 w-full rounded-lg border border-line bg-carbon px-2 text-[0.72rem] text-ink-2 placeholder:text-ink-3"
       />
     </li>
@@ -333,10 +333,10 @@ function ChallengeEditor({
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-4">
-      <h3 className="display text-fluid-lg">The wheel</h3>
+      <h3 className="display text-fluid-lg">La ruleta</h3>
       <p className="mt-1 text-fluid-xs text-ink-3">
-        Weights are relative, not percentages. Raise one and the rest adjust on
-        their own.
+        Los pesos son relativos, no porcentajes. Subí uno y el resto se ajusta
+        solo.
       </p>
 
       <ul className="mt-4 space-y-2">
@@ -363,13 +363,13 @@ function ChallengeEditor({
       >
         <input
           value={draft.name}
-          placeholder="New challenge"
+          placeholder="Nuevo reto"
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           className="min-h-10 rounded-lg border border-line bg-carbon-2 px-3 text-fluid-sm"
         />
         <input
           value={draft.detail}
-          placeholder="Detail (optional)"
+          placeholder="Detalle (opcional)"
           onChange={(event) => setDraft({ ...draft, detail: event.target.value })}
           className="min-h-10 rounded-lg border border-line bg-carbon-2 px-3 text-fluid-sm"
         />
@@ -388,7 +388,7 @@ function ChallengeEditor({
           className="eyebrow min-h-10 rounded-lg px-4 text-void disabled:opacity-40"
           style={{ background: 'var(--color-accent)' }}
         >
-          Add
+          Agregar
         </button>
       </form>
     </section>

@@ -16,7 +16,7 @@ export function tierColor(rank: Rank | null): string {
 
 export const ROLE_LABEL: Record<Role, string> = {
   TOP: 'Top',
-  JUNGLE: 'Jungle',
+  JUNGLE: 'Jungla',
   MID: 'Mid',
   ADC: 'Bot',
   SUPPORT: 'Support',
@@ -95,8 +95,8 @@ export function Avatar({ name, iconId, size = 40, inGame, ring }: AvatarProps) {
             background: 'var(--color-mark-teal)',
             outline: '2px solid var(--color-carbon)',
           }}
-          title="In game right now"
-          aria-label="In game right now"
+          title="En partida ahora"
+          aria-label="En partida ahora"
         />
       )}
     </span>
@@ -190,7 +190,7 @@ export function StreakPill({ streak }: { streak: number }) {
         background: `color-mix(in oklab, ${color} 14%, transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${color} 30%, transparent)`,
       }}
-      title={`${Math.abs(streak)} ${isWin ? 'wins' : 'losses'} in a row`}
+      title={`${Math.abs(streak)} ${isWin ? 'victorias' : 'derrotas'} seguidas`}
     >
       {Math.abs(streak)}
       {isWin ? 'W' : 'L'}
@@ -292,7 +292,7 @@ export function PositionDelta({
     <span
       className="tabular inline-flex items-center gap-0.5 text-[0.68rem] font-semibold"
       style={{ color }}
-      title={`${up ? 'Up' : 'Down'} ${Math.abs(moved)} since the last update`}
+      title={`${up ? 'Subió' : 'Bajó'} ${Math.abs(moved)} desde la última actualización`}
     >
       {up ? '▲' : '▼'}
       {Math.abs(moved)}
@@ -308,7 +308,7 @@ export function OpggLink({ url }: { url: string }) {
       rel="noreferrer noopener"
       className="eyebrow inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-ink-2 transition-all hover:border-[color:var(--color-accent)] hover:text-ink"
       style={{ letterSpacing: '0.12em' }}
-      title="Open on OP.GG"
+      title="Abrir en OP.GG"
     >
       OP.GG
       <svg width="9" height="9" viewBox="0 0 16 16" fill="none" aria-hidden="true">

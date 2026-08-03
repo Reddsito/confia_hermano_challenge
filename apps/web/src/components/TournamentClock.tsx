@@ -34,10 +34,10 @@ export function TournamentClock({
       />
       <span className="eyebrow hidden leading-tight text-ink-3 sm:inline">
         {countdown.ready && countdown.expired
-          ? 'Challenge over'
+          ? 'Challenge terminado'
           : notStarted
-            ? 'Starts in'
-            : 'Ends in'}
+            ? 'Empieza en'
+            : 'Termina en'}
       </span>
 
       {countdown.ready && countdown.expired ? (

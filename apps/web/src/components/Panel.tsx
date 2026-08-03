@@ -135,8 +135,8 @@ export function Panel() {
         <div>
           <h2 className="display text-fluid-lg">Roster</h2>
           <p className="text-fluid-xs text-ink-3">
-            {roster.filter((p) => p.status === 'approved').length} on the board
-            {info && ` · ${info.platform} · ${info.source} data`}
+            {roster.filter((p) => p.status === 'approved').length} en la tabla
+            {info && ` · ${info.platform} · datos ${info.source}`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -176,10 +176,10 @@ export function Panel() {
                 const result = await editPlayer(code, player.id, draft);
                 if (result.statsReset) {
                   setNotice(
-                    'Riot ID changed, so the accumulated stats for that player were cleared.',
+                    'Cambió el Riot ID, así que se borraron las estadísticas acumuladas de ese jugador.',
                   );
                 }
-              }, 'Saved.')
+              }, 'Guardado.')
             }
             onToggle={() =>
               run(() =>
@@ -187,7 +187,7 @@ export function Panel() {
               )
             }
             onDelete={() =>
-              run(() => removePlayer(code, player.id), 'Player removed.')
+              run(() => removePlayer(code, player.id), 'Jugador eliminado.')
             }
           />
         ))}
@@ -195,7 +195,7 @@ export function Panel() {
 
       {roster.length === 0 && (
         <p className="rounded-2xl border border-line bg-carbon p-8 text-center text-ink-2">
-          Nobody on the roster yet. Add the first player above.
+          Todavía no hay nadie en el roster. Agregá el primer jugador arriba.
         </p>
       )}
 
@@ -221,9 +221,9 @@ function CodeGate({
 }) {
   return (
     <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-6">
-      <h2 className="display text-fluid-lg">Enter the group code</h2>
+      <h2 className="display text-fluid-lg">Ingresá el código del grupo</h2>
       <p className="mt-2 text-fluid-sm text-ink-2">
-        Whoever has this code can edit the roster. Ask in the group chat.
+        El que tenga este código puede editar el roster. Pedilo en el chat del grupo.
       </p>
 
       <form
@@ -234,13 +234,13 @@ function CodeGate({
         }}
       >
         <label className="block">
-          <span className="sr-only">Group code</span>
+          <span className="sr-only">Código del grupo</span>
           <input
             type="password"
             value={code}
             autoComplete="current-password"
             onChange={(event) => onCodeChange(event.target.value)}
-            placeholder="Group code"
+            placeholder="Código del grupo"
             className="min-h-11 w-full rounded-lg border border-line bg-carbon-2 px-3 text-fluid-sm text-ink placeholder:text-ink-3 focus:border-[color:var(--color-accent)]"
           />
         </label>
@@ -251,7 +251,7 @@ function CodeGate({
           className="eyebrow min-h-11 w-full rounded-lg px-4 text-void transition-opacity disabled:opacity-40"
           style={{ background: 'var(--color-accent)' }}
         >
-          {busy ? 'Checking…' : 'Unlock'}
+          {busy ? 'Verificando…' : 'Desbloquear'}
         </button>
       </form>
 
@@ -262,8 +262,8 @@ function CodeGate({
       )}
       {!info && (
         <p className="mt-3 text-fluid-xs text-ink-3">
-          The backend is not answering. Check that it is running and that this
-          site's URL is in its ALLOWED_ORIGINS.
+          El backend no responde. Fijate que esté corriendo y que la URL de este
+          sitio esté en su ALLOWED_ORIGINS.
         </p>
       )}
     </div>
@@ -289,11 +289,11 @@ function AddPlayerForm({
         if (await onAdd(draft)) setDraft(EMPTY_DRAFT);
       }}
     >
-      <h3 className="eyebrow text-ink-3">Add a player</h3>
+      <h3 className="eyebrow text-ink-3">Agregar jugador</h3>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
         <Field
-          label="Riot name"
+          label="Nombre de Riot"
           value={draft.gameName}
           onChange={(gameName) => setDraft({ ...draft, gameName })}
           placeholder="Reddsito"
@@ -305,7 +305,7 @@ function AddPlayerForm({
           placeholder="EUW"
         />
         <Field
-          label="Display name"
+          label="Nombre a mostrar"
           value={draft.displayName}
           onChange={(displayName) => setDraft({ ...draft, displayName })}
           placeholder="optional"
@@ -358,7 +358,7 @@ function PlayerRow({
       <li className="rounded-xl border border-line bg-carbon p-3">
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <Field
-            label="Riot name"
+            label="Nombre de Riot"
             value={draft.gameName}
             onChange={(gameName) => setDraft({ ...draft, gameName })}
           />
@@ -368,7 +368,7 @@ function PlayerRow({
             onChange={(tagLine) => setDraft({ ...draft, tagLine })}
           />
           <Field
-            label="Display name"
+            label="Nombre a mostrar"
             value={draft.displayName}
             onChange={(displayName) => setDraft({ ...draft, displayName })}
           />
@@ -384,8 +384,8 @@ function PlayerRow({
             className="mt-2 text-fluid-xs"
             style={{ color: 'var(--color-mark-amber)' }}
           >
-            Changing the Riot ID points this row at a different account, so its
-            accumulated stats will be cleared.
+            Cambiar el Riot ID apunta esta fila a otra cuenta, así que se van a
+            borrar sus estadísticas acumuladas.
           </p>
         )}
 
@@ -406,7 +406,7 @@ function PlayerRow({
             onClick={() => setEditing(false)}
             className="eyebrow min-h-9 rounded-full border border-line px-4 text-ink-2"
           >
-            Cancel
+            Cancelar
           </button>
         </div>
       </li>
@@ -443,7 +443,7 @@ function PlayerRow({
         onClick={() => setEditing(true)}
         className="eyebrow min-h-9 rounded-full border border-line px-3 text-ink-2 transition-colors hover:text-ink"
       >
-        Edit
+        Editar
       </button>
 
       <button
@@ -453,11 +453,11 @@ function PlayerRow({
         className="eyebrow min-h-9 rounded-full border border-line px-3 text-ink-2 transition-colors hover:text-ink disabled:opacity-40"
         title={
           hidden
-            ? 'Show this player on the leaderboard'
-            : 'Hide from the leaderboard without deleting their stats'
+            ? 'Mostrar este jugador en la tabla'
+            : 'Ocultar de la tabla sin borrar sus estadísticas'
         }
       >
-        {hidden ? 'Show' : 'Hide'}
+        {hidden ? 'Mostrar' : 'Ocultar'}
       </button>
 
       {confirming ? (
@@ -469,14 +469,14 @@ function PlayerRow({
             className="eyebrow min-h-9 rounded-full px-3 text-void disabled:opacity-40"
             style={{ background: 'var(--color-mark-red)' }}
           >
-            Delete for good
+            Eliminar definitivamente
           </button>
           <button
             type="button"
             onClick={() => setConfirming(false)}
             className="eyebrow min-h-9 px-2 text-ink-3"
           >
-            Cancel
+            Cancelar
           </button>
         </span>
       ) : (
@@ -484,9 +484,9 @@ function PlayerRow({
           type="button"
           onClick={() => setConfirming(true)}
           className="eyebrow min-h-9 rounded-full border border-line px-3 text-ink-3 transition-colors hover:text-ink"
-          title="Removes the player and every stat collected for them"
+          title="Elimina al jugador y todas sus estadísticas"
         >
-          Delete
+          Eliminar
         </button>
       )}
     </li>

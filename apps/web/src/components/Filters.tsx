@@ -5,11 +5,11 @@ import { RoleIcon } from './icons';
 export type SortKey = 'ladder' | 'gained' | 'winrate' | 'kda' | 'games';
 
 export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: 'ladder', label: 'Rank' },
+  { key: 'ladder', label: 'Rango' },
   { key: 'gained', label: 'LP gained' },
-  { key: 'winrate', label: 'Win rate' },
+  { key: 'winrate', label: 'Winrate' },
   { key: 'kda', label: 'KDA' },
-  { key: 'games', label: 'Games played' },
+  { key: 'games', label: 'Partidas jugadas' },
 ];
 
 export interface FilterState {
@@ -41,7 +41,7 @@ export function Filters({
       <div
         className="-mx-1 flex gap-1 overflow-x-auto px-1 py-1"
         role="group"
-        aria-label="Filter by role"
+        aria-label="Filtrar por rol"
       >
         {roleOptions.map((role) => {
           const active = value.role === role;
@@ -129,7 +129,7 @@ export function Filters({
           <input
             type="search"
             value={value.query}
-            placeholder="Search player…"
+            placeholder="Buscar jugador…"
             onChange={(event) =>
               onChange({ ...value, query: event.target.value })
             }

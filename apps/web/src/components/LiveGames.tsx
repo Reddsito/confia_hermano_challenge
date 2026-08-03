@@ -56,21 +56,21 @@ export function LiveGames({ players }: { players: RankedPlayer[] }) {
   if (error) {
     return (
       <Empty
-        title="Cannot reach the backend"
-        detail="Live games come from the server, which is not answering right now."
+        title="No se puede conectar al backend"
+        detail="Las partidas en vivo vienen del servidor, que ahora no responde."
       />
     );
   }
 
   if (games === null) {
-    return <Empty title="Looking for games…" detail="One moment." />;
+    return <Empty title="Buscando partidas…" detail="Un momento." />;
   }
 
   if (games.length === 0) {
     return (
       <Empty
-        title="Nobody is playing"
-        detail="Games show up here within a couple of minutes of starting. The practice tool never appears — Riot only publishes games that can be spectated."
+        title="Nadie está jugando"
+        detail="Las partidas aparecen acá a los pocos minutos de empezar. La herramienta de práctica nunca aparece — Riot solo publica partidas que se pueden espectar."
       />
     );
   }
@@ -107,7 +107,7 @@ function GameCard({
         <div className="min-w-0 flex-1">
           <p className="display truncate text-fluid-sm">
             {tracked.map((player) => player.displayName).join(' · ') ||
-              'Tracked player'}
+              'Jugador seguido'}
           </p>
           <p className="flex flex-wrap items-center gap-1.5 text-[0.68rem] text-ink-3">
             {game.queueLabel}
@@ -119,9 +119,9 @@ function GameCard({
                   background:
                     'color-mix(in oklab, var(--color-mark-amber) 16%, transparent)',
                 }}
-                title="This queue does not count towards the challenge"
+                title="Esta cola no cuenta para el challenge"
               >
-                doesn't count
+                no cuenta
               </span>
             )}
           </p>

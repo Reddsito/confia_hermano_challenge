@@ -142,14 +142,14 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     { id: 'ranking' as const, label: 'Ranking' },
     {
       id: 'live' as const,
-      label: 'Live',
+      label: 'En vivo',
       // The badge is the point of the tab: it tells you to look without looking.
       badge: liveCount > 0 ? String(liveCount) : undefined,
     },
-    { id: 'stats' as const, label: 'Statistics' },
+    { id: 'stats' as const, label: 'Estadísticas' },
     // Signing in is what unlocks the tab; showing it while signed out would
     // only lead to a dead end.
-    ...(user ? [{ id: 'shells' as const, label: 'Blue Shells' }] : []),
+    ...(user ? [{ id: 'shells' as const, label: 'Conchas Azules' }] : []),
   ];
 
   return (
@@ -173,7 +173,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             tabs={sections}
             active={section}
             onChange={setSection}
-            label="Page sections"
+            label="Secciones de la página"
           />
         </div>
 
@@ -199,8 +199,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           className="mt-4 rounded-xl border border-line bg-carbon px-3 py-2 text-fluid-xs"
           style={{ color: 'var(--color-mark-red)' }}
         >
-          Could not fetch the latest snapshot ({error}). Showing the last version
-          that loaded.
+          No se pudo traer la última actualización ({error}). Mostrando la
+          última versión que cargó.
         </p>
       )}
 
@@ -302,7 +302,7 @@ function AccountChip({
             color: 'var(--color-accent)',
             background: 'color-mix(in oklab, var(--color-accent) 14%, transparent)',
           }}
-          title="Blue shells available"
+          title="Conchas azules disponibles"
         >
           <ShellMark size={11} />
           {user.shells.available}
@@ -313,7 +313,7 @@ function AccountChip({
         type="button"
         onClick={onSignOut}
         className="eyebrow rounded-full px-2 py-1 text-ink-3 transition-colors hover:text-ink"
-        aria-label="Sign out"
+        aria-label="Cerrar sesión"
       >
         Out
       </button>

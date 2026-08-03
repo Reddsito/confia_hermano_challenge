@@ -131,7 +131,7 @@ export function PlayerDetail({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Cerrar"
             className="eyebrow min-h-9 shrink-0 rounded-full border border-line px-3 text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
           >
             Close
@@ -161,7 +161,7 @@ export function PlayerDetail({
 
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Record" value={`${player.totals.wins}W ${player.totals.losses}L`} />
-            <Stat label="Win rate" value={formatPercent(player.winRate, 1)} />
+            <Stat label="Winrate" value={formatPercent(player.winRate, 1)} />
             <Stat label="KDA" value={player.kda.toFixed(2)} />
             <Stat label="LP gained" value={formatSigned(player.ladderPointsGained)} />
             <Stat
@@ -170,7 +170,7 @@ export function PlayerDetail({
             />
             <Stat label="CS per min" value={player.csPerMinute.toFixed(1)} />
             <Stat
-              label="Hours played"
+              label="Horas jugadas"
               value={(player.totals.minutesPlayed / 60).toFixed(1)}
             />
             <Stat
@@ -201,7 +201,7 @@ export function PlayerDetail({
                 />
                 <Stat label="Surrenders" value={String(extras.surrenders)} />
                 <Stat
-                  label="Best game KDA"
+                  label="Mejor KDA en una partida"
                   value={extras.bestKdaGame ? extras.bestKdaGame.toFixed(2) : '—'}
                 />
                 <Stat
@@ -375,7 +375,7 @@ function DayCard({
   return (
     <div className="rounded-lg border border-line bg-carbon-2 p-3">
       <p className="text-[0.68rem] text-ink-3">
-        {good ? 'Biggest climb' : 'Worst tilt'}
+        {good ? 'Mayor subida' : 'Peor tilt'}
       </p>
       <p className="tabular mt-1 text-fluid-lg font-semibold" style={{ color }}>
         {formatSigned(delta)} LP

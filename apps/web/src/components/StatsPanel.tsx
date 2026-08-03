@@ -22,24 +22,24 @@ const TOP_N = 10;
 const CATEGORIES: Category[] = [
   {
     key: 'kills',
-    title: 'Kills',
-    caption: 'Most eliminations',
+    title: 'Asesinatos',
+    caption: 'Más eliminaciones',
     pick: (player) => player.totals.kills,
     format: (value) => value.toLocaleString(),
     minimumGames: 1,
   },
   {
     key: 'deaths',
-    title: 'Deaths',
-    caption: 'Most times eliminated',
+    title: 'Muertes',
+    caption: 'Más veces eliminado',
     pick: (player) => player.totals.deaths,
     format: (value) => value.toLocaleString(),
     minimumGames: 1,
   },
   {
     key: 'assists',
-    title: 'Assists',
-    caption: 'Most assists',
+    title: 'Asistencias',
+    caption: 'Más asistencias',
     pick: (player) => player.totals.assists,
     format: (value) => value.toLocaleString(),
     minimumGames: 1,
@@ -47,7 +47,7 @@ const CATEGORIES: Category[] = [
   {
     key: 'cspm',
     title: 'CS / min',
-    caption: 'Farm per minute',
+    caption: 'Farmeo por minuto',
     pick: (player) => player.csPerMinute,
     format: (value) => value.toFixed(2),
     minimumGames: 5,
@@ -103,20 +103,20 @@ export function StatsPanel({
   return (
     <div className="space-y-4">
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <Tile label="Games" value={totals.games.toLocaleString()} />
+        <Tile label="Partidas" value={totals.games.toLocaleString()} />
         <Tile
-          label="Hours played"
+          label="Horas jugadas"
           value={Math.round(totals.minutes / 60).toLocaleString()}
         />
         <Tile
-          label="Combined win rate"
+          label="Winrate combinado"
           value={
             totals.games > 0 ? formatPercent(totals.wins / totals.games, 1) : '—'
           }
         />
-        <Tile label="Kills" value={totals.kills.toLocaleString()} />
-        <Tile label="Deaths" value={totals.deaths.toLocaleString()} />
-        <Tile label="Pooled KDA" value={pooledKda.toFixed(2)} />
+        <Tile label="Asesinatos" value={totals.kills.toLocaleString()} />
+        <Tile label="Muertes" value={totals.deaths.toLocaleString()} />
+        <Tile label="KDA global" value={pooledKda.toFixed(2)} />
       </dl>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -142,7 +142,7 @@ export function StatsPanel({
 
         {kdaLeaders.length === 0 ? (
           <p className="mt-4 text-center text-fluid-sm text-ink-3">
-            No player has reached 5 games yet.
+            Ningún jugador llegó a 5 partidas todavía.
           </p>
         ) : (
           <>
@@ -192,7 +192,7 @@ function DuoBoard({
 
       {rows.length === 0 ? (
         <p className="mt-4 text-center text-fluid-sm text-ink-3">
-          Nobody has duoed yet, or not enough games together.
+          Todavía nadie hizo dúo, o no jugaron suficientes partidas juntos.
         </p>
       ) : (
         <ol className="mt-4 grid gap-1.5 sm:grid-cols-2">
@@ -320,7 +320,7 @@ function LeaderColumn({
 
       {!winner ? (
         <p className="mt-6 text-center text-fluid-sm text-ink-3">
-          Not enough games yet.
+          Todavía no hay suficientes partidas.
         </p>
       ) : (
         <>

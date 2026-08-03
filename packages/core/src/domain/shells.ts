@@ -24,14 +24,31 @@ export type ShellRule = (typeof SHELL_RULES)[number];
 
 export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
   PENTAKILL: 'Pentakill',
-  QUADRAKILL: 'Quadrakill',
-  KILLS_22: '22 kills in one game',
-  ASSISTS_30: '30 assists in one game',
-  WIN_STREAK_6: '6 wins in a row',
-  PERFECT_KDA_20: 'Perfect KDA above 20',
-  LONG_WIN_40: 'Won a 40 minute game',
-  FIVE_CHAMPION_WINS: '5 wins on 5 different champions',
-  FIVE_SMITE_WINS: '5 wins carrying Smite',
+  QUADRAKILL: 'Cuádruple',
+  KILLS_22: '22 asesinatos en una partida',
+  ASSISTS_30: '30 asistencias en una partida',
+  WIN_STREAK_6: '6 victorias seguidas',
+  PERFECT_KDA_20: 'KDA perfecto arriba de 20',
+  LONG_WIN_40: 'Ganar una partida de 40 minutos',
+  FIVE_CHAMPION_WINS: '5 victorias con 5 campeones distintos',
+  FIVE_SMITE_WINS: '5 victorias llevando Castigo',
+};
+
+/**
+ * What one occurrence of each rule pays. Pentakills are the only rule worth
+ * more than a single shell. Kept next to the labels so the UI can advertise
+ * the payout without restating a number the scoring already owns.
+ */
+export const SHELL_RULE_AWARD: Record<ShellRule, number> = {
+  PENTAKILL: 2,
+  QUADRAKILL: 1,
+  KILLS_22: 1,
+  ASSISTS_30: 1,
+  WIN_STREAK_6: 1,
+  PERFECT_KDA_20: 1,
+  LONG_WIN_40: 1,
+  FIVE_CHAMPION_WINS: 1,
+  FIVE_SMITE_WINS: 1,
 };
 
 /**
@@ -97,7 +114,7 @@ export function earnedShells(
   if (game.pentaKills > 0) {
     earned.push({
       rule: 'PENTAKILL',
-      amount: 2 * game.pentaKills,
+      amount: SHELL_RULE_AWARD.PENTAKILL * game.pentaKills,
       detail: game.pentaKills > 1 ? `${game.pentaKills} pentakills` : 'Pentakill',
     });
   }

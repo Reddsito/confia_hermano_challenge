@@ -33,7 +33,7 @@ export function Podium({
   return (
     <section aria-labelledby="podium-heading" className="mb-6">
       <h2 id="podium-heading" className="sr-only">
-        Top three
+        Top tres
       </h2>
       <ol className="grid gap-3 lg:grid-cols-3">
         {top.map((player, index) => (
@@ -150,7 +150,7 @@ function PodiumCard({
           label={`${player.totals.games} games`}
           value={`${player.totals.wins}W ${player.totals.losses}L`}
         />
-        <Stat label="Win rate" value={formatPercent(player.winRate)} />
+        <Stat label="Winrate" value={formatPercent(player.winRate)} />
         <Stat label="LP gained" value={formatSigned(player.ladderPointsGained)} />
       </dl>
 

@@ -71,7 +71,7 @@ async function request<T>(
       response.status,
       body.error ??
         (response.status === 401
-          ? 'That code is not right.'
+          ? 'Ese código no es correcto.'
           : `Request failed (${response.status}).`),
     );
   }

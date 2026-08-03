@@ -37,16 +37,16 @@ export function RankingTable({
         <p className="display text-fluid-lg">
           {emptyRoster
             ? loading
-              ? 'Loading the standings…'
-              : 'No players yet'
-            : 'No players match these filters'}
+              ? 'Cargando la tabla…'
+              : 'Todavía no hay jugadores'
+            : 'Ningún jugador coincide con estos filtros'}
         </p>
         <p className="mt-1 text-fluid-sm text-ink-2">
           {emptyRoster
             ? loading
-              ? 'Fetching from the server.'
-              : 'Add players from the roster panel to get started.'
-            : 'Clear the search or pick a different role.'}
+              ? 'Trayendo datos del servidor.'
+              : 'Agregá jugadores desde el panel para empezar.'
+            : 'Limpiá la búsqueda o elegí otro rol.'}
         </p>
       </div>
     );
@@ -57,7 +57,7 @@ export function RankingTable({
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[980px] border-separate border-spacing-y-1.5 text-fluid-sm">
           <caption className="sr-only">
-            Full standings, sorted with the controls above
+            Tabla completa, ordenada con los controles de arriba
           </caption>
           <thead>
             <tr className="eyebrow text-left text-ink-3">
@@ -89,7 +89,7 @@ export function RankingTable({
                 KDA
               </th>
               <th scope="col" className="px-2 pb-1 font-semibold">
-                Champions
+                Campeones
               </th>
               <th scope="col" className="px-4 pb-1 font-semibold">
                 <span className="sr-only">External profile</span>

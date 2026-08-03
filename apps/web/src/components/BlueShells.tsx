@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   MAX_HELD_SHELLS,
+  SHELL_RULES,
+  SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
   type RankedPlayer,
 } from '@challenge/core/domain';
@@ -114,11 +116,13 @@ export function BlueShells({
         />
       </div>
 
+      <Earn shells={mine?.shells ?? []} />
+
       <section className="rounded-2xl border border-line bg-carbon p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="display text-fluid-lg">Choose a victim</h3>
+          <h3 className="display text-fluid-lg">Elegí una víctima</h3>
           <p className="text-fluid-xs text-ink-3">
-            The wheel decides what they owe.
+            La ruleta decide qué te deben.
           </p>
         </header>
 
@@ -153,12 +157,12 @@ export function BlueShells({
           }}
         >
           {spinning
-            ? 'Incoming…'
+            ? 'Ahí va…'
             : available <= 0
-              ? 'No shells to fire'
+              ? 'No tenés conchas para tirar'
               : targetPlayer
-                ? `Fire at ${targetPlayer.displayName}`
-                : 'Pick a victim first'}
+                ? `Tirarle a ${targetPlayer.displayName}`
+                : 'Elegí una víctima primero'}
         </button>
 
         {error && (
@@ -255,10 +259,10 @@ function Wheel({
         {done
           ? targetName
             ? `Le cayó a ${targetName}`
-            : 'It landed'
+            : 'Cayó'
           : spinning
-            ? 'Spinning'
-            : 'The wheel'}
+            ? 'Girando'
+            : 'La ruleta'}
       </p>
 
       <div className="relative mt-4" style={{ width: size, height: size }}>
@@ -315,7 +319,7 @@ function Wheel({
         className="display mt-4 min-h-[2rem] text-center text-fluid-lg leading-tight"
         style={done ? { color: 'var(--color-accent)' } : { opacity: 0.6 }}
       >
-        {done ? landed?.name : spinning ? '…' : 'Pick a victim and fire'}
+        {done ? landed?.name : spinning ? '…' : 'Elegí una víctima y tirá'}
       </p>
       {done && landed?.detail && (
         <p className="mt-1 text-center text-fluid-sm text-ink-2">
@@ -363,7 +367,7 @@ function Inventory({
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-5">
-      <p className="eyebrow text-ink-3">Your arsenal</p>
+      <p className="eyebrow text-ink-3">Tu arsenal</p>
 
       <div className="mt-3 flex items-center gap-2">
         {Array.from({ length: MAX_HELD_SHELLS }, (_, index) => (
@@ -380,12 +384,12 @@ function Inventory({
         style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
       >
         {full
-          ? 'Loaded. Nothing else counts until you fire it.'
-          : 'Empty. Earn one, or take it from someone you beat.'}
+          ? 'Cargada. Nada más cuenta hasta que la tires.'
+          : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
       </p>
       <p className="mt-1 text-fluid-xs text-ink-3">
-        Beat another participant in a game and their shell is yours — or gone,
-        if you were already loaded.
+        Ganale una partida a otro participante y su concha es tuya — o se
+        pierde, si ya estabas cargado.
       </p>
 
       {shells.length > 0 && (
@@ -401,7 +405,7 @@ function Inventory({
               <span className="min-w-0">
                 <span className="block truncate text-fluid-xs">
                   {SHELL_RULE_LABEL[shell.rule as keyof typeof SHELL_RULE_LABEL] ??
-                    'Adjustment'}
+                    'Ajuste'}
                 </span>
                 <span className="block truncate text-[0.68rem] text-ink-3">
                   {shell.detail}
@@ -411,6 +415,70 @@ function Inventory({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/**
+ * Every way to earn a shell, always all of them. The inventory above only ever
+ * shows what you already did, which leaves the rest of the list invisible —
+ * and nobody chases a target they cannot see.
+ */
+function Earn({
+  shells,
+}: {
+  shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
+}) {
+  const done = new Set(shells.map((shell) => shell.rule));
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="display text-fluid-lg">Cómo ganar una</h3>
+        <p className="text-fluid-xs text-ink-3">
+          Las rachas y los hitos vuelven a pagar cada vez que los cumplís.
+        </p>
+      </header>
+
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {SHELL_RULES.map((rule) => {
+          const earned = done.has(rule);
+
+          return (
+            <li
+              key={rule}
+              className="flex items-center gap-3 rounded-xl border border-line p-3"
+              style={
+                earned
+                  ? {
+                      borderColor:
+                        'color-mix(in oklab, var(--color-accent) 40%, transparent)',
+                    }
+                  : undefined
+              }
+            >
+              <span
+                className="tabular text-fluid-xs font-semibold"
+                style={{
+                  color: earned
+                    ? 'var(--color-accent)'
+                    : 'var(--color-ink-3)',
+                }}
+              >
+                +{SHELL_RULE_AWARD[rule]}
+              </span>
+              <span className="min-w-0 text-fluid-xs">
+                {SHELL_RULE_LABEL[rule]}
+              </span>
+              {earned && (
+                <span className="ml-auto shrink-0" title="Ya la ganaste">
+                  <ShellMark size={16} filled />
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -477,9 +545,9 @@ function Odds({ odds }: { odds: ChallengeOdds[] }) {
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-5">
-      <h3 className="display text-fluid-lg">What can land</h3>
+      <h3 className="display text-fluid-lg">Qué puede caer</h3>
       <p className="mt-1 text-fluid-xs text-ink-3">
-        Odds are derived from the weights set in the panel.
+        Las probabilidades salen de los pesos configurados en el panel.
       </p>
 
       <ul className="mt-4 space-y-2.5">
@@ -523,11 +591,11 @@ function History({
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-5">
-      <h3 className="display text-fluid-lg">Recent hits</h3>
+      <h3 className="display text-fluid-lg">Impactos recientes</h3>
 
       {throws.length === 0 ? (
         <p className="mt-3 text-fluid-sm text-ink-3">
-          Nobody has been hit yet. Someone has to go first.
+          Todavía no le pegaron a nadie. Alguien tiene que empezar.
         </p>
       ) : (
         <ol className="mt-4 space-y-3">
@@ -545,12 +613,12 @@ function History({
                 <span className="block text-fluid-sm">
                   <span className="text-ink-2">
                     {row.fromPlayer
-                      ? (byId.get(row.fromPlayer)?.displayName ?? 'Someone')
-                      : 'Someone'}
+                      ? (byId.get(row.fromPlayer)?.displayName ?? 'Alguien')
+                      : 'Alguien'}
                   </span>
-                  <span className="text-ink-3"> hit </span>
+                  <span className="text-ink-3"> le pegó a </span>
                   <span className="font-medium">
-                    {byId.get(row.toPlayer)?.displayName ?? 'someone'}
+                    {byId.get(row.toPlayer)?.displayName ?? 'alguien'}
                   </span>
                 </span>
                 <span
@@ -574,10 +642,10 @@ function Gate() {
       <span className="inline-flex">
         <ShellMark size={64} filled />
       </span>
-      <h2 className="display mt-4 text-fluid-lg">Blue Shells</h2>
+      <h2 className="display mt-4 text-fluid-lg">Conchas Azules</h2>
       <p className="mt-2 text-fluid-sm text-ink-2">
-        Earn them by doing something absurd in a game. Spend them making someone
-        else suffer.
+        Ganalas haciendo algo absurdo en una partida. Gastalas haciendo sufrir a
+        otro.
       </p>
       <a
         href={loginUrl()}
@@ -587,7 +655,7 @@ function Gate() {
           boxShadow: '0 0 36px -14px var(--color-accent)',
         }}
       >
-        Sign in with Discord
+        Entrar con Discord
       </a>
     </div>
   );
@@ -597,10 +665,10 @@ function Unlinked({ username }: { username: string }) {
   return (
     <div className="mx-auto max-w-md rounded-2xl border border-line bg-carbon p-8 text-center">
       <ShellMark size={48} />
-      <h2 className="display mt-4 text-fluid-lg">Almost there</h2>
+      <h2 className="display mt-4 text-fluid-lg">Casi</h2>
       <p className="mt-2 text-fluid-sm text-ink-2">
-        Signed in as <strong>{username}</strong>, but this Discord account is not
-        linked to a player yet. An admin does that from the roster panel.
+        Entraste como <strong>{username}</strong>, pero esta cuenta de Discord
+        todavía no está vinculada a un jugador. Un admin lo hace desde el panel.
       </p>
     </div>
   );

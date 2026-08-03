@@ -129,6 +129,6 @@ export async function throwShell(
   });
 
   const body = (await response.json()) as ThrowResult & { error?: string };
-  if (!response.ok) throw new Error(body.error ?? 'Could not throw the shell.');
+  if (!response.ok) throw new Error(body.error ?? 'No se pudo tirar la concha.');
   return body;
 }

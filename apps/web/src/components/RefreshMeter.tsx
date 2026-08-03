@@ -43,7 +43,7 @@ export function RefreshMeter({
             {!mounted
               ? '…'
               : ageMinutes === 0
-                ? 'moments ago'
+                ? 'recién'
                 : `${ageMinutes} min ago`}
           </span>
           {source === 'mock' && (
@@ -55,7 +55,7 @@ export function RefreshMeter({
                   'color-mix(in oklab, var(--color-mark-amber) 16%, transparent)',
               }}
             >
-              Simulated
+              Simulado
             </span>
           )}
         </p>
