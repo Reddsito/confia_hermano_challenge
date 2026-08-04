@@ -197,12 +197,19 @@ export function shellThrowEmbed(
   challengeName: string,
   challengeDetail: string,
   context: EmbedContext,
+  /**
+   * What the challenge rolled, already rendered as fields. An embed carries one
+   * image, so a rune page cannot be drawn icon by icon — it is spelled out in
+   * text here, and the site link is what leads to the illustrated version.
+   */
+  rolled?: DiscordEmbed['fields'],
 ): DiscordEmbed {
   return {
     color: 0x22d3ee,
     author: { name: `${fromName} lanzó una Blue Shell` },
     title: `Le cayó a ${toName}`,
     description: `**${challengeName}**${challengeDetail ? `\n${challengeDetail}` : ''}`,
+    fields: rolled && rolled.length > 0 ? rolled : undefined,
     thumbnail: { url: profileIcon(context.profileIconId) ?? championIcon('Ahri') },
     url: context.siteUrl,
     footer: { text: context.tournamentName },

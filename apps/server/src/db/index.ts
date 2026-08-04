@@ -230,6 +230,44 @@ const MIGRATIONS: string[] = [
     fetched_at INTEGER NOT NULL
   );
   `,
+
+  // Challenges stopped being pure text: some of them roll something when they
+  // land. The kind decides what gets rolled, and defaults to TEXT so every
+  // challenge written before this migration keeps behaving exactly as it did.
+  //
+  // The roll itself lives on the throw rather than on the challenge: the same
+  // "random champion" entry lands on different people and must produce a
+  // different champion each time.
+  `
+  ALTER TABLE challenges ADD COLUMN kind TEXT NOT NULL DEFAULT 'TEXT';
+
+  ALTER TABLE shell_throws ADD COLUMN payload TEXT;
+
+  -- One row per spin, including the first. Rerolls are capped, and a cap is
+  -- only enforceable if the spins are counted rather than overwritten — and
+  -- keeping them all is what makes "he said he didn't own it" auditable
+  -- instead of a claim someone makes after the fact.
+  CREATE TABLE shell_throw_rolls (
+    id        TEXT PRIMARY KEY,
+    throw_id  TEXT NOT NULL REFERENCES shell_throws (id) ON DELETE CASCADE,
+    payload   TEXT NOT NULL,
+    reason    TEXT NOT NULL DEFAULT '',
+    rolled_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX idx_shell_throw_rolls_throw ON shell_throw_rolls (throw_id);
+
+  -- Mastery points per player, cached. CHAMPION-MASTERY-V4 is one call per
+  -- player and the pool only has to be fresh enough to spin against, so it is
+  -- refreshed on demand rather than every sync cycle.
+  CREATE TABLE champion_mastery (
+    player_id   TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    champion_id INTEGER NOT NULL,
+    points      INTEGER NOT NULL,
+    fetched_at  INTEGER NOT NULL,
+    PRIMARY KEY (player_id, champion_id)
+  );
+  `,
 ];
 
 export function openDatabase(path: string): Db {

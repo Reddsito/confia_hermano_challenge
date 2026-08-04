@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { MAX_HELD_SHELLS, type EarnedShell, type ShellProgress } from '@challenge/core/domain';
+import {
+  MAX_CHAMPION_REROLLS,
+  MAX_HELD_SHELLS,
+  type EarnedShell,
+  type RunePage,
+  type ShellProgress,
+} from '@challenge/core/domain';
 
 import type { Db } from './index';
 
@@ -119,12 +125,26 @@ export function listShells(db: Db, playerId: string): ShellRow[] {
     .all(playerId) as ShellRow[];
 }
 
+/**
+ * What a challenge does when it lands. TEXT is the plain kind — the name is the
+ * whole punishment. The others make the server roll something at throw time.
+ */
+export const CHALLENGE_KINDS = ['TEXT', 'RANDOM_CHAMPION', 'RANDOM_RUNES'] as const;
+export type ChallengeKind = (typeof CHALLENGE_KINDS)[number];
+
+function toKind(raw: string): ChallengeKind {
+  return (CHALLENGE_KINDS as readonly string[]).includes(raw)
+    ? (raw as ChallengeKind)
+    : 'TEXT';
+}
+
 export interface ChallengeRow {
   id: string;
   name: string;
   detail: string;
   weight: number;
   enabled: boolean;
+  kind: ChallengeKind;
   createdAt: number;
 }
 
@@ -134,6 +154,7 @@ interface RawChallenge {
   detail: string;
   weight: number;
   enabled: number;
+  kind: string;
   created_at: number;
 }
 
@@ -144,6 +165,7 @@ function toChallenge(row: RawChallenge): ChallengeRow {
     detail: row.detail,
     weight: row.weight,
     enabled: row.enabled === 1,
+    kind: toKind(row.kind),
     createdAt: row.created_at,
   };
 }
@@ -159,12 +181,20 @@ export function listChallenges(db: Db, onlyEnabled = false): ChallengeRow[] {
 
 export function insertChallenge(
   db: Db,
-  input: { name: string; detail?: string; weight?: number },
+  input: { name: string; detail?: string; weight?: number; kind?: ChallengeKind },
 ): ChallengeRow {
   const id = randomUUID();
   db.prepare(
-    'INSERT INTO challenges (id, name, detail, weight, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)',
-  ).run(id, input.name, input.detail ?? '', Math.max(input.weight ?? 1, 1), Date.now());
+    `INSERT INTO challenges (id, name, detail, weight, enabled, kind, created_at)
+     VALUES (?, ?, ?, ?, 1, ?, ?)`,
+  ).run(
+    id,
+    input.name,
+    input.detail ?? '',
+    Math.max(input.weight ?? 1, 1),
+    input.kind ?? 'TEXT',
+    Date.now(),
+  );
 
   return listChallenges(db).find((challenge) => challenge.id === id)!;
 }
@@ -172,7 +202,13 @@ export function insertChallenge(
 export function updateChallenge(
   db: Db,
   id: string,
-  input: { name?: string; detail?: string; weight?: number; enabled?: boolean },
+  input: {
+    name?: string;
+    detail?: string;
+    weight?: number;
+    enabled?: boolean;
+    kind?: ChallengeKind;
+  },
 ): boolean {
   const current = db.prepare('SELECT * FROM challenges WHERE id = ?').get(id) as
     | RawChallenge
@@ -180,12 +216,13 @@ export function updateChallenge(
   if (!current) return false;
 
   db.prepare(
-    'UPDATE challenges SET name = ?, detail = ?, weight = ?, enabled = ? WHERE id = ?',
+    'UPDATE challenges SET name = ?, detail = ?, weight = ?, enabled = ?, kind = ? WHERE id = ?',
   ).run(
     input.name?.trim() || current.name,
     input.detail ?? current.detail,
     input.weight !== undefined ? Math.max(input.weight, 1) : current.weight,
     input.enabled === undefined ? current.enabled : input.enabled ? 1 : 0,
+    input.kind ?? current.kind,
     id,
   );
   return true;
@@ -225,6 +262,35 @@ export interface ThrowRow {
   challengeName: string;
   thrownAt: number;
   completedAt: number | null;
+  /** What the challenge rolled, if its kind rolls anything. */
+  payload: ShellPayload | null;
+}
+
+interface RawThrow extends Omit<ThrowRow, 'payload'> {
+  payload: string | null;
+}
+
+function toThrow(row: RawThrow): ThrowRow {
+  return { ...row, payload: parsePayload(row.payload) };
+}
+
+/**
+ * Stored as JSON rather than as columns because the shapes have nothing in
+ * common: a champion roll is one number, a rune page is five fields. Columns
+ * would mean most of them null on most rows.
+ */
+export type ShellPayload =
+  | { kind: 'RANDOM_CHAMPION'; championId: number }
+  | { kind: 'RANDOM_RUNES'; page: RunePage };
+
+function parsePayload(raw: string | null): ShellPayload | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ShellPayload;
+  } catch {
+    // A row written by a future version is not worth crashing the panel over.
+    return null;
+  }
 }
 
 export function recordThrow(
@@ -232,15 +298,31 @@ export function recordThrow(
   fromPlayer: string | null,
   toPlayer: string,
   challenge: ChallengeRow,
+  payload: ShellPayload | null = null,
 ): ThrowRow {
   const id = randomUUID();
   const thrownAt = Date.now();
 
-  db.prepare(
-    `INSERT INTO shell_throws
-       (id, from_player, to_player, challenge_id, challenge_name, thrown_at, completed_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-  ).run(id, fromPlayer, toPlayer, challenge.id, challenge.name, thrownAt);
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO shell_throws
+         (id, from_player, to_player, challenge_id, challenge_name, thrown_at, completed_at, payload)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
+    ).run(
+      id,
+      fromPlayer,
+      toPlayer,
+      challenge.id,
+      challenge.name,
+      thrownAt,
+      payload ? JSON.stringify(payload) : null,
+    );
+
+    // The opening spin is a roll like any other, so it goes in the history too.
+    // Without it the log would start at the first reroll and read as though the
+    // original result had never happened.
+    if (payload) recordRoll(db, id, payload, '');
+  })();
 
   return {
     id,
@@ -250,18 +332,123 @@ export function recordThrow(
     challengeName: challenge.name,
     thrownAt,
     completedAt: null,
+    payload,
   };
 }
 
 export function listThrows(db: Db, limit = 50): ThrowRow[] {
-  return db
+  const rows = db
     .prepare(
       `SELECT id, from_player AS fromPlayer, to_player AS toPlayer,
               challenge_id AS challengeId, challenge_name AS challengeName,
-              thrown_at AS thrownAt, completed_at AS completedAt
+              thrown_at AS thrownAt, completed_at AS completedAt, payload
        FROM shell_throws ORDER BY thrown_at DESC LIMIT ?`,
     )
-    .all(limit) as ThrowRow[];
+    .all(limit) as RawThrow[];
+  return rows.map(toThrow);
+}
+
+export function getThrow(db: Db, id: string): ThrowRow | null {
+  const row = db
+    .prepare(
+      `SELECT id, from_player AS fromPlayer, to_player AS toPlayer,
+              challenge_id AS challengeId, challenge_name AS challengeName,
+              thrown_at AS thrownAt, completed_at AS completedAt, payload
+       FROM shell_throws WHERE id = ?`,
+    )
+    .get(id) as RawThrow | undefined;
+  return row ? toThrow(row) : null;
+}
+
+/** Everything fired at one player, newest first, with each spin it went through. */
+export function throwsAgainst(db: Db, playerId: string): ThrowRow[] {
+  const rows = db
+    .prepare(
+      `SELECT id, from_player AS fromPlayer, to_player AS toPlayer,
+              challenge_id AS challengeId, challenge_name AS challengeName,
+              thrown_at AS thrownAt, completed_at AS completedAt, payload
+       FROM shell_throws WHERE to_player = ? ORDER BY thrown_at DESC`,
+    )
+    .all(playerId) as RawThrow[];
+  return rows.map(toThrow);
+}
+
+export interface RollRow {
+  id: string;
+  throwId: string;
+  payload: ShellPayload | null;
+  reason: string;
+  rolledAt: number;
+}
+
+export function recordRoll(
+  db: Db,
+  throwId: string,
+  payload: ShellPayload,
+  reason: string,
+): void {
+  db.prepare(
+    `INSERT INTO shell_throw_rolls (id, throw_id, payload, reason, rolled_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(randomUUID(), throwId, JSON.stringify(payload), reason, Date.now());
+}
+
+export function listRolls(db: Db, throwId: string): RollRow[] {
+  const rows = db
+    .prepare(
+      `SELECT id, throw_id AS throwId, payload, reason, rolled_at AS rolledAt
+       FROM shell_throw_rolls WHERE throw_id = ? ORDER BY rolled_at ASC`,
+    )
+    .all(throwId) as Array<Omit<RollRow, 'payload'> & { payload: string }>;
+
+  return rows.map((row) => ({ ...row, payload: parsePayload(row.payload) }));
+}
+
+/** Spins already used, counting the original. Rerolls left is this minus one. */
+export function rollCount(db: Db, throwId: string): number {
+  return (
+    db
+      .prepare('SELECT COUNT(*) AS n FROM shell_throw_rolls WHERE throw_id = ?')
+      .get(throwId) as { n: number }
+  ).n;
+}
+
+/**
+ * Replaces the current roll, keeping the old one in the history.
+ *
+ * Returns false when the reroll budget is spent, checked inside the transaction
+ * so two clicks landing together cannot both spend the last one.
+ */
+export function applyReroll(
+  db: Db,
+  throwId: string,
+  payload: ShellPayload,
+  reason: string,
+): boolean {
+  let applied = false;
+
+  db.transaction(() => {
+    if (rollCount(db, throwId) > MAX_CHAMPION_REROLLS) return;
+
+    db.prepare('UPDATE shell_throws SET payload = ? WHERE id = ?').run(
+      JSON.stringify(payload),
+      throwId,
+    );
+    recordRoll(db, throwId, payload, reason);
+    applied = true;
+  })();
+
+  return applied;
+}
+
+/**
+ * Removes a throw and, through the cascade, every spin it went through.
+ *
+ * The shell comes back on its own: `balanceFor` counts thrown rows, so there is
+ * nothing to credit back by hand.
+ */
+export function deleteThrow(db: Db, id: string): boolean {
+  return db.prepare('DELETE FROM shell_throws WHERE id = ?').run(id).changes > 0;
 }
 
 export function completeThrow(db: Db, id: string): boolean {
@@ -270,6 +457,36 @@ export function completeThrow(db: Db, id: string): boolean {
       .prepare('UPDATE shell_throws SET completed_at = ? WHERE id = ? AND completed_at IS NULL')
       .run(Date.now(), id).changes > 0
   );
+}
+
+/**
+ * The rolling challenges, added if they are not on the wheel yet.
+ *
+ * Separate from the seed because the seed only runs on an empty table: a
+ * tournament already under way has challenges, so it would never see these.
+ * Matched by kind rather than by name so renaming one in the panel does not
+ * cause a duplicate to reappear on the next boot.
+ */
+export function ensureRollingChallenges(db: Db): void {
+  const existing = new Set(listChallenges(db).map((challenge) => challenge.kind));
+
+  if (!existing.has('RANDOM_CHAMPION')) {
+    insertChallenge(db, {
+      name: 'Campeón aleatorio',
+      detail: 'Sorteado entre los campeones en los que tenés maestría',
+      weight: 3,
+      kind: 'RANDOM_CHAMPION',
+    });
+  }
+
+  if (!existing.has('RANDOM_RUNES')) {
+    insertChallenge(db, {
+      name: 'Runas aleatorias',
+      detail: 'Página completa sorteada, tal cual sale',
+      weight: 3,
+      kind: 'RANDOM_RUNES',
+    });
+  }
 }
 
 /** Seeded on first boot so the wheel is never empty when someone fires. */

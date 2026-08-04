@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { QUEUE_IDS, loadConfig } from './config';
 import { openDatabase } from './db/index';
 import { listPlayers } from './db/players';
-import { seedDefaultChallenges } from './db/shells';
+import { ensureRollingChallenges, seedDefaultChallenges } from './db/shells';
 import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import { liveRoutes } from './routes/live';
@@ -27,6 +27,7 @@ const config = loadConfig(ROOT);
 const db = openDatabase(config.databasePath);
 // The wheel must never be empty when someone spends a shell.
 seedDefaultChallenges(db);
+ensureRollingChallenges(db);
 const scheduler = new Scheduler(db, config);
 
 const app = new Hono();
