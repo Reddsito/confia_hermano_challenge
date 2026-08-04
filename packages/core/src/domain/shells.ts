@@ -30,7 +30,7 @@ export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
   WIN_STREAK_6: '6 victorias seguidas',
   PERFECT_KDA_20: 'KDA perfecto arriba de 20',
   LONG_WIN_40: 'Ganar una partida de 40 minutos',
-  FIVE_CHAMPION_WINS: '5 victorias con 5 campeones distintos',
+  FIVE_CHAMPION_WINS: '5 victorias seguidas con 5 campeones distintos',
   FIVE_SMITE_WINS: '5 victorias llevando Castigo',
 };
 
@@ -77,8 +77,12 @@ export interface ShellGame {
 export interface ShellProgress {
   /** Consecutive wins, including this game. */
   winStreak: number;
-  /** Distinct champions the player has at least one win with, after this game. */
-  distinctChampionWins: number;
+  /**
+   * Distinct champions among the last five games, counted only when those five
+   * were all wins. Zero otherwise, so the rule below cannot fire off a run that
+   * was broken by a loss.
+   */
+  streakChampions: number;
   /** Total wins carrying Smite, after this game. */
   smiteWins: number;
 }
@@ -181,15 +185,22 @@ export function earnedShells(
     });
   }
 
+  // Five wins in a row, each on a different champion. The streak is what makes
+  // this hard: scattered wins across a whole tournament used to pay, which any
+  // one-trick cleared eventually just by playing enough.
+  //
+  // Gated on the streak length as well as the champion count so a long run pays
+  // once every five wins rather than on every game after the fifth.
   if (
     game.win &&
-    progress.distinctChampionWins > 0 &&
-    progress.distinctChampionWins % MILESTONE_STEP === 0
+    progress.winStreak >= MILESTONE_STEP &&
+    progress.winStreak % MILESTONE_STEP === 0 &&
+    progress.streakChampions === MILESTONE_STEP
   ) {
     earned.push({
       rule: 'FIVE_CHAMPION_WINS',
       amount: 1,
-      detail: `Ganó con ${progress.distinctChampionWins} campeones distintos`,
+      detail: '5 victorias seguidas con 5 campeones distintos',
     });
   }
 

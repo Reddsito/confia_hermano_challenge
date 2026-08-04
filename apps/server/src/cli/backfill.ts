@@ -126,15 +126,17 @@ for (const player of listPlayers(db, 'approved')) {
     .all(player.id) as Array<Record<string, number | string>>;
 
   let winStreak = 0;
-  const winningChampions = new Set<number>();
   let smiteWins = 0;
+  // Champions of the current unbroken run of wins, newest last. Reset by any
+  // loss, which is what "five in a row" means.
+  let streak: number[] = [];
 
   for (const game of games) {
     const win = game.win === 1;
     const usedSmite = game.used_smite === 1;
 
     winStreak = win ? winStreak + 1 : 0;
-    if (win) winningChampions.add(game.champion_id as number);
+    streak = win ? [...streak, game.champion_id as number] : [];
     if (win && usedSmite) smiteWins += 1;
 
     const earned = earnedShells(
@@ -151,7 +153,8 @@ for (const player of listPlayers(db, 'approved')) {
       },
       {
         winStreak,
-        distinctChampionWins: winningChampions.size,
+        streakChampions:
+          streak.length >= 5 ? new Set(streak.slice(-5)).size : 0,
         smiteWins,
       },
     );

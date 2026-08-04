@@ -78,15 +78,28 @@ export function awardShells(
 export function progressFor(db: Db, playerId: string): Omit<ShellProgress, 'winStreak'> {
   const row = db
     .prepare(
-      `SELECT
-         COUNT(DISTINCT CASE WHEN win = 1 THEN champion_id END) AS champions,
-         COALESCE(SUM(CASE WHEN win = 1 AND used_smite = 1 THEN 1 ELSE 0 END), 0) AS smiteWins
+      `SELECT COALESCE(SUM(CASE WHEN win = 1 AND used_smite = 1 THEN 1 ELSE 0 END), 0) AS smiteWins
        FROM player_matches WHERE player_id = ?`,
     )
-    .get(playerId) as { champions: number; smiteWins: number };
+    .get(playerId) as { smiteWins: number };
+
+  // The last five games, newest first. Counted here rather than in SQL because
+  // the count only means anything if all five were wins, and that condition is
+  // clearer as a check on the rows than as a CASE inside the aggregate.
+  const recent = db
+    .prepare(
+      `SELECT win, champion_id AS championId
+       FROM player_matches WHERE player_id = ?
+       ORDER BY played_at DESC LIMIT 5`,
+    )
+    .all(playerId) as Array<{ win: number; championId: number }>;
+
+  const allWins = recent.length === 5 && recent.every((game) => game.win === 1);
 
   return {
-    distinctChampionWins: row.champions,
+    streakChampions: allWins
+      ? new Set(recent.map((game) => game.championId)).size
+      : 0,
     smiteWins: row.smiteWins,
   };
 }
