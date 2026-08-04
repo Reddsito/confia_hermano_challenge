@@ -8,8 +8,18 @@
 const VERSIONS_URL = 'https://ddragon.leagueoflegends.com/api/versions.json';
 const CACHE_MS = 24 * 60 * 60 * 1000;
 
+export interface ChampionInfo {
+  id: number;
+  name: string;
+  icon: string;
+}
+
 let cache: { names: Map<number, string>; fetchedAt: number } | null = null;
 let inFlight: Promise<Map<number, string>> | null = null;
+
+// Built alongside the names from the same payload, so asking for icons never
+// costs a second fetch.
+let iconCache: Map<number, ChampionInfo> = new Map();
 
 async function load(): Promise<Map<number, string>> {
   const versions = (await (await fetch(VERSIONS_URL)).json()) as string[];
@@ -20,13 +30,31 @@ async function load(): Promise<Map<number, string>> {
     await fetch(
       `https://ddragon.leagueoflegends.com/cdn/${latest}/data/en_US/champion.json`,
     )
-  ).json()) as { data: Record<string, { key: string; name: string }> };
+  ).json()) as { data: Record<string, { id: string; key: string; name: string }> };
 
   const names = new Map<number, string>();
+  const icons = new Map<number, ChampionInfo>();
+
   for (const champion of Object.values(payload.data)) {
-    names.set(Number(champion.key), champion.name);
+    const id = Number(champion.key);
+    names.set(id, champion.name);
+    // The image file is keyed by the internal id ("MonkeyKing"), never by the
+    // display name ("Wukong") — deriving one from the other 404s.
+    icons.set(id, {
+      id,
+      name: champion.name,
+      icon: `https://ddragon.leagueoflegends.com/cdn/${latest}/img/champion/${champion.id}.png`,
+    });
   }
+
+  iconCache = icons;
   return names;
+}
+
+/** Id to name and icon, for anything that has to draw a champion. */
+export async function championIndex(): Promise<ChampionInfo[]> {
+  await championNames();
+  return [...iconCache.values()];
 }
 
 export async function championNames(): Promise<Map<number, string>> {

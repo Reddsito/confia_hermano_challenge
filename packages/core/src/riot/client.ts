@@ -40,6 +40,12 @@ export interface LeagueEntryDto {
   hotStreak: boolean;
 }
 
+export interface ChampionMasteryDto {
+  championId: number;
+  championLevel: number;
+  championPoints: number;
+}
+
 export interface MatchParticipantDto {
   puuid: string;
   championId: number;
@@ -219,6 +225,21 @@ export class RiotClient {
   getMatch(matchId: string): Promise<MatchDto> {
     return this.request<MatchDto>(
       `${this.regionalBase}/lol/match/v5/matches/${matchId}`,
+    );
+  }
+
+  /**
+   * CHAMPION-MASTERY-V4 — platform routing.
+   *
+   * This is the closest the public API gets to "which champions does this player
+   * have": there is no ownership endpoint outside the local client, so mastery
+   * points stand in for it. Points can also be earned on a free-rotation
+   * champion, so the list is a strong hint and not a guarantee — which is why
+   * anything drawn from it stays rerollable.
+   */
+  getChampionMastery(puuid: string): Promise<ChampionMasteryDto[]> {
+    return this.request<ChampionMasteryDto[]>(
+      `${this.platformBase}/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}`,
     );
   }
 
