@@ -45,7 +45,10 @@ app.use(
       if (config.allowedOrigins.includes('*')) return origin ?? '*';
       return config.allowedOrigins.includes(origin) ? origin : null;
     },
-    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    // Every verb the API actually answers. A method missing here fails in the
+    // preflight, so the request never reaches a route and never reaches the
+    // log either — it just surfaces in the browser as a network error.
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,
   }),
