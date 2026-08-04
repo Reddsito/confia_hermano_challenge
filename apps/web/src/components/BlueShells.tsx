@@ -12,6 +12,7 @@ import {
   fetchChallenges,
   fetchChampionIndex,
   fetchChampionPool,
+  fetchItemIndex,
   fetchReceived,
   fetchRuneIndex,
   fetchShells,
@@ -21,6 +22,7 @@ import {
   throwShell,
   type ChallengeOdds,
   type ChampionInfo,
+  type ItemInfo,
   type ReceivedThrow,
   type RuneOption,
   type SessionUser,
@@ -75,6 +77,7 @@ export function BlueShells({
   // page is open, so they are fetched once rather than per roll.
   const [champions, setChampions] = useState<Map<number, ChampionInfo>>(new Map());
   const [runes, setRunes] = useState<Map<number, RuneOption>>(new Map());
+  const [items, setItems] = useState<Map<number, ItemInfo>>(new Map());
   const [received, setReceived] = useState<ReceivedThrow[]>([]);
 
   const reload = useCallback(async () => {
@@ -101,12 +104,14 @@ export function BlueShells({
 
   useEffect(() => {
     void (async () => {
-      const [championIndex, runeIndex] = await Promise.all([
+      const [championIndex, runeIndex, itemIndex] = await Promise.all([
         fetchChampionIndex(),
         fetchRuneIndex(),
+        fetchItemIndex(),
       ]);
       setChampions(championIndex);
       setRunes(runeIndex);
+      setItems(itemIndex);
     })();
   }, []);
 
@@ -204,7 +209,12 @@ export function BlueShells({
         actionable, and it used to sit below the wheel where it was only found
         by scrolling past everything you might do to somebody else.
       */}
-      <Received throws={received} champions={champions} runes={runes} />
+      <Received
+        throws={received}
+        champions={champions}
+        runes={runes}
+        items={items}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
         <Inventory available={available} shells={mine?.shells ?? []} />
@@ -260,6 +270,7 @@ export function BlueShells({
               payload={rolled.payload}
               champions={champions}
               runes={runes}
+              items={items}
               pool={pool}
               animate
             />
@@ -355,6 +366,7 @@ export function BlueShells({
           targetId={target ?? user.playerId}
           champions={champions}
           runes={runes}
+          items={items}
           pool={pool}
         />
       )}
@@ -379,19 +391,23 @@ function TestBench({
   targetId,
   champions,
   runes,
+  items,
   pool,
 }: {
   token: string | null;
   targetId: string | null;
   champions: Map<number, ChampionInfo>;
   runes: Map<number, RuneOption>;
+  items: Map<number, ItemInfo>;
   pool: number[];
 }) {
   const [preview, setPreview] = useState<ShellPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const roll = async (kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES') => {
+  const roll = async (
+    kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES' | 'RANDOM_BUILD',
+  ) => {
     if (!token || !targetId || busy) return;
 
     setBusy(true);
@@ -431,6 +447,14 @@ function TestBench({
         >
           Probar runas
         </button>
+        <button
+          type="button"
+          disabled={busy || !targetId}
+          onClick={() => void roll('RANDOM_BUILD')}
+          className="eyebrow min-h-11 rounded-xl border border-line px-4 transition-colors hover:text-ink disabled:opacity-35"
+        >
+          Probar build
+        </button>
       </div>
 
       {error && (
@@ -447,11 +471,16 @@ function TestBench({
         <div className="mt-4">
           <PayloadView
             key={
-              preview.kind === 'RANDOM_CHAMPION' ? preview.championId : 'runes'
+              preview.kind === 'RANDOM_CHAMPION'
+                ? preview.championId
+                : preview.kind === 'RANDOM_BUILD'
+                  ? preview.itemIds.join('-')
+                  : 'runes'
             }
             payload={preview}
             champions={champions}
             runes={runes}
+            items={items}
             pool={pool}
             animate
           />
@@ -471,10 +500,12 @@ function Received({
   throws,
   champions,
   runes,
+  items,
 }: {
   throws: ReceivedThrow[];
   champions: Map<number, ChampionInfo>;
   runes: Map<number, RuneOption>;
+  items: Map<number, ItemInfo>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   // Settled ones are history; what you still owe is the reason to look.
@@ -554,6 +585,7 @@ function Received({
                 payload={next.payload}
                 champions={champions}
                 runes={runes}
+                items={items}
               />
             </div>
           )}
@@ -617,6 +649,7 @@ function Received({
                       payload={record.payload}
                       champions={champions}
                       runes={runes}
+                      items={items}
                     />
 
                     {record.rolls.length > 1 && (

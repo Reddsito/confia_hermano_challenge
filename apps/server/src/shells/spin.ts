@@ -6,7 +6,7 @@
  * which is why this needs the database and a Riot client rather than living in
  * the pure domain next to the dice.
  */
-import { rollChampion, rollRunePage } from '@challenge/core/domain';
+import { rollBuild, rollChampion, rollRunePage } from '@challenge/core/domain';
 import { RiotClient } from '@challenge/core/riot';
 
 import type { ServerConfig } from '../config';
@@ -15,6 +15,7 @@ import { masteryIsStale, masteryPool, saveMastery } from '../db/mastery';
 import { getPlayerState } from '../db/players';
 import type { ChallengeKind, ShellPayload } from '../db/shells';
 import { runeTrees } from '../riot/runes';
+import { buildableItems } from '../riot/items';
 
 /**
  * The champions a player can be sentenced to.
@@ -65,6 +66,11 @@ export async function rollFor(
   if (kind === 'RANDOM_RUNES') {
     const page = rollRunePage(await runeTrees());
     return page === null ? null : { kind: 'RANDOM_RUNES', page };
+  }
+
+  if (kind === 'RANDOM_BUILD') {
+    const itemIds = rollBuild(await buildableItems());
+    return itemIds === null ? null : { kind: 'RANDOM_BUILD', itemIds };
   }
 
   return null;

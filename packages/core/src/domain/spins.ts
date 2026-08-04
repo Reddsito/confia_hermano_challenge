@@ -33,6 +33,55 @@ export function rollChampion(
 export const MAX_CHAMPION_REROLLS = 2;
 
 // ---------------------------------------------------------------------------
+// Builds
+// ---------------------------------------------------------------------------
+
+/** A full inventory: six slots, trinket aside. */
+export const BUILD_SIZE = 6;
+
+export interface BuildItem {
+  id: number;
+  isBoots: boolean;
+}
+
+/**
+ * Six distinct items, at most one pair of boots.
+ *
+ * The boots cap is the only rule bent here, and it is not taste: you cannot
+ * wear two pairs, so a roll with three of them would be a punishment nobody
+ * could carry out. Everything else stays uniform — a full-tank build on an ADC
+ * is exactly the sort of thing this is for.
+ *
+ * Returns null when the pool cannot fill six slots, which only happens if the
+ * item list failed to load.
+ */
+export function rollBuild(
+  pool: readonly BuildItem[],
+  rng: Rng = defaultRng,
+): number[] | null {
+  if (pool.length < BUILD_SIZE) return null;
+
+  const remaining = [...pool];
+  const chosen: number[] = [];
+  let hasBoots = false;
+
+  while (chosen.length < BUILD_SIZE && remaining.length > 0) {
+    const index = Math.floor(rng() * remaining.length);
+    const [item] = remaining.splice(index, 1);
+    if (!item) break;
+
+    // Drawn without replacement, so a rejected pair of boots is gone rather
+    // than able to come up again and stall the loop.
+    if (item.isBoots && hasBoots) continue;
+    if (item.isBoots) hasBoots = true;
+
+    chosen.push(item.id);
+  }
+
+  return chosen.length === BUILD_SIZE ? chosen : null;
+}
+
+// ---------------------------------------------------------------------------
 // Runes
 // ---------------------------------------------------------------------------
 

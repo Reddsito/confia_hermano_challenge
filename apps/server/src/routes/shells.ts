@@ -16,12 +16,14 @@ import {
   rollCount,
   spinChallenge,
   throwsAgainst,
+  type ChallengeKind,
 } from '../db/shells';
 import { MAX_CHAMPION_REROLLS, rollChampion } from '@challenge/core/domain';
 import { championPoolFor, rollFor } from '../shells/spin';
 import { describePayload } from '../shells/describe';
 import { runeTrees } from '../riot/runes';
 import { championIndex } from '../riot/champions';
+import { buildableItems } from '../riot/items';
 import { shellThrowEmbed } from '../discord/embeds';
 import { DiscordNotifier } from '../discord/notifier';
 import { mentionFor } from '../db/users';
@@ -55,6 +57,11 @@ export function shellRoutes(db: Db, config: ServerConfig) {
    * for a day server-side.
    */
   app.get('/runes', async (context) => context.json({ trees: await runeTrees() }));
+
+  /** The buildable pool, already filtered to items you could finish a game on. */
+  app.get('/items', async (context) =>
+    context.json({ items: await buildableItems() }),
+  );
 
   /** Champion id, name and icon, for drawing whatever a shell rolled. */
   app.get('/champions', async (context) =>
@@ -215,7 +222,10 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     const targetId = String(body.targetId ?? user.playerId ?? '');
     if (!targetId) return context.json({ error: 'Pick a target.' }, 400);
 
-    const kind = body.kind === 'RANDOM_RUNES' ? 'RANDOM_RUNES' : 'RANDOM_CHAMPION';
+    const kind: ChallengeKind =
+      body.kind === 'RANDOM_RUNES' || body.kind === 'RANDOM_BUILD'
+        ? body.kind
+        : 'RANDOM_CHAMPION';
     const payload = await rollFor(db, config, kind, targetId);
 
     return context.json({ payload });

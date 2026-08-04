@@ -9,6 +9,7 @@ import type { RunePage } from '@challenge/core/domain';
 
 import { championName } from '../riot/champions';
 import { runeIndex, SHARD_LABEL } from '../riot/runes';
+import { itemIndex } from '../riot/items';
 import type { ShellPayload } from '../db/shells';
 
 export interface DescribedField {
@@ -56,6 +57,19 @@ export async function describePayload(
       {
         name: 'Te toca',
         value: `**${await championName(payload.championId)}**`,
+        inline: false,
+      },
+    ];
+  }
+
+  if (payload.kind === 'RANDOM_BUILD') {
+    const items = await itemIndex();
+    return [
+      {
+        name: 'Tu build',
+        value: payload.itemIds
+          .map((id) => `• ${items.get(id)?.name ?? `#${id}`}`)
+          .join('\n'),
         inline: false,
       },
     ];

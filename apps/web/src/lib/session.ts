@@ -65,7 +65,11 @@ export async function fetchMe(token: string): Promise<SessionUser | null> {
   return (await response.json()) as SessionUser;
 }
 
-export type ChallengeKind = 'TEXT' | 'RANDOM_CHAMPION' | 'RANDOM_RUNES';
+export type ChallengeKind =
+  | 'TEXT'
+  | 'RANDOM_CHAMPION'
+  | 'RANDOM_RUNES'
+  | 'RANDOM_BUILD';
 
 export interface ChallengeOdds {
   id: string;
@@ -123,7 +127,24 @@ export interface RunePage {
 
 export type ShellPayload =
   | { kind: 'RANDOM_CHAMPION'; championId: number }
-  | { kind: 'RANDOM_RUNES'; page: RunePage };
+  | { kind: 'RANDOM_RUNES'; page: RunePage }
+  | { kind: 'RANDOM_BUILD'; itemIds: number[] };
+
+export interface ItemInfo {
+  id: number;
+  name: string;
+  icon: string;
+  gold: number;
+  isBoots: boolean;
+}
+
+export async function fetchItemIndex(): Promise<Map<number, ItemInfo>> {
+  const response = await fetch(`${API_URL}/api/shells/items`);
+  if (!response.ok) return new Map();
+
+  const { items } = (await response.json()) as { items: ItemInfo[] };
+  return new Map(items.map((item) => [item.id, item]));
+}
 
 export interface ThrowResult {
   challenge: { id: string; name: string; detail: string; kind: ChallengeKind };
@@ -163,7 +184,7 @@ export async function throwShell(
 export async function previewRoll(
   token: string,
   targetId: string,
-  kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES',
+  kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES' | 'RANDOM_BUILD',
 ): Promise<ShellPayload | null> {
   const response = await fetch(`${API_URL}/api/shells/preview`, {
     method: 'POST',

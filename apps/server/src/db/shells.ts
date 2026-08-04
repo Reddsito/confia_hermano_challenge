@@ -142,7 +142,12 @@ export function listShells(db: Db, playerId: string): ShellRow[] {
  * What a challenge does when it lands. TEXT is the plain kind — the name is the
  * whole punishment. The others make the server roll something at throw time.
  */
-export const CHALLENGE_KINDS = ['TEXT', 'RANDOM_CHAMPION', 'RANDOM_RUNES'] as const;
+export const CHALLENGE_KINDS = [
+  'TEXT',
+  'RANDOM_CHAMPION',
+  'RANDOM_RUNES',
+  'RANDOM_BUILD',
+] as const;
 export type ChallengeKind = (typeof CHALLENGE_KINDS)[number];
 
 function toKind(raw: string): ChallengeKind {
@@ -294,7 +299,8 @@ function toThrow(row: RawThrow): ThrowRow {
  */
 export type ShellPayload =
   | { kind: 'RANDOM_CHAMPION'; championId: number }
-  | { kind: 'RANDOM_RUNES'; page: RunePage };
+  | { kind: 'RANDOM_RUNES'; page: RunePage }
+  | { kind: 'RANDOM_BUILD'; itemIds: number[] };
 
 function parsePayload(raw: string | null): ShellPayload | null {
   if (!raw) return null;
@@ -520,6 +526,15 @@ export function ensureRollingChallenges(db: Db): void {
       detail: 'Página completa sorteada, tal cual sale',
       weight: 3,
       kind: 'RANDOM_RUNES',
+    });
+  }
+
+  if (!existing.has('RANDOM_BUILD')) {
+    insertChallenge(db, {
+      name: 'Build aleatoria',
+      detail: 'Seis objetos sorteados. Terminá la partida con ellos',
+      weight: 3,
+      kind: 'RANDOM_BUILD',
     });
   }
 }

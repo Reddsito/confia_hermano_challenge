@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { RunePage, RuneOption, ShellPayload } from '../lib/session';
+import type {
+  ItemInfo,
+  RunePage,
+  RuneOption,
+  ShellPayload,
+} from '../lib/session';
 import { classNames } from './ui';
 
 /**
@@ -123,6 +128,60 @@ export function ChampionReel({
         aria-live={settled ? 'polite' : 'off'}
       >
         {showing?.name ?? '—'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The rolled build, drawn as the six inventory slots it has to end up as.
+ *
+ * Laid out as a fixed six-slot grid rather than a list, because that is the
+ * shape the punishment is checked against at the end of the game.
+ */
+export function BuildView({
+  itemIds,
+  items,
+}: {
+  itemIds: number[];
+  items: Map<number, ItemInfo>;
+}) {
+  const gold = itemIds.reduce((sum, id) => sum + (items.get(id)?.gold ?? 0), 0);
+
+  return (
+    <div className="space-y-3">
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {itemIds.map((id, index) => {
+          const item = items.get(id);
+
+          return (
+            <li
+              key={`${id}-${index}`}
+              className="flex flex-col items-center gap-1"
+            >
+              <span className="grid aspect-square w-full place-items-center overflow-hidden rounded-lg border border-line bg-carbon-3">
+                {item ? (
+                  <img
+                    src={item.icon}
+                    alt={item.name}
+                    title={item.name}
+                    draggable={false}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-fluid-xs text-ink-3">?</span>
+                )}
+              </span>
+              <span className="w-full text-center text-[0.6rem] leading-tight text-ink-2">
+                {item?.name ?? `#${id}`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="tabular text-fluid-xs text-ink-3">
+        {gold.toLocaleString('es-AR')} de oro en total
       </p>
     </div>
   );
@@ -254,12 +313,14 @@ export function PayloadView({
   payload,
   champions,
   runes,
+  items,
   pool = [],
   animate = false,
 }: {
   payload: ShellPayload | null;
   champions: Map<number, ChampionInfo>;
   runes: Map<number, RuneOption>;
+  items: Map<number, ItemInfo>;
   pool?: number[];
   animate?: boolean;
 }) {
@@ -274,6 +335,10 @@ export function PayloadView({
         animate={animate}
       />
     );
+  }
+
+  if (payload.kind === 'RANDOM_BUILD') {
+    return <BuildView itemIds={payload.itemIds} items={items} />;
   }
 
   return <RunePageView page={payload.page} runes={runes} />;
