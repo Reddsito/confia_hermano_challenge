@@ -348,6 +348,28 @@ export function listThrows(db: Db, limit = 50): ThrowRow[] {
   return rows.map(toThrow);
 }
 
+/** One page of the throw history, newest first, plus how many there are. */
+export function pageThrows(
+  db: Db,
+  limit: number,
+  offset: number,
+): { rows: ThrowRow[]; total: number } {
+  const total = (
+    db.prepare('SELECT COUNT(*) AS n FROM shell_throws').get() as { n: number }
+  ).n;
+
+  const rows = db
+    .prepare(
+      `SELECT id, from_player AS fromPlayer, to_player AS toPlayer,
+              challenge_id AS challengeId, challenge_name AS challengeName,
+              thrown_at AS thrownAt, completed_at AS completedAt, payload
+       FROM shell_throws ORDER BY thrown_at DESC LIMIT ? OFFSET ?`,
+    )
+    .all(limit, offset) as RawThrow[];
+
+  return { rows: rows.map(toThrow), total };
+}
+
 export function getThrow(db: Db, id: string): ThrowRow | null {
   const row = db
     .prepare(

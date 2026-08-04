@@ -67,6 +67,9 @@ export function BlueShells({
   } | null>(null);
   const [pool, setPool] = useState<number[]>([]);
   const [rerolling, setRerolling] = useState(false);
+  // Admin only: naming the challenge instead of spinning for it, so one entry
+  // can be tested on purpose rather than by firing until it comes up.
+  const [forced, setForced] = useState<string | null>(null);
 
   // Static reference data: champion art and rune names never change while the
   // page is open, so they are fetched once rather than per roll.
@@ -141,7 +144,7 @@ export function BlueShells({
     try {
       // The server draws before the reel moves. A client-side spin would be a
       // re-roll away from meaningless.
-      const outcome = await throwShell(token, target);
+      const outcome = await throwShell(token, target, forced ?? undefined);
       // The wheel may be out of date if someone edited it while this page was
       // open; refresh it first so the drawn slice exists to stop on.
       setOdds(await fetchChallenges());
@@ -196,6 +199,13 @@ export function BlueShells({
 
   return (
     <div className="space-y-4">
+      {/*
+        What you owe comes first. It is the one thing on this page that is
+        actionable, and it used to sit below the wheel where it was only found
+        by scrolling past everything you might do to somebody else.
+      */}
+      <Received throws={received} champions={champions} runes={runes} />
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
         <Inventory available={available} shells={mine?.shells ?? []} />
 
@@ -282,6 +292,27 @@ export function BlueShells({
             ))}
         </ul>
 
+        {user.isAdmin && (
+          <label className="mt-4 block">
+            <span className="eyebrow text-ink-3">
+              Forzar reto (solo admin) — vacío gira la ruleta
+            </span>
+            <select
+              value={forced ?? ''}
+              onChange={(event) => setForced(event.target.value || null)}
+              disabled={spinning}
+              className="mt-1 min-h-11 w-full rounded-xl border border-line bg-void px-3 text-fluid-sm"
+            >
+              <option value="">Que decida la ruleta</option>
+              {odds.map((challenge) => (
+                <option key={challenge.id} value={challenge.id}>
+                  {challenge.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <button
           type="button"
           disabled={!target || available <= 0 || spinning}
@@ -327,8 +358,6 @@ export function BlueShells({
           pool={pool}
         />
       )}
-
-      <Received throws={received} champions={champions} runes={runes} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Odds odds={odds} />
@@ -448,35 +477,120 @@ function Received({
   runes: Map<number, RuneOption>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  // Settled ones are history; what you still owe is the reason to look.
+  const [showDone, setShowDone] = useState(false);
 
-  return (
-    <section className="rounded-2xl border border-line bg-carbon p-5">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="display text-fluid-lg">Lo que te tiraron</h3>
-        <p className="text-fluid-xs text-ink-3">
-          {throws.filter((record) => !record.completedAt).length} sin cumplir
-        </p>
-      </header>
+  const pending = throws.filter((record) => !record.completedAt);
+  const done = throws.filter((record) => record.completedAt);
+  const shown = showDone ? throws : pending;
 
-      {throws.length === 0 ? (
-        <p className="mt-4 text-fluid-xs text-ink-3">
+  // The oldest debt is the one the next game pays off, so it leads.
+  const next = pending[pending.length - 1] ?? null;
+
+  if (throws.length === 0) {
+    return (
+      <section className="rounded-2xl border border-line bg-carbon p-5">
+        <h3 className="display text-fluid-lg">Lo que te deben cumplir</h3>
+        <p className="mt-2 text-fluid-xs text-ink-3">
           Todavía nadie te tiró nada. Disfrutalo.
         </p>
-      ) : (
-        <ul className="mt-4 space-y-2">
-          {throws.map((record) => {
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="overflow-hidden rounded-2xl border bg-carbon"
+      style={{
+        borderColor: pending.length > 0 ? 'var(--color-accent)' : 'var(--color-line)',
+      }}
+    >
+      <header
+        className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+        style={{
+          background:
+            pending.length > 0
+              ? 'color-mix(in oklab, var(--color-accent) 12%, transparent)'
+              : undefined,
+        }}
+      >
+        <div>
+          <h3 className="display text-fluid-lg">
+            {pending.length > 0 ? 'Tenés retos pendientes' : 'Estás al día'}
+          </h3>
+          <p className="text-fluid-xs text-ink-3">
+            {pending.length > 0
+              ? `${pending.length} ${pending.length === 1 ? 'reto' : 'retos'} · se paga uno por partida`
+              : 'Cumpliste todo lo que te tiraron'}
+          </p>
+        </div>
+
+        {done.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDone(!showDone)}
+            className="eyebrow min-h-10 rounded-full border border-line px-4 text-ink-3 transition-colors hover:text-ink"
+          >
+            {showDone ? 'Ocultar cumplidos' : `Ver cumplidos (${done.length})`}
+          </button>
+        )}
+      </header>
+
+      {/*
+        The next one to pay is shown open, because a debt behind a click is a
+        debt you can claim you never saw.
+      */}
+      {next && (
+        <div className="border-t border-line px-5 py-4">
+          <p className="eyebrow text-ink-3">Lo próximo que jugás paga esto</p>
+          <p className="display mt-1 text-fluid-lg">{next.challengeName}</p>
+          <p className="text-fluid-xs text-ink-3">
+            Te la tiró {next.fromName ?? 'alguien'}
+          </p>
+
+          {next.payload && (
+            <div className="mt-4">
+              <PayloadView
+                payload={next.payload}
+                champions={champions}
+                runes={runes}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <ul className="divide-y divide-line border-t border-line">
+        {shown
+          .filter((record) => record.id !== next?.id)
+          .map((record) => {
             const expanded = open === record.id;
 
             return (
-              <li key={record.id} className="rounded-xl border border-line">
+              <li key={record.id}>
                 <button
                   type="button"
                   onClick={() => setOpen(expanded ? null : record.id)}
                   aria-expanded={expanded}
-                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
+                  className="flex min-h-14 w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-carbon-3"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-fluid-sm">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{
+                      background: record.completedAt
+                        ? 'var(--color-line)'
+                        : 'var(--color-accent)',
+                    }}
+                    aria-hidden
+                  />
+
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={classNames(
+                        'block truncate text-fluid-sm',
+                        Boolean(record.completedAt) && 'text-ink-3 line-through',
+                      )}
+                    >
                       {record.challengeName}
                     </span>
                     <span className="block text-fluid-xs text-ink-3">
@@ -485,20 +599,20 @@ function Received({
                     </span>
                   </span>
 
-                  <span
-                    className="eyebrow shrink-0 text-fluid-xs"
-                    style={{
-                      color: record.completedAt
-                        ? 'var(--color-mark-green, #0fa892)'
-                        : 'var(--color-accent)',
-                    }}
-                  >
-                    {record.completedAt ? 'Cumplido' : 'Pendiente'}
-                  </span>
+                  {record.payload?.kind === 'RANDOM_CHAMPION' && (
+                    <img
+                      src={champions.get(record.payload.championId)?.icon}
+                      alt=""
+                      width={30}
+                      height={30}
+                      className="shrink-0 rounded-md"
+                      aria-hidden
+                    />
+                  )}
                 </button>
 
                 {expanded && (
-                  <div className="space-y-4 border-t border-line px-4 py-4">
+                  <div className="space-y-4 px-5 pb-4">
                     <PayloadView
                       payload={record.payload}
                       champions={champions}
@@ -530,8 +644,7 @@ function Received({
               </li>
             );
           })}
-        </ul>
-      )}
+      </ul>
     </section>
   );
 }

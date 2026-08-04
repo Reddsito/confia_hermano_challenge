@@ -225,22 +225,36 @@ function ThrowsAdmin({
   busy: boolean;
   onRun: (action: () => Promise<unknown>, success?: string) => Promise<boolean>;
 }) {
+  const PAGE = 10;
   const [throws, setThrows] = useState<AdminThrow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
 
   const load = useCallback(() => {
-    fetchAdminThrows(code)
-      .then(setThrows)
-      .catch(() => setThrows([]));
-  }, [code]);
+    fetchAdminThrows(code, PAGE, offset)
+      .then((page) => {
+        setThrows(page.throws);
+        setTotal(page.total);
+      })
+      .catch(() => {
+        setThrows([]);
+        setTotal(0);
+      });
+  }, [code, offset]);
 
   useEffect(load, [load]);
+
+  // A deleted last-row page would otherwise strand you on an empty view.
+  useEffect(() => {
+    if (offset > 0 && offset >= total) setOffset(Math.max(total - PAGE, 0));
+  }, [total, offset]);
 
   return (
     <section className="rounded-2xl border border-line bg-carbon p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="display text-fluid-lg">Conchas tiradas</h3>
         <p className="text-fluid-xs text-ink-3">
-          Borrar una devuelve la concha a quien la tiró
+          {total} en total · borrar una devuelve la concha a quien la tiró
         </p>
       </header>
 
@@ -280,6 +294,32 @@ function ThrowsAdmin({
             </li>
           ))}
         </ul>
+      )}
+
+      {total > PAGE && (
+        <nav className="mt-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={offset === 0}
+            onClick={() => setOffset(Math.max(offset - PAGE, 0))}
+            className="eyebrow min-h-10 rounded-full border border-line px-4 text-ink-3 transition-colors hover:text-ink disabled:opacity-35"
+          >
+            Anteriores
+          </button>
+
+          <span className="tabular text-fluid-xs text-ink-3">
+            {offset + 1}–{Math.min(offset + PAGE, total)} de {total}
+          </span>
+
+          <button
+            type="button"
+            disabled={offset + PAGE >= total}
+            onClick={() => setOffset(offset + PAGE)}
+            className="eyebrow min-h-10 rounded-full border border-line px-4 text-ink-3 transition-colors hover:text-ink disabled:opacity-35"
+          >
+            Siguientes
+          </button>
+        </nav>
       )}
     </section>
   );

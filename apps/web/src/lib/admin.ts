@@ -183,9 +183,22 @@ export interface AdminThrow {
   completedAt: number | null;
 }
 
-export function fetchAdminThrows(code: string): Promise<AdminThrow[]> {
-  return request<{ throws: AdminThrow[] }>(code, '/api/admin/throws').then(
-    (body) => body.throws,
+export interface ThrowPage {
+  throws: AdminThrow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Paged: the history only grows, and the panel does not need it all at once. */
+export function fetchAdminThrows(
+  code: string,
+  limit = 10,
+  offset = 0,
+): Promise<ThrowPage> {
+  return request<ThrowPage>(
+    code,
+    `/api/admin/throws?limit=${limit}&offset=${offset}`,
   );
 }
 

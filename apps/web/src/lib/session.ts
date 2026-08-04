@@ -132,9 +132,14 @@ export interface ThrowResult {
   remaining: number;
 }
 
+/**
+ * `challengeId` names the challenge instead of spinning for it. Admin only and
+ * rejected for everyone else, so a normal throw is always the wheel's call.
+ */
 export async function throwShell(
   token: string,
   targetId: string,
+  challengeId?: string,
 ): Promise<ThrowResult> {
   const response = await fetch(`${API_URL}/api/shells/throw`, {
     method: 'POST',
@@ -142,7 +147,7 @@ export async function throwShell(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ targetId }),
+    body: JSON.stringify({ targetId, challengeId }),
   });
 
   const body = (await response.json()) as ThrowResult & { error?: string };
@@ -226,6 +231,57 @@ export async function rerollThrow(
   const body = (await response.json()) as RerollResult & { error?: string };
   if (!response.ok) throw new Error(body.error ?? 'No se pudo volver a girar.');
   return body;
+}
+
+export interface Placement {
+  playerId: string;
+  tierKey: string;
+  position: number;
+  updatedBy: string | null;
+  updatedAt: number;
+}
+
+export interface TierMove {
+  id: string;
+  playerId: string;
+  playerName: string | null;
+  fromTier: string | null;
+  toTier: string | null;
+  movedBy: string | null;
+  movedByName: string | null;
+  movedAt: number;
+}
+
+export interface TierBoard {
+  placements: Placement[];
+  moves: TierMove[];
+}
+
+export async function fetchTierBoard(): Promise<TierBoard> {
+  const response = await fetch(`${API_URL}/api/tierlist`);
+  if (!response.ok) return { placements: [], moves: [] };
+  return (await response.json()) as TierBoard;
+}
+
+/** Moves a player, or takes them off the board when tierKey is null. */
+export async function placeOnTier(
+  token: string,
+  playerId: string,
+  tierKey: string | null,
+): Promise<void> {
+  const response = await fetch(`${API_URL}/api/tierlist/placements/${playerId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tierKey }),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? 'No se pudo mover.');
+  }
 }
 
 export interface ChampionInfo {

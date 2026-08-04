@@ -21,7 +21,7 @@ import {
   deleteThrow,
   insertChallenge,
   listChallenges,
-  listThrows,
+  pageThrows,
   updateChallenge,
   type ChallengeKind,
 } from '../db/shells';
@@ -192,13 +192,24 @@ export function adminRoutes(
     return context.json(result);
   });
 
+  /**
+   * Paged, because the history only grows and the panel does not need it all.
+   * `total` is what lets the page tell you there is more without fetching it.
+   */
   app.get('/throws', (context) => {
     const names = new Map(
       listPlayers(db).map((player) => [player.id, player.displayName]),
     );
 
+    const limit = Math.min(Math.max(Number(context.req.query('limit') ?? 10), 1), 50);
+    const offset = Math.max(Number(context.req.query('offset') ?? 0), 0);
+    const page = pageThrows(db, limit, offset);
+
     return context.json({
-      throws: listThrows(db, 100).map((record) => ({
+      total: page.total,
+      limit,
+      offset,
+      throws: page.rows.map((record) => ({
         ...record,
         fromName: record.fromPlayer ? (names.get(record.fromPlayer) ?? null) : null,
         toName: names.get(record.toPlayer) ?? null,

@@ -103,8 +103,8 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     }
 
     const body = await context.req
-      .json<{ targetId?: string }>()
-      .catch(() => ({}) as { targetId?: string });
+      .json<{ targetId?: string; challengeId?: string }>()
+      .catch(() => ({}) as { targetId?: string; challengeId?: string });
     const targetId = String(body.targetId ?? '');
     if (!targetId) return context.json({ error: 'Pick someone to hit.' }, 400);
     // Admins may fire at themselves. It is the only way to try the wheel end to
@@ -124,7 +124,21 @@ export function shellRoutes(db: Db, config: ServerConfig) {
       return context.json({ error: 'You have no blue shells.' }, 409);
     }
 
-    const challenge = spinChallenge(db);
+    // Admins may name the challenge instead of spinning for it. It is the only
+    // way to test one entry on purpose rather than firing until the wheel
+    // happens to land on it. Everyone else always gets the spin.
+    const chosen =
+      user.isAdmin && body.challengeId
+        ? (listChallenges(db, true).find(
+            (entry) => entry.id === body.challengeId,
+          ) ?? null)
+        : null;
+
+    if (user.isAdmin && body.challengeId && !chosen) {
+      return context.json({ error: 'No such challenge.' }, 404);
+    }
+
+    const challenge = chosen ?? spinChallenge(db);
     if (!challenge) {
       return context.json(
         { error: 'The wheel is empty. Add challenges in the panel first.' },
