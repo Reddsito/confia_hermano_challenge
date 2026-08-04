@@ -25,7 +25,7 @@ import {
   updateChallenge,
   type ChallengeKind,
 } from '../db/shells';
-import { linkDiscordUser, listDiscordUsers } from '../db/users';
+import { linkDiscordUser, listDiscordUsers, setDiscordAdmin } from '../db/users';
 import type { Scheduler } from '../sync/scheduler';
 
 /** Constant-time compare so the token cannot be guessed by timing the response. */
@@ -163,6 +163,27 @@ export function adminRoutes(
     }
 
     const ok = linkDiscordUser(db, context.req.param('discordId'), playerId);
+    return ok
+      ? context.json({ ok: true })
+      : context.json({ error: 'No such Discord user' }, 404);
+  });
+
+  /**
+   * Grants or revokes Discord-side admin for one account.
+   *
+   * Signing in always lands as a plain user, so without this there is no way to
+   * become an admin on the site itself — the flag was write-once-as-zero.
+   */
+  app.post('/discord-users/:discordId/admin', async (context) => {
+    const body = await context.req
+      .json<{ isAdmin?: boolean }>()
+      .catch(() => ({}) as { isAdmin?: boolean });
+
+    const ok = setDiscordAdmin(
+      db,
+      context.req.param('discordId'),
+      Boolean(body.isAdmin),
+    );
     return ok
       ? context.json({ ok: true })
       : context.json({ error: 'No such Discord user' }, 404);

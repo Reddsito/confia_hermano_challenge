@@ -7,6 +7,7 @@ import {
   linkDiscordUser,
   patchChallenge,
   removeChallenge,
+  setDiscordAdmin,
   type AdminChallenge,
   type DiscordUser,
   type RosterPlayer,
@@ -80,6 +81,10 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
           Vinculá cada cuenta con un jugador del roster. Una cuenta, un jugador —
           si elegís a alguien ya vinculado, se lo mueve.
         </p>
+        <p className="mt-1 text-fluid-xs text-ink-3">
+          “Admin” es aparte del código de este panel: es lo que habilita forzar
+          un reto y dispararse a uno mismo desde Conchas Azules.
+        </p>
 
         {users.length === 0 ? (
           <p className="mt-4 text-fluid-sm text-ink-2">
@@ -129,6 +134,32 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                     )}
                   </span>
                 </span>
+
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        setDiscordAdmin(code, user.discordId, !user.isAdmin),
+                      user.discordId,
+                    )
+                  }
+                  className={classNames(
+                    'eyebrow min-h-10 shrink-0 rounded-full border px-3 transition-colors',
+                    user.isAdmin
+                      ? 'border-transparent text-void'
+                      : 'border-line text-ink-3 hover:text-ink',
+                  )}
+                  style={
+                    user.isAdmin
+                      ? { background: 'var(--color-accent)' }
+                      : undefined
+                  }
+                  aria-pressed={user.isAdmin}
+                >
+                  Admin
+                </button>
 
                 <label className="flex items-center gap-2">
                   <span className="sr-only">

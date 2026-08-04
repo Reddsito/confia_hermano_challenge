@@ -92,6 +92,25 @@ export function linkDiscordUser(
   return true;
 }
 
+/**
+ * Grants or revokes Discord-side admin.
+ *
+ * This is a different thing from the panel code: the code opens the panel,
+ * this flag is what a signed-in session carries around the rest of the site —
+ * forcing a challenge, firing at yourself. Logging in never sets it, so it can
+ * only ever be handed out from the panel.
+ */
+export function setDiscordAdmin(
+  db: Db,
+  discordId: string,
+  isAdmin: boolean,
+): boolean {
+  const result = db
+    .prepare('UPDATE discord_users SET is_admin = ? WHERE discord_id = ?')
+    .run(isAdmin ? 1 : 0, discordId);
+  return result.changes > 0;
+}
+
 /** The Discord account linked to a roster player, if any. */
 export function getDiscordUserByPlayer(
   db: Db,

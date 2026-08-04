@@ -155,6 +155,21 @@ export function linkDiscordUser(
   });
 }
 
+/**
+ * Site-wide admin for a signed-in Discord session. Separate from the panel
+ * code: this is what unlocks forcing a challenge and firing at yourself.
+ */
+export function setDiscordAdmin(
+  code: string,
+  discordId: string,
+  isAdmin: boolean,
+): Promise<{ ok: true }> {
+  return request(code, `/api/admin/discord-users/${discordId}/admin`, {
+    method: 'POST',
+    body: JSON.stringify({ isAdmin }),
+  });
+}
+
 export type ChallengeKind = 'TEXT' | 'RANDOM_CHAMPION' | 'RANDOM_RUNES';
 
 export const CHALLENGE_KIND_LABEL: Record<ChallengeKind, string> = {
