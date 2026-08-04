@@ -13,6 +13,7 @@ import {
   type SessionUser,
 } from '../lib/session';
 import { BlueShells, ShellMark } from './BlueShells';
+import { TierList } from './TierList';
 import { LiveGames } from './LiveGames';
 import { Filters, type FilterState, type SortKey } from './Filters';
 import { PlayerDetail } from './PlayerDetail';
@@ -27,7 +28,7 @@ import { TournamentClock, TournamentProgress } from './TournamentClock';
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-type Section = 'ranking' | 'live' | 'stats' | 'shells';
+type Section = 'ranking' | 'live' | 'stats' | 'shells' | 'tierlist';
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -148,6 +149,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
       badge: liveCount > 0 ? String(liveCount) : undefined,
     },
     { id: 'stats' as const, label: 'Estadísticas' },
+    // Public: the board reads for anyone, and only editing needs a session.
+    { id: 'tierlist' as const, label: 'Tier list' },
     // Signing in is what unlocks the tab; showing it while signed out would
     // only lead to a dead end.
     ...(user ? [{ id: 'shells' as const, label: 'Conchas Azules' }] : []),
@@ -246,6 +249,10 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             players={ranking}
             onBalanceChange={() => void loadSession()}
           />
+        </TabPanel>
+
+        <TabPanel id="tierlist" active={section === 'tierlist'}>
+          <TierList players={ranking} user={user} token={token} />
         </TabPanel>
       </div>
 

@@ -12,6 +12,7 @@ import { authRoutes } from './routes/auth';
 import { adminRoutes } from './routes/admin';
 import { liveRoutes } from './routes/live';
 import { shellRoutes } from './routes/shells';
+import { tierListRoutes } from './routes/tierlist';
 import { buildSnapshot } from './snapshot';
 import { Scheduler } from './sync/scheduler';
 
@@ -71,6 +72,7 @@ app.get('/api/snapshot', (context) => {
 
 app.route('/api/auth', authRoutes(db, config));
 app.route('/api/shells', shellRoutes(db, config));
+app.route('/api/tierlist', tierListRoutes(db, config));
 app.route(
   '/api/live',
   liveRoutes(db, QUEUE_IDS[config.tournament.queue] ?? 420, config.platform),

@@ -268,6 +268,36 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (player_id, champion_id)
   );
   `,
+
+  // The shared tier list: one board everyone edits, predicting where each
+  // player finishes. One row per placed player, so a player can only be in one
+  // bracket at a time by construction rather than by cleaning up duplicates.
+  //
+  // Anyone missing from this table is simply unplaced and shows in the tray.
+  `
+  CREATE TABLE tier_placements (
+    player_id  TEXT PRIMARY KEY REFERENCES players (id) ON DELETE CASCADE,
+    tier_key   TEXT NOT NULL,
+    -- Order within the row, so a bracket can be sorted by conviction.
+    position   INTEGER NOT NULL DEFAULT 0,
+    updated_by TEXT REFERENCES players (id) ON DELETE SET NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  -- Every move, kept forever. A shared board with no attribution is an edit
+  -- war; with one, it self-regulates, and that is the whole reason this table
+  -- exists rather than the placements simply being overwritten in silence.
+  CREATE TABLE tier_moves (
+    id         TEXT PRIMARY KEY,
+    player_id  TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    from_tier  TEXT,
+    to_tier    TEXT,
+    moved_by   TEXT REFERENCES players (id) ON DELETE SET NULL,
+    moved_at   INTEGER NOT NULL
+  );
+
+  CREATE INDEX idx_tier_moves_at ON tier_moves (moved_at DESC);
+  `,
 ];
 
 export function openDatabase(path: string): Db {

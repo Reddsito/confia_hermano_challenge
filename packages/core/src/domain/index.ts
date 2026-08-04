@@ -3,3 +3,4 @@ export * from './ranking';
 export * from './tiers';
 export * from './shells';
 export * from './spins';
+export * from './tierlist';
