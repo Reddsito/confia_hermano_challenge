@@ -7,12 +7,15 @@ import {
   addPlayer,
   clearCode,
   editPlayer,
+  fetchAdminThrows,
   fetchInfo,
   fetchRoster,
   readCode,
   removePlayer,
+  removeThrow,
   setVisible,
   storeCode,
+  type AdminThrow,
   type PanelInfo,
   type RosterPlayer,
 } from '../lib/admin';
@@ -199,8 +202,86 @@ export function Panel() {
         </p>
       )}
 
+      <ThrowsAdmin code={code} busy={busy} onRun={run} />
+
       <PanelLinks code={code} roster={roster} onError={setError} />
     </div>
+  );
+}
+
+/**
+ * Every shell that has landed, with a way to undo one.
+ *
+ * Undoing gives the shell back for free: balances are earned minus thrown, both
+ * counted from rows, so deleting the throw restores the spender's count with no
+ * compensating entry to get wrong.
+ */
+function ThrowsAdmin({
+  code,
+  busy,
+  onRun,
+}: {
+  code: string;
+  busy: boolean;
+  onRun: (action: () => Promise<unknown>, success?: string) => Promise<boolean>;
+}) {
+  const [throws, setThrows] = useState<AdminThrow[]>([]);
+
+  const load = useCallback(() => {
+    fetchAdminThrows(code)
+      .then(setThrows)
+      .catch(() => setThrows([]));
+  }, [code]);
+
+  useEffect(load, [load]);
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="display text-fluid-lg">Conchas tiradas</h3>
+        <p className="text-fluid-xs text-ink-3">
+          Borrar una devuelve la concha a quien la tiró
+        </p>
+      </header>
+
+      {throws.length === 0 ? (
+        <p className="mt-4 text-fluid-xs text-ink-3">Todavía no tiró nadie.</p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {throws.map((record) => (
+            <li
+              key={record.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-fluid-sm">
+                  {record.fromName ?? 'Alguien'} → {record.toName ?? 'alguien'}
+                </span>
+                <span className="block text-fluid-xs text-ink-3">
+                  {record.challengeName} ·{' '}
+                  {new Date(record.thrownAt).toLocaleString('es-AR')}
+                  {record.completedAt && ' · cumplido'}
+                </span>
+              </span>
+
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void onRun(async () => {
+                    await removeThrow(code, record.id);
+                    load();
+                  }, 'Tirada borrada y concha devuelta.')
+                }
+                className="eyebrow min-h-10 shrink-0 rounded-full border border-line px-4 text-ink-3 transition-colors hover:text-ink disabled:opacity-35"
+              >
+                Borrar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

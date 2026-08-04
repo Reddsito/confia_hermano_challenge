@@ -18,9 +18,12 @@ import {
 import {
   adjustShells,
   deleteChallenge,
+  deleteThrow,
   insertChallenge,
   listChallenges,
+  listThrows,
   updateChallenge,
+  type ChallengeKind,
 } from '../db/shells';
 import { linkDiscordUser, listDiscordUsers } from '../db/users';
 import type { Scheduler } from '../sync/scheduler';
@@ -189,6 +192,33 @@ export function adminRoutes(
     return context.json(result);
   });
 
+  app.get('/throws', (context) => {
+    const names = new Map(
+      listPlayers(db).map((player) => [player.id, player.displayName]),
+    );
+
+    return context.json({
+      throws: listThrows(db, 100).map((record) => ({
+        ...record,
+        fromName: record.fromPlayer ? (names.get(record.fromPlayer) ?? null) : null,
+        toName: names.get(record.toPlayer) ?? null,
+      })),
+    });
+  });
+
+  /**
+   * Undoes a throw entirely.
+   *
+   * Deleting the row is what gives the shell back: a balance is earned minus
+   * thrown, counted from these rows, so removing one restores the spender's
+   * count without a compensating ledger entry. The spin history goes with it
+   * through the cascade, which is correct — the throw never happened.
+   */
+  app.delete('/throws/:id', (context) => {
+    const ok = deleteThrow(db, context.req.param('id'));
+    return ok ? context.json({ ok: true }) : context.json({ error: 'Not found' }, 404);
+  });
+
   app.get('/challenges', (context) =>
     context.json({ challenges: listChallenges(db) }),
   );
@@ -198,12 +228,20 @@ export function adminRoutes(
       name?: string;
       detail?: string;
       weight?: number;
+      kind?: ChallengeKind;
     }>();
     const name = (body.name ?? '').trim();
     if (!name) return context.json({ error: 'A challenge needs a name.' }, 400);
 
     return context.json(
-      { challenge: insertChallenge(db, { name, detail: body.detail, weight: body.weight }) },
+      {
+        challenge: insertChallenge(db, {
+          name,
+          detail: body.detail,
+          weight: body.weight,
+          kind: body.kind,
+        }),
+      },
       201,
     );
   });
@@ -214,6 +252,7 @@ export function adminRoutes(
       detail?: string;
       weight?: number;
       enabled?: boolean;
+      kind?: ChallengeKind;
     }>();
     const ok = updateChallenge(db, context.req.param('id'), body);
     return ok ? context.json({ ok: true }) : context.json({ error: 'Not found' }, 404);

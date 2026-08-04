@@ -155,12 +155,43 @@ export function linkDiscordUser(
   });
 }
 
+export type ChallengeKind = 'TEXT' | 'RANDOM_CHAMPION' | 'RANDOM_RUNES';
+
+export const CHALLENGE_KIND_LABEL: Record<ChallengeKind, string> = {
+  TEXT: 'Texto',
+  RANDOM_CHAMPION: 'Campeón aleatorio',
+  RANDOM_RUNES: 'Runas aleatorias',
+};
+
 export interface AdminChallenge {
   id: string;
   name: string;
   detail: string;
   weight: number;
   enabled: boolean;
+  kind: ChallengeKind;
+}
+
+export interface AdminThrow {
+  id: string;
+  fromPlayer: string | null;
+  fromName: string | null;
+  toPlayer: string;
+  toName: string | null;
+  challengeName: string;
+  thrownAt: number;
+  completedAt: number | null;
+}
+
+export function fetchAdminThrows(code: string): Promise<AdminThrow[]> {
+  return request<{ throws: AdminThrow[] }>(code, '/api/admin/throws').then(
+    (body) => body.throws,
+  );
+}
+
+/** Undoes a throw. The shell returns on its own — balances count these rows. */
+export function removeThrow(code: string, id: string): Promise<unknown> {
+  return request(code, `/api/admin/throws/${id}`, { method: 'DELETE' });
 }
 
 export function fetchAdminChallenges(code: string): Promise<AdminChallenge[]> {
@@ -171,7 +202,7 @@ export function fetchAdminChallenges(code: string): Promise<AdminChallenge[]> {
 
 export function createChallenge(
   code: string,
-  input: { name: string; detail?: string; weight?: number },
+  input: { name: string; detail?: string; weight?: number; kind?: ChallengeKind },
 ): Promise<unknown> {
   return request(code, '/api/admin/challenges', {
     method: 'POST',
