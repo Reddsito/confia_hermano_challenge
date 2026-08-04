@@ -10,14 +10,25 @@ import {
 
 import {
   fetchChallenges,
+  fetchChampionIndex,
+  fetchChampionPool,
+  fetchReceived,
+  fetchRuneIndex,
   fetchShells,
   loginUrl,
+  previewRoll,
+  rerollThrow,
   throwShell,
   type ChallengeOdds,
+  type ChampionInfo,
+  type ReceivedThrow,
+  type RuneOption,
   type SessionUser,
+  type ShellPayload,
   type ShellsState,
 } from '../lib/session';
 import { TierCrest } from './icons';
+import { PayloadView } from './ShellRoll';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 interface BlueShellsProps {
@@ -47,6 +58,22 @@ export function BlueShells({
   >(null);
   const [error, setError] = useState<string | null>(null);
 
+  // What the landed challenge rolled, if it rolls anything, plus the throw it
+  // belongs to — the reroll needs the id, not just the result.
+  const [rolled, setRolled] = useState<{
+    throwId: string;
+    payload: ShellPayload;
+    rerollsLeft: number;
+  } | null>(null);
+  const [pool, setPool] = useState<number[]>([]);
+  const [rerolling, setRerolling] = useState(false);
+
+  // Static reference data: champion art and rune names never change while the
+  // page is open, so they are fetched once rather than per roll.
+  const [champions, setChampions] = useState<Map<number, ChampionInfo>>(new Map());
+  const [runes, setRunes] = useState<Map<number, RuneOption>>(new Map());
+  const [received, setReceived] = useState<ReceivedThrow[]>([]);
+
   const reload = useCallback(async () => {
     const [shells, challenges] = await Promise.all([
       fetchShells(),
@@ -56,9 +83,39 @@ export function BlueShells({
     setOdds(challenges);
   }, []);
 
+  const reloadReceived = useCallback(async () => {
+    if (!token) return;
+    setReceived(await fetchReceived(token));
+  }, [token]);
+
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    void reloadReceived();
+  }, [reloadReceived]);
+
+  useEffect(() => {
+    void (async () => {
+      const [championIndex, runeIndex] = await Promise.all([
+        fetchChampionIndex(),
+        fetchRuneIndex(),
+      ]);
+      setChampions(championIndex);
+      setRunes(runeIndex);
+    })();
+  }, []);
+
+  // Warmed as soon as a target is picked, so the reel already has real
+  // candidates to flick through by the time the wheel stops.
+  useEffect(() => {
+    if (!target) {
+      setPool([]);
+      return;
+    }
+    void fetchChampionPool(target).then(setPool);
+  }, [target]);
 
   const byId = useMemo(
     () => new Map(players.map((player) => [player.id, player])),
@@ -78,6 +135,7 @@ export function BlueShells({
 
     setError(null);
     setLanded(null);
+    setRolled(null);
     setSpinning(true);
 
     try {
@@ -89,7 +147,19 @@ export function BlueShells({
       setOdds(await fetchChallenges());
       setLanded(outcome.challenge);
       await new Promise((resolve) => setTimeout(resolve, SPIN_MS));
+
+      // Revealed only after the wheel has stopped: showing the champion while
+      // the wheel is still turning gives the result away before its own spin.
+      if (outcome.throw.payload) {
+        setRolled({
+          throwId: outcome.throw.id,
+          payload: outcome.throw.payload,
+          rerollsLeft: outcome.rerollsLeft,
+        });
+      }
+
       await reload();
+      await reloadReceived();
       onBalanceChange();
       setTarget(null);
     } catch (cause) {
@@ -97,6 +167,27 @@ export function BlueShells({
       setLanded(null);
     } finally {
       setSpinning(false);
+    }
+  };
+
+  const reroll = async () => {
+    if (!token || !rolled || rerolling || rolled.rerollsLeft <= 0) return;
+
+    setRerolling(true);
+    setError(null);
+
+    try {
+      const outcome = await rerollThrow(token, rolled.throwId, 'No lo tiene');
+      setRolled({
+        throwId: rolled.throwId,
+        payload: { kind: 'RANDOM_CHAMPION', championId: outcome.championId },
+        rerollsLeft: outcome.rerollsLeft,
+      });
+      await reloadReceived();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRerolling(false);
     }
   };
 
@@ -116,6 +207,56 @@ export function BlueShells({
         />
       </div>
 
+      {rolled && (
+        <section className="rounded-2xl border border-line bg-carbon p-5">
+          <header className="flex flex-wrap items-baseline justify-between gap-3">
+            <h3 className="display text-fluid-lg">
+              {rolled.payload.kind === 'RANDOM_CHAMPION'
+                ? 'Le tocó'
+                : 'Con estas runas'}
+            </h3>
+
+            {rolled.payload.kind === 'RANDOM_CHAMPION' && (
+              <div className="flex items-center gap-3">
+                <p className="text-fluid-xs text-ink-3">
+                  {rolled.rerollsLeft > 0
+                    ? `Te quedan ${rolled.rerollsLeft} giros si no lo tiene`
+                    : 'Sin giros: este es el definitivo'}
+                </p>
+                <button
+                  type="button"
+                  disabled={rolled.rerollsLeft <= 0 || rerolling}
+                  onClick={() => void reroll()}
+                  className={classNames(
+                    'eyebrow min-h-11 rounded-xl border border-line px-4 transition-all',
+                    'disabled:cursor-not-allowed disabled:opacity-35',
+                  )}
+                >
+                  {rerolling ? 'Girando…' : 'No lo tiene, girar'}
+                </button>
+              </div>
+            )}
+          </header>
+
+          <div className="mt-4">
+            <PayloadView
+              // Keyed by the result so a reroll remounts the reel and replays
+              // the spin, instead of silently swapping the icon underneath.
+              key={
+                rolled.payload.kind === 'RANDOM_CHAMPION'
+                  ? rolled.payload.championId
+                  : 'runes'
+              }
+              payload={rolled.payload}
+              champions={champions}
+              runes={runes}
+              pool={pool}
+              animate
+            />
+          </div>
+        </section>
+      )}
+
       <section className="rounded-2xl border border-line bg-carbon p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="display text-fluid-lg">Elegí una víctima</h3>
@@ -126,7 +267,10 @@ export function BlueShells({
 
         <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {players
-            .filter((player) => player.id !== user.playerId)
+            // Admins keep themselves on the list: firing at yourself is the
+            // only way to walk the whole flow without making someone else owe
+            // a game. It still costs a shell.
+            .filter((player) => user.isAdmin || player.id !== user.playerId)
             .map((player) => (
               <TargetCard
                 key={player.id}
@@ -174,11 +318,221 @@ export function BlueShells({
         )}
       </section>
 
+      {user.isAdmin && (
+        <TestBench
+          token={token}
+          targetId={target ?? user.playerId}
+          champions={champions}
+          runes={runes}
+          pool={pool}
+        />
+      )}
+
+      <Received throws={received} champions={champions} runes={runes} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Odds odds={odds} />
         <History state={state} byId={byId} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Admin-only bench for seeing what a roll produces.
+ *
+ * Nothing here is stored and no shell is spent, so it can be hammered while
+ * checking how a rune page or a champion reel renders. Firing for real is still
+ * the button above.
+ */
+function TestBench({
+  token,
+  targetId,
+  champions,
+  runes,
+  pool,
+}: {
+  token: string | null;
+  targetId: string | null;
+  champions: Map<number, ChampionInfo>;
+  runes: Map<number, RuneOption>;
+  pool: number[];
+}) {
+  const [preview, setPreview] = useState<ShellPayload | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const roll = async (kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES') => {
+    if (!token || !targetId || busy) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      setPreview(await previewRoll(token, targetId, kind));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-dashed border-line bg-carbon p-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="display text-fluid-lg">Banco de pruebas</h3>
+        <p className="text-fluid-xs text-ink-3">
+          No gasta conchas ni le debe nada a nadie
+        </p>
+      </header>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy || !targetId}
+          onClick={() => void roll('RANDOM_CHAMPION')}
+          className="eyebrow min-h-11 rounded-xl border border-line px-4 transition-colors hover:text-ink disabled:opacity-35"
+        >
+          Probar campeón
+        </button>
+        <button
+          type="button"
+          disabled={busy || !targetId}
+          onClick={() => void roll('RANDOM_RUNES')}
+          className="eyebrow min-h-11 rounded-xl border border-line px-4 transition-colors hover:text-ink disabled:opacity-35"
+        >
+          Probar runas
+        </button>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-3 text-fluid-xs"
+          style={{ color: 'var(--color-mark-red)' }}
+        >
+          {error}
+        </p>
+      )}
+
+      {preview && (
+        <div className="mt-4">
+          <PayloadView
+            key={
+              preview.kind === 'RANDOM_CHAMPION' ? preview.championId : 'runes'
+            }
+            payload={preview}
+            champions={champions}
+            runes={runes}
+            pool={pool}
+            animate
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * What has been fired at you, newest first, with the full spin history of each.
+ *
+ * The history is the point: a champion that was rerolled twice shows all three
+ * results, so "he said he didn't own it" is a record rather than a claim.
+ */
+function Received({
+  throws,
+  champions,
+  runes,
+}: {
+  throws: ReceivedThrow[];
+  champions: Map<number, ChampionInfo>;
+  runes: Map<number, RuneOption>;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="display text-fluid-lg">Lo que te tiraron</h3>
+        <p className="text-fluid-xs text-ink-3">
+          {throws.filter((record) => !record.completedAt).length} sin cumplir
+        </p>
+      </header>
+
+      {throws.length === 0 ? (
+        <p className="mt-4 text-fluid-xs text-ink-3">
+          Todavía nadie te tiró nada. Disfrutalo.
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {throws.map((record) => {
+            const expanded = open === record.id;
+
+            return (
+              <li key={record.id} className="rounded-xl border border-line">
+                <button
+                  type="button"
+                  onClick={() => setOpen(expanded ? null : record.id)}
+                  aria-expanded={expanded}
+                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 text-left"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-fluid-sm">
+                      {record.challengeName}
+                    </span>
+                    <span className="block text-fluid-xs text-ink-3">
+                      {record.fromName ?? 'Alguien'} ·{' '}
+                      {new Date(record.thrownAt).toLocaleDateString('es-AR')}
+                    </span>
+                  </span>
+
+                  <span
+                    className="eyebrow shrink-0 text-fluid-xs"
+                    style={{
+                      color: record.completedAt
+                        ? 'var(--color-mark-green, #0fa892)'
+                        : 'var(--color-accent)',
+                    }}
+                  >
+                    {record.completedAt ? 'Cumplido' : 'Pendiente'}
+                  </span>
+                </button>
+
+                {expanded && (
+                  <div className="space-y-4 border-t border-line px-4 py-4">
+                    <PayloadView
+                      payload={record.payload}
+                      champions={champions}
+                      runes={runes}
+                    />
+
+                    {record.rolls.length > 1 && (
+                      <div>
+                        <p className="eyebrow text-ink-3">Giros</p>
+                        <ol className="mt-2 space-y-1">
+                          {record.rolls.map((roll, index) => (
+                            <li
+                              key={roll.id}
+                              className="text-fluid-xs text-ink-2"
+                            >
+                              {index + 1}.{' '}
+                              {roll.payload?.kind === 'RANDOM_CHAMPION'
+                                ? (champions.get(roll.payload.championId)?.name ??
+                                  `#${roll.payload.championId}`)
+                                : 'Página de runas'}
+                              {roll.reason && ` — ${roll.reason}`}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 

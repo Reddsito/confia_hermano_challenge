@@ -65,11 +65,14 @@ export async function fetchMe(token: string): Promise<SessionUser | null> {
   return (await response.json()) as SessionUser;
 }
 
+export type ChallengeKind = 'TEXT' | 'RANDOM_CHAMPION' | 'RANDOM_RUNES';
+
 export interface ChallengeOdds {
   id: string;
   name: string;
   detail: string;
   weight: number;
+  kind: ChallengeKind;
   chance: number;
 }
 
@@ -110,8 +113,22 @@ export async function fetchShells(): Promise<ShellsState | null> {
   return (await response.json()) as ShellsState;
 }
 
+export interface RunePage {
+  primaryStyle: number;
+  primary: number[];
+  secondaryStyle: number;
+  secondary: number[];
+  shards: number[];
+}
+
+export type ShellPayload =
+  | { kind: 'RANDOM_CHAMPION'; championId: number }
+  | { kind: 'RANDOM_RUNES'; page: RunePage };
+
 export interface ThrowResult {
-  challenge: { id: string; name: string; detail: string };
+  challenge: { id: string; name: string; detail: string; kind: ChallengeKind };
+  throw: { id: string; payload: ShellPayload | null };
+  rerollsLeft: number;
   remaining: number;
 }
 
@@ -131,4 +148,138 @@ export async function throwShell(
   const body = (await response.json()) as ThrowResult & { error?: string };
   if (!response.ok) throw new Error(body.error ?? 'No se pudo tirar la concha.');
   return body;
+}
+
+/**
+ * Rolls a result without storing anything. Admin only, and deliberately not
+ * wired to a shell: it exists to check what a roll looks like, so it must not
+ * cost one or leave anybody owing a game.
+ */
+export async function previewRoll(
+  token: string,
+  targetId: string,
+  kind: 'RANDOM_CHAMPION' | 'RANDOM_RUNES',
+): Promise<ShellPayload | null> {
+  const response = await fetch(`${API_URL}/api/shells/preview`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ targetId, kind }),
+  });
+
+  const body = (await response.json()) as {
+    payload: ShellPayload | null;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? 'No se pudo previsualizar.');
+  return body.payload;
+}
+
+export interface RollRecord {
+  id: string;
+  payload: ShellPayload | null;
+  reason: string;
+  rolledAt: number;
+}
+
+export interface ReceivedThrow {
+  id: string;
+  fromPlayer: string | null;
+  fromName: string | null;
+  challengeName: string;
+  thrownAt: number;
+  completedAt: number | null;
+  payload: ShellPayload | null;
+  rolls: RollRecord[];
+}
+
+export async function fetchReceived(token: string): Promise<ReceivedThrow[]> {
+  const response = await fetch(`${API_URL}/api/shells/received`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return [];
+  return ((await response.json()) as { throws: ReceivedThrow[] }).throws;
+}
+
+export interface RerollResult {
+  championId: number;
+  rerollsLeft: number;
+  rolls: RollRecord[];
+}
+
+export async function rerollThrow(
+  token: string,
+  throwId: string,
+  reason: string,
+): Promise<RerollResult> {
+  const response = await fetch(`${API_URL}/api/shells/throw/${throwId}/reroll`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ reason }),
+  });
+
+  const body = (await response.json()) as RerollResult & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? 'No se pudo volver a girar.');
+  return body;
+}
+
+export interface ChampionInfo {
+  id: number;
+  name: string;
+  icon: string;
+}
+
+export async function fetchChampionIndex(): Promise<Map<number, ChampionInfo>> {
+  const response = await fetch(`${API_URL}/api/shells/champions`);
+  if (!response.ok) return new Map();
+
+  const { champions } = (await response.json()) as { champions: ChampionInfo[] };
+  return new Map(champions.map((champion) => [champion.id, champion]));
+}
+
+/** The champions a roll against this player could land on. */
+export async function fetchChampionPool(playerId: string): Promise<number[]> {
+  const response = await fetch(`${API_URL}/api/shells/pool/${playerId}`);
+  if (!response.ok) return [];
+  return ((await response.json()) as { championIds: number[] }).championIds;
+}
+
+export interface RuneOption {
+  id: number;
+  name: string;
+  icon: string;
+}
+
+export interface RuneTree {
+  id: number;
+  name: string;
+  icon: string;
+  slots: Array<{ runes: RuneOption[] }>;
+}
+
+/**
+ * Flat id-to-rune lookup, built once and shared. Rendering a stored page means
+ * resolving nine ids, and walking the trees for each one would be nine nested
+ * scans per page on screen.
+ */
+export async function fetchRuneIndex(): Promise<Map<number, RuneOption>> {
+  const response = await fetch(`${API_URL}/api/shells/runes`);
+  if (!response.ok) return new Map();
+
+  const { trees } = (await response.json()) as { trees: RuneTree[] };
+  const index = new Map<number, RuneOption>();
+
+  for (const tree of trees) {
+    index.set(tree.id, { id: tree.id, name: tree.name, icon: tree.icon });
+    for (const slot of tree.slots) {
+      for (const rune of slot.runes) index.set(rune.id, rune);
+    }
+  }
+
+  return index;
 }
