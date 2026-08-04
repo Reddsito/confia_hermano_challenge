@@ -26,7 +26,7 @@ export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
   PENTAKILL: 'Pentakill',
   QUADRAKILL: 'Cuádruple',
   KILLS_20: '20 asesinatos en una partida',
-  ASSISTS_30: '30 asistencias en una partida',
+  ASSISTS_30: '20 asistencias en una partida',
   WIN_STREAK_6: '6 victorias seguidas',
   PERFECT_KDA_20: 'KDA perfecto arriba de 20',
   LONG_WIN_40: 'Ganar una partida de 40 minutos',
@@ -96,7 +96,7 @@ export interface EarnedShell {
 }
 
 const KILL_THRESHOLD = 20;
-const ASSIST_THRESHOLD = 30;
+const ASSIST_THRESHOLD = 20;
 const STREAK_THRESHOLD = 6;
 const PERFECT_KDA_THRESHOLD = 20;
 const LONG_GAME_MINUTES = 40;
