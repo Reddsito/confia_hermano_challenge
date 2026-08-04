@@ -90,6 +90,23 @@ export function StatsPanel({
       .sort((a, b) => b.value - a.value)
       .slice(0, TOP_N);
 
+  /**
+   * Longest runs. Players with no streak at all are dropped rather than shown
+   * as a row of zeros — a board of "0 seguidas" says nothing.
+   */
+  const streakLeaders = (
+    key: 'longestWinStreak' | 'longestLossStreak',
+  ): LeaderRow[] =>
+    players
+      .map((player) => ({
+        player,
+        value: player.extras?.[key] ?? 0,
+        display: `${player.extras?.[key] ?? 0} seguidas`,
+      }))
+      .filter((row) => row.value > 1)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, TOP_N);
+
   const kdaLeaders = players
     .filter((player) => player.totals.games >= 5)
     .map((player) => ({
@@ -128,6 +145,24 @@ export function StatsPanel({
             rows={rank(category)}
           />
         ))}
+      </div>
+
+      {/*
+        Two boards rather than one signed column: the best and the worst run
+        are different achievements, and merging them would rank a 9-game losing
+        streak against a 9-game winning one as if they were comparable.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <LeaderColumn
+          title="Mejor racha"
+          caption="Victorias seguidas"
+          rows={streakLeaders('longestWinStreak')}
+        />
+        <LeaderColumn
+          title="Peor racha"
+          caption="Derrotas seguidas"
+          rows={streakLeaders('longestLossStreak')}
+        />
       </div>
 
       <DuoBoard duos={duos} players={players} />

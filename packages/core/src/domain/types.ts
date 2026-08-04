@@ -103,6 +103,9 @@ export interface PlayerExtras {
   bestKdaGame: number | null;
   /** Hour of day (UTC) this player queues most often. */
   favouriteHour: number | null;
+  /** Longest run ever recorded, not the current one. */
+  longestWinStreak: number;
+  longestLossStreak: number;
 }
 
 /** Two tracked players who ended up in the same game. */

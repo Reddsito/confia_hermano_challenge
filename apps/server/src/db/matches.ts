@@ -129,6 +129,41 @@ export interface ExtraTotals {
   bestKdaGame: number | null;
   /** 0-23, the hour this player starts games most often. */
   favouriteHour: number | null;
+  /** Longest run of wins ever recorded, not the current one. */
+  longestWinStreak: number;
+  longestLossStreak: number;
+}
+
+/**
+ * The longest run of each result, walked over the games in order.
+ *
+ * Done in JavaScript rather than SQL because SQLite has no window function for
+ * "length of the current run" without a gaps-and-islands query that would be
+ * far harder to read than the loop, for a list this size.
+ */
+function longestStreaks(db: Db, playerId: string): {
+  win: number;
+  loss: number;
+} {
+  const rows = db
+    .prepare(
+      'SELECT win FROM player_matches WHERE player_id = ? ORDER BY played_at ASC',
+    )
+    .all(playerId) as Array<{ win: number }>;
+
+  let win = 0;
+  let loss = 0;
+  let run = 0;
+  let running: number | null = null;
+
+  for (const row of rows) {
+    run = row.win === running ? run + 1 : 1;
+    running = row.win;
+    if (row.win === 1) win = Math.max(win, run);
+    else loss = Math.max(loss, run);
+  }
+
+  return { win, loss };
 }
 
 export function extraTotalsFor(db: Db, playerId: string): ExtraTotals {
@@ -164,6 +199,8 @@ export function extraTotalsFor(db: Db, playerId: string): ExtraTotals {
     )
     .get(playerId) as { hour: number; games: number } | undefined;
 
+  const streaks = longestStreaks(db, playerId);
+
   return {
     timeDeadSeconds: row.timeDead ?? 0,
     goldEarned: row.gold ?? 0,
@@ -180,6 +217,8 @@ export function extraTotalsFor(db: Db, playerId: string): ExtraTotals {
     killParticipation: row.killParticipation ?? null,
     bestKdaGame: row.bestKda ?? null,
     favouriteHour: hour?.hour ?? null,
+    longestWinStreak: streaks.win,
+    longestLossStreak: streaks.loss,
   };
 }
 
