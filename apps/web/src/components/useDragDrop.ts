@@ -29,8 +29,16 @@ export interface DragState<T> {
 /** Movement in px before a press becomes a drag rather than a tap. */
 const SLOP = 6;
 
+/**
+ * How long after a drop a click is treated as its tail rather than a real tap.
+ * A drag always ends with a click on the grabbed element, and that click must
+ * not be mistaken for the user selecting it.
+ */
+const CLICK_TAIL_MS = 300;
+
 export function useDragDrop<T>(onDrop: (item: T, zone: string) => void) {
   const [drag, setDrag] = useState<DragState<T> | null>(null);
+  const droppedAt = useRef(0);
 
   // Held in a ref as well: the pointer handlers are registered once and would
   // otherwise close over the state as it was when they were attached.
@@ -107,6 +115,7 @@ export function useDragDrop<T>(onDrop: (item: T, zone: string) => void) {
       setDrag(null);
 
       if (!current) return;
+      droppedAt.current = Date.now();
       const zone = zoneAt(event.clientX, event.clientY);
       if (zone) onDropRef.current(current.item, zone);
     };
@@ -123,5 +132,10 @@ export function useDragDrop<T>(onDrop: (item: T, zone: string) => void) {
     };
   }, []);
 
-  return { drag, start };
+  const justDragged = useCallback(
+    () => Date.now() - droppedAt.current < CLICK_TAIL_MS,
+    [],
+  );
+
+  return { drag, start, justDragged };
 }

@@ -107,7 +107,7 @@ export function TierList({ players, user, token }: TierListProps) {
     [token, tierOf, user, reload],
   );
 
-  const { drag, start } = useDragDrop<string>((playerId, zone) => {
+  const { drag, start, justDragged } = useDragDrop<string>((playerId, zone) => {
     void move(playerId, zone);
   });
 
@@ -214,6 +214,7 @@ export function TierList({ players, user, token }: TierListProps) {
                       dragging={drag?.item === player.id}
                       armed={armed === player.id}
                       onPointerDown={(event) => canEdit && start(event, player.id)}
+                      justDragged={justDragged}
                       onToggleArm={() =>
                         setArmed(armed === player.id ? null : player.id)
                       }
@@ -258,6 +259,7 @@ export function TierList({ players, user, token }: TierListProps) {
                 dragging={drag?.item === player.id}
                 armed={armed === player.id}
                 onPointerDown={(event) => canEdit && start(event, player.id)}
+                justDragged={justDragged}
                 onToggleArm={() =>
                   setArmed(armed === player.id ? null : player.id)
                 }
@@ -303,6 +305,7 @@ function PlayerChip({
   dragging,
   armed,
   onPointerDown,
+  justDragged,
   onToggleArm,
 }: {
   player: RankedPlayer;
@@ -310,6 +313,7 @@ function PlayerChip({
   dragging: boolean;
   armed: boolean;
   onPointerDown: (event: React.PointerEvent) => void;
+  justDragged: () => boolean;
   onToggleArm: () => void;
 }) {
   return (
@@ -318,16 +322,22 @@ function PlayerChip({
         type="button"
         disabled={!draggable}
         onPointerDown={onPointerDown}
+        // Belt and braces with draggable={false} on the avatar image: any
+        // native drag starting here would cancel the pointer sequence.
+        onDragStart={(event) => event.preventDefault()}
         onClick={(event) => {
           // The row underneath is also a drop zone; letting this bubble would
           // arm and immediately place in the same click.
           event.stopPropagation();
+          // A drag ends with a click on the grabbed button, which would
+          // otherwise arm the player you just dropped.
+          if (justDragged()) return;
           onToggleArm();
         }}
         aria-pressed={armed}
         title={player.displayName}
         className={classNames(
-          'flex w-16 flex-col items-center gap-1 rounded-lg p-1 transition-opacity',
+          'flex w-16 select-none flex-col items-center gap-1 rounded-lg p-1 transition-opacity',
           // touch-none is what lets a drag start on a phone: without it the
           // browser claims the gesture for scrolling before pointermove fires.
           draggable && 'cursor-grab touch-none',

@@ -82,6 +82,10 @@ export function Avatar({ name, iconId, size = 40, inGame, ring }: AvatarProps) {
             width={size}
             height={size}
             loading="lazy"
+            // Without this the browser's own image drag hijacks the gesture:
+            // it shows its ghost instead of ours and fires pointercancel,
+            // which kills any pointer-event drag the avatar takes part in.
+            draggable={false}
             className="h-full w-full object-cover"
           />
         ) : (
