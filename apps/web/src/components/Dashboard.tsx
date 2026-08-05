@@ -20,6 +20,8 @@ import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
 import { RankingTable } from './RankingTable';
 import { RefreshMeter } from './RefreshMeter';
+import { RulesButton } from './Rules';
+import { Clips } from './Clips';
 import { BestDays, EloEvolution } from './EloCharts';
 import { StatsPanel } from './StatsPanel';
 import { Tabs, TabPanel } from './Tabs';
@@ -28,7 +30,7 @@ import { TournamentClock, TournamentProgress } from './TournamentClock';
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-type Section = 'ranking' | 'live' | 'stats' | 'shells' | 'tierlist';
+type Section = 'ranking' | 'live' | 'stats' | 'shells' | 'tierlist' | 'clips';
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -151,6 +153,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     { id: 'stats' as const, label: 'Estadísticas' },
     // Public: the board reads for anyone, and only editing needs a session.
     { id: 'tierlist' as const, label: 'Tier list' },
+    // Watching is public too; uploading and liking are what need an account.
+    { id: 'clips' as const, label: 'Clips' },
     // Signing in is what unlocks the tab; showing it while signed out would
     // only lead to a dead end.
     ...(user ? [{ id: 'shells' as const, label: 'Conchas Azules' }] : []),
@@ -182,6 +186,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <RulesButton />
           <TournamentClock tournament={snapshot.tournament} />
           <AccountChip
             user={user}
@@ -253,6 +258,10 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
         <TabPanel id="tierlist" active={section === 'tierlist'}>
           <TierList players={ranking} user={user} token={token} />
+        </TabPanel>
+
+        <TabPanel id="clips" active={section === 'clips'}>
+          <Clips user={user} token={token} players={ranking} />
         </TabPanel>
       </div>
 

@@ -10,6 +10,7 @@ import {
   type DiscordEvent,
 } from './discord/notifier';
 import { isPlatformId, type PlatformId } from '@challenge/core/riot';
+import type { R2Config } from './storage/r2';
 
 export interface ServerConfig {
   port: number;
@@ -33,6 +34,11 @@ export interface ServerConfig {
   } | null;
   /** Signs login sessions. Falls back to ADMIN_TOKEN so it is never empty. */
   sessionSecret: string;
+  /**
+   * Null unless every R2 variable is set. The clips section reads this to stay
+   * hidden rather than offering an upload that cannot succeed.
+   */
+  r2: R2Config | null;
   platform: PlatformId;
   /**
    * Queue ids whose matches are ingested. Defaults to the challenge queue
@@ -91,6 +97,7 @@ export function loadConfig(root: string): ServerConfig {
       .filter(Boolean),
     siteUrl: env('SITE_URL'),
     sessionSecret: env('SESSION_SECRET') || adminToken || 'insecure-dev-secret',
+    r2: r2Config(),
     discordOAuth:
       env('DISCORD_CLIENT_ID') && env('DISCORD_CLIENT_SECRET')
         ? {
@@ -129,6 +136,22 @@ export function loadConfig(root: string): ServerConfig {
       ),
     },
   };
+}
+
+/**
+ * All five variables or nothing: a partially configured bucket would fail at
+ * upload time, per user, instead of at boot.
+ */
+function r2Config(): R2Config | null {
+  const config = {
+    accountId: env('R2_ACCOUNT_ID'),
+    accessKeyId: env('R2_ACCESS_KEY_ID'),
+    secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
+    bucket: env('R2_BUCKET'),
+    publicUrl: env('R2_PUBLIC_URL'),
+  };
+
+  return Object.values(config).every(Boolean) ? config : null;
 }
 
 /**

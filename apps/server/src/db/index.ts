@@ -298,6 +298,43 @@ const MIGRATIONS: string[] = [
 
   CREATE INDEX idx_tier_moves_at ON tier_moves (moved_at DESC);
   `,
+
+  // Clips uploaded by viewers and stored in R2. The row is the record; the
+  // object is just bytes, so `object_key` is what ties one to the other and a
+  // delete has to remove both.
+  //
+  // Rows are written only after the browser's upload to R2 succeeds. An
+  // abandoned upload therefore leaves an orphan object and no row, which costs
+  // storage but never shows a broken player to anyone.
+  `
+  CREATE TABLE clips (
+    id           TEXT PRIMARY KEY,
+    title        TEXT NOT NULL,
+    -- Who uploaded it. Kept by Discord id rather than player id because people
+    -- who are not on the roster can still upload.
+    discord_id   TEXT NOT NULL REFERENCES discord_users (discord_id) ON DELETE CASCADE,
+    -- Optional: the roster player the clip is about, for filtering later.
+    player_id    TEXT REFERENCES players (id) ON DELETE SET NULL,
+    object_key   TEXT NOT NULL UNIQUE,
+    content_type TEXT NOT NULL,
+    size_bytes   INTEGER NOT NULL,
+    -- Seconds, read off the video element by the uploader's browser. Null when
+    -- the browser could not determine it; never trusted for anything but display.
+    duration     REAL,
+    created_at   INTEGER NOT NULL
+  );
+
+  CREATE INDEX idx_clips_created ON clips (created_at DESC);
+
+  -- One like per person per clip, enforced by the primary key rather than by
+  -- checking before insert, so a double-tap cannot race itself into two rows.
+  CREATE TABLE clip_likes (
+    clip_id    TEXT NOT NULL REFERENCES clips (id) ON DELETE CASCADE,
+    discord_id TEXT NOT NULL REFERENCES discord_users (discord_id) ON DELETE CASCADE,
+    liked_at   INTEGER NOT NULL,
+    PRIMARY KEY (clip_id, discord_id)
+  );
+  `,
 ];
 
 export function openDatabase(path: string): Db {
