@@ -186,7 +186,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <RulesButton />
+          <RulesButton tournament={snapshot.tournament} />
           <TournamentClock tournament={snapshot.tournament} />
           <AccountChip
             user={user}

@@ -1,4 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+
+import {
+  MAX_HELD_SHELLS,
+  SHELL_RULES,
+  SHELL_RULE_AWARD,
+  SHELL_RULE_LABEL,
+  type TournamentMeta,
+} from '@challenge/core/domain';
 
 /**
  * The palette has no bright yellow — `--color-mark-amber` is a dark ochre that
@@ -12,59 +21,74 @@ interface RuleSection {
   items: string[];
 }
 
-/**
- * Split into two columns the way the reference sheet is laid out: schedule and
- * fair play on the left, everything match-related on the right.
- */
-const RULE_COLUMNS: RuleSection[][] = [
-  [
-    {
-      title: 'Calendario',
-      items: ['Inicio: 28 de julio a las 16:00.', 'Duración: 21 días.'],
-    },
-    {
-      title: 'Juego limpio',
-      items: [
-        'En tu cuenta del torneo solo puedes tener agregadas otras cuentas del torneo.',
-        'Prohibido jugar fuera de stream, incluso con cuentas ajenas al torneo.',
-        'Buscar partida a la vez que otros participantes para intentar coincidir está permitido, siempre en directo y con cuentas del torneo.',
-        'Prohibido el coaching dentro de la partida.',
-        'Prohibido estar en llamadas de Discord (o similar) mientras juegas partidas del torneo, excepto si te toca con participantes del torneo en tu mismo equipo.',
-        'Chat restringido = 24h sin poder jugar.',
-      ],
-    },
-    {
-      title: 'Stream',
-      items: [
-        'Todas las partidas se juegan en directo y con cámara activada.',
-        'Obligatorio tener el overlay del torneo puesto durante todos tus streams del SoloQ Challenge.',
-        'Prohibido enseñar en directo la página de configuración de overlays (lleva tu URL con token privado). La página de Blue Shell sí puedes mostrarla, y os animamos a usarla en directo.',
-        'Obligatorio publicar los VODs de todos los streams.',
-      ],
-    },
-  ],
-  [
-    {
-      title: 'Partidas',
-      items: [
-        'Sin límite de partidas.',
-        'Top 5: obligatorio jugar 6+ partidas al día durante los últimos 7 días.',
-      ],
-    },
-    {
-      title: 'Bans e información',
-      items: [
-        'Coincides con otro participante, alguien dodgea y en la siguiente partida baneas su campeón porque puede tocarte de rival: permitido.',
-        'Banear siempre el campeón de otro participante porque sabes que está jugando: permitido. Será discutible como estrategia, pero no incumple ninguna norma.',
-        'PROHIBIDO usar el directo de otro participante para saber si está en tu partida, en qué equipo está o para tomar cualquier decisión dentro de ella. Eso es streamsniping.',
-        'La diferencia es sencilla: información pública o deducida del matchmaking, permitido. Información sacada de un stream, prohibido.',
-      ],
-    },
-  ],
-];
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('es', {
+    day: 'numeric',
+    month: 'long',
+  });
+}
 
-/** The button and its modal travel together — the nav only renders `<RulesButton />`. */
-export function RulesButton() {
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Built from the tournament config and the scoring module rather than typed out
+ * here. A rules sheet that restates the numbers is a rules sheet that goes
+ * stale the first time a threshold moves — and those thresholds have already
+ * moved once.
+ */
+function buildSections(tournament: TournamentMeta): RuleSection[][] {
+  const start = new Date(tournament.startsAt);
+  const end = new Date(tournament.endsAt);
+  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+
+  const earning = SHELL_RULES.map((rule) => {
+    const award = SHELL_RULE_AWARD[rule];
+    return `${SHELL_RULE_LABEL[rule]}${award > 1 ? ` — ${award} conchas` : ''}.`;
+  });
+
+  return [
+    [
+      {
+        title: 'Calendario',
+        items: [
+          `Inicio: ${formatDate(tournament.startsAt)} a las ${formatTime(tournament.startsAt)}.`,
+          `Cierre: ${formatDate(tournament.endsAt)} a las ${formatTime(tournament.endsAt)}.`,
+          `Duración: ${days} días.`,
+        ],
+      },
+      {
+        title: 'Partidas',
+        items: [
+          'Solo cuenta la SoloQ ranked. Flex, normales y customs no suman.',
+          'Sin límite de partidas.',
+          'El ranking se ordena por elo, y se actualiza solo cada pocos minutos.',
+        ],
+      },
+    ],
+    [
+      {
+        title: 'Cómo se ganan conchas',
+        items: earning,
+      },
+      {
+        title: 'Cómo se usan',
+        items: [
+          `Podés tener hasta ${MAX_HELD_SHELLS} conchas sin gastar. En el tope dejás de ganar hasta tirar una.`,
+          'Tirás una concha a otro participante y le cae un reto que tiene que cumplir en una partida.',
+          'El reto se resuelve al momento de tirarla: campeón al azar, runas al azar o build al azar, según cuál toque.',
+        ],
+      },
+    ],
+  ];
+}
+
+/** The button and its modal travel together — the nav only renders this. */
+export function RulesButton({ tournament }: { tournament: TournamentMeta }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -87,12 +111,20 @@ export function RulesButton() {
         Reglas
       </button>
 
-      {open && <RulesModal onClose={() => setOpen(false)} />}
+      {open && (
+        <RulesModal tournament={tournament} onClose={() => setOpen(false)} />
+      )}
     </>
   );
 }
 
-function RulesModal({ onClose }: { onClose: () => void }) {
+function RulesModal({
+  tournament,
+  onClose,
+}: {
+  tournament: TournamentMeta;
+  onClose: () => void;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -103,7 +135,6 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     };
     document.addEventListener('keydown', onKey);
 
-    // The page behind must not scroll while a modal is open on a phone.
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -113,7 +144,18 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  return (
+  const columns = buildSections(tournament);
+
+  /*
+    Rendered into <body>, not where the button sits.
+
+    The nav has `backdrop-blur-md`, and any backdrop-filter makes that element
+    the containing block for fixed-position descendants. Left in place, the
+    overlay resolved `inset-0` against the nav instead of the viewport, so it
+    hung off the top of the page and got clipped. A portal is the fix, not more
+    z-index.
+  */
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-void/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
@@ -123,18 +165,21 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-label="Reglas del torneo"
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-line bg-carbon sm:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-line bg-carbon sm:rounded-2xl"
       >
         <header
           className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-carbon/95 p-4 backdrop-blur"
           style={{ boxShadow: `inset 0 2px 0 0 ${GOLD}` }}
         >
           <div className="min-w-0 flex-1">
-            <p className="display text-fluid-lg leading-tight" style={{ color: GOLD }}>
+            <p
+              className="display text-fluid-lg leading-tight"
+              style={{ color: GOLD }}
+            >
               Reglas
             </p>
             <p className="truncate text-fluid-xs text-ink-3">
-              SoloQ Challenge
+              {tournament.name}
             </p>
           </div>
 
@@ -150,7 +195,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         </header>
 
         <div className="grid gap-x-8 gap-y-6 p-4 sm:p-6 md:grid-cols-2">
-          {RULE_COLUMNS.map((column, index) => (
+          {columns.map((column, index) => (
             <div key={index} className="space-y-6">
               {column.map((section) => (
                 <RuleBlock key={section.title} section={section} />
@@ -159,14 +204,18 @@ function RulesModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 function RuleBlock({ section }: { section: RuleSection }) {
   return (
     <section>
-      <h3 className="eyebrow flex items-center gap-2 border-b pb-2" style={{ color: GOLD, borderColor: 'var(--color-line)' }}>
+      <h3
+        className="eyebrow flex items-center gap-2 border-b border-line pb-2"
+        style={{ color: GOLD }}
+      >
         <span
           aria-hidden="true"
           className="size-1.5 shrink-0 rounded-full"
@@ -176,7 +225,10 @@ function RuleBlock({ section }: { section: RuleSection }) {
       </h3>
       <ul className="mt-3 space-y-2.5">
         {section.items.map((item) => (
-          <li key={item} className="flex gap-2 text-fluid-sm leading-relaxed text-ink-2">
+          <li
+            key={item}
+            className="flex gap-2 text-fluid-sm leading-relaxed text-ink-2"
+          >
             <span aria-hidden="true" className="shrink-0 text-ink-3">
               ›
             </span>
