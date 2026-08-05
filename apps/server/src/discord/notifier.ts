@@ -7,7 +7,8 @@ export type DiscordEvent =
   | 'new_leader'
   | 'shell_thrown'
   | 'challenge_served'
-  | 'shell_stolen';
+  | 'shell_stolen'
+  | 'signup';
 
 export interface DiscordConfig {
   /** Where anything without its own channel is posted. */
@@ -170,6 +171,7 @@ export const ALL_EVENTS: DiscordEvent[] = [
   'shell_thrown',
   'challenge_served',
   'shell_stolen',
+  'signup',
 ];
 
 /** Parses DISCORD_EVENTS, defaulting to everything except the noisy one. */

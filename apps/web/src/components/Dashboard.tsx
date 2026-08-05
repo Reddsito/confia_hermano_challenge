@@ -22,6 +22,7 @@ import { RankingTable } from './RankingTable';
 import { RefreshMeter } from './RefreshMeter';
 import { RulesButton } from './Rules';
 import { Clips } from './Clips';
+import { DiscordLink, SignupButton } from './Signup';
 import { BestDays, EloEvolution } from './EloCharts';
 import { StatsPanel } from './StatsPanel';
 import { Tabs, TabPanel } from './Tabs';
@@ -187,6 +188,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
         <div className="flex items-center gap-2">
           <RulesButton tournament={snapshot.tournament} />
+          <SignupButton />
+          <DiscordLink />
           <TournamentClock tournament={snapshot.tournament} />
           <AccountChip
             user={user}
