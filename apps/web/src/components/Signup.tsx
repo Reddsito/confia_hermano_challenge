@@ -150,33 +150,46 @@ function SignupModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              <label className="block">
-                <span className="eyebrow text-ink-3">Nombre de invocador</span>
+            {/*
+              Both columns are sized by the grid, and every input is w-full
+              inside its own column. Sizing an input directly (w-24) left it
+              inline beside its label and blew the column past the modal edge.
+            */}
+            <div className="grid grid-cols-[1fr_6rem] gap-2">
+              <label className="flex flex-col">
+                <span className="eyebrow mb-1 text-ink-3">
+                  Nombre de invocador
+                </span>
                 <input
                   value={gameName}
                   onChange={(event) => setGameName(event.target.value)}
                   placeholder="Rama"
-                  className="mt-1 w-full rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
+                  className="w-full rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
                 />
               </label>
-              <label className="block">
-                <span className="eyebrow text-ink-3">Tag</span>
-                <input
-                  value={tagLine}
-                  onChange={(event) => setTagLine(event.target.value)}
-                  placeholder="LAN"
-                  className="mt-1 w-24 rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
-                />
+              <label className="flex flex-col">
+                <span className="eyebrow mb-1 text-ink-3">Tag</span>
+                <div className="flex items-center rounded-lg border border-line bg-void pl-2 focus-within:border-line-strong">
+                  {/* The # is never part of the value, so nobody has to guess. */}
+                  <span aria-hidden="true" className="text-fluid-sm text-ink-3">
+                    #
+                  </span>
+                  <input
+                    value={tagLine}
+                    onChange={(event) => setTagLine(event.target.value)}
+                    placeholder="LAN"
+                    className="w-full min-w-0 rounded-lg bg-transparent py-2 pr-2 pl-1 text-fluid-sm outline-none"
+                  />
+                </div>
               </label>
             </div>
 
-            <label className="block">
-              <span className="eyebrow text-ink-3">Rol</span>
+            <label className="flex flex-col">
+              <span className="eyebrow mb-1 text-ink-3">Rol</span>
               <select
                 value={role}
                 onChange={(event) => setRole(event.target.value as Role)}
-                className="mt-1 w-full rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
+                className="w-full rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
               >
                 <option value="">Elegí uno</option>
                 {ROLES.map((option) => (
