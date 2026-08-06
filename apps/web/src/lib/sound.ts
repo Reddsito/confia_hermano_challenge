@@ -1,12 +1,25 @@
 /**
- * The alert sounds, synthesized rather than downloaded.
+ * The alert sounds.
  *
  * Every one of these is a handful of square-wave notes, which is literally what
  * the consoles they are quoting did — so a table of frequencies reproduces them
  * more faithfully than a compressed sample would, and costs no bytes to ship.
+ * Cues backed by a real recording are the exception; see `Cue`.
  */
 
-export type SoundId = 'coin' | 'ring' | 'oneup' | 'secret' | 'powerup';
+export type SoundId =
+  | 'coin'
+  | 'ring'
+  | 'oneup'
+  | 'secret'
+  | 'powerup'
+  | 'fanfare'
+  | 'jump'
+  | 'pipe'
+  | 'waka'
+  | 'alarm'
+  | 'select'
+  | 'victory';
 
 interface Note {
   /** Hz. */
@@ -17,19 +30,41 @@ interface Note {
   hold: number;
 }
 
-interface Cue {
+interface Common {
   label: string;
   detail: string;
+}
+
+interface Synth extends Common {
+  kind?: 'synth';
   wave: OscillatorType;
   notes: Note[];
 }
 
+interface Sample extends Common {
+  kind: 'sample';
+  /** Path under `public/`, e.g. `/sounds/hey.mp3`. */
+  src: string;
+}
+
+/**
+ * A cue is either notes we synthesize or a file we play.
+ *
+ * Chiptune blips are a handful of square-wave notes, so a frequency table
+ * reproduces them exactly and costs nothing to ship. Anything with a *voice* in
+ * it — Navi yelling, an announcer — is a recording; no oscillator will ever
+ * approximate it, so those must arrive as a file under `public/sounds/`.
+ */
+type Cue = Synth | Sample;
+
 /** Equal temperament from A4, so the tables below can be written as note names. */
 const HZ = {
-  A4: 440, GS4: 415.3, B4: 493.88,
-  C5: 523.25, DS5: 622.25, E5: 659.25, FS5: 739.99, G5: 783.99, B5: 987.77,
-  C6: 1046.5, D6: 1174.66, E6: 1318.51, G6: 1567.98, B6: 1975.53,
-  E7: 2637.02,
+  C4: 261.63, E4: 329.63, G4: 392, GS4: 415.3, A4: 440, B4: 493.88,
+  C5: 523.25, D5: 587.33, DS5: 622.25, E5: 659.25, F5: 698.46, FS5: 739.99,
+  G5: 783.99, GS5: 830.61, A5: 880, AS5: 932.33, B5: 987.77,
+  C6: 1046.5, D6: 1174.66, DS6: 1244.51, E6: 1318.51, F6: 1396.91,
+  G6: 1567.98, A6: 1760, B6: 1975.53,
+  C7: 2093, E7: 2637.02,
 } as const;
 
 /** `at` and `hold` in seconds; the whole cue is under a second by design. */
@@ -95,6 +130,86 @@ export const CUES: Record<SoundId, Cue> = {
       { hz: HZ.G5, at: 0.3, hold: 0.05 },
       { hz: HZ.D6, at: 0.35, hold: 0.05 },
       { hz: HZ.G6, at: 0.4, hold: 0.22 },
+    ],
+  },
+  fanfare: {
+    label: 'Cofre de Zelda',
+    detail: 'La fanfarria de cuando abrís el cofre.',
+    wave: 'triangle',
+    notes: [
+      { hz: HZ.A5, at: 0, hold: 0.13 },
+      { hz: HZ.AS5, at: 0.13, hold: 0.13 },
+      { hz: HZ.B5, at: 0.26, hold: 0.13 },
+      { hz: HZ.C6, at: 0.39, hold: 0.55 },
+    ],
+  },
+  jump: {
+    label: 'Salto',
+    detail: 'Un barrido corto para arriba. El más discreto.',
+    wave: 'square',
+    notes: [
+      { hz: HZ.C5, at: 0, hold: 0.04 },
+      { hz: HZ.G5, at: 0.04, hold: 0.04 },
+      { hz: HZ.C6, at: 0.08, hold: 0.04 },
+      { hz: HZ.E6, at: 0.12, hold: 0.12 },
+    ],
+  },
+  pipe: {
+    label: 'Bajar al tubo',
+    detail: 'Va para abajo en vez de para arriba.',
+    wave: 'square',
+    notes: [
+      { hz: HZ.C6, at: 0, hold: 0.05 },
+      { hz: HZ.G5, at: 0.05, hold: 0.05 },
+      { hz: HZ.E5, at: 0.1, hold: 0.05 },
+      { hz: HZ.C5, at: 0.15, hold: 0.05 },
+      { hz: HZ.G4, at: 0.2, hold: 0.05 },
+      { hz: HZ.C4, at: 0.25, hold: 0.18 },
+    ],
+  },
+  waka: {
+    label: 'Pac-Man',
+    detail: 'Cuatro mordiscos.',
+    wave: 'square',
+    notes: [
+      { hz: HZ.C5, at: 0, hold: 0.05 },
+      { hz: HZ.C6, at: 0.06, hold: 0.05 },
+      { hz: HZ.C5, at: 0.14, hold: 0.05 },
+      { hz: HZ.C6, at: 0.2, hold: 0.05 },
+      { hz: HZ.C5, at: 0.28, hold: 0.05 },
+      { hz: HZ.C6, at: 0.34, hold: 0.05 },
+    ],
+  },
+  alarm: {
+    label: 'Alarma de caparazón',
+    detail: 'Dos tonos alternados. El más molesto, a propósito.',
+    wave: 'sawtooth',
+    notes: [
+      { hz: HZ.E6, at: 0, hold: 0.12 },
+      { hz: HZ.B5, at: 0.14, hold: 0.12 },
+      { hz: HZ.E6, at: 0.28, hold: 0.12 },
+      { hz: HZ.B5, at: 0.42, hold: 0.12 },
+      { hz: HZ.E6, at: 0.56, hold: 0.2 },
+    ],
+  },
+  select: {
+    label: 'Blip de menú',
+    detail: 'Una nota y listo. Para el que no quiere melodía.',
+    wave: 'square',
+    notes: [{ hz: HZ.E6, at: 0, hold: 0.09 }],
+  },
+  victory: {
+    label: 'Victoria',
+    detail: 'Tres golpes y una nota larga. Épico y corto.',
+    wave: 'square',
+    notes: [
+      { hz: HZ.C6, at: 0, hold: 0.09 },
+      { hz: HZ.C6, at: 0.12, hold: 0.09 },
+      { hz: HZ.C6, at: 0.24, hold: 0.09 },
+      { hz: HZ.GS5, at: 0.36, hold: 0.14 },
+      { hz: HZ.DS6, at: 0.5, hold: 0.1 },
+      { hz: HZ.C6, at: 0.6, hold: 0.1 },
+      { hz: HZ.F6, at: 0.7, hold: 0.45 },
     ],
   },
 };
@@ -194,6 +309,18 @@ export function play(id: SoundId = readSound(), volume = 0.22): void {
   void ctx.resume();
 
   const cue = CUES[id];
+
+  // A recorded cue is a file, not an oscillator. It rides the same enable and
+  // unlock rules; only the playback differs.
+  if (cue.kind === 'sample') {
+    const element = new Audio(cue.src);
+    element.volume = Math.min(volume * 3, 1);
+    void element.play().catch(() => {
+      /* Missing file or a browser that refused. Silence beats a crash. */
+    });
+    return;
+  }
+
   const start = ctx.currentTime + 0.02;
 
   for (const note of cue.notes) {
