@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
+  BET_MARKETS,
+  BET_MARKET_LABEL,
+  BET_WINDOW_SECONDS,
   MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
+  MAX_HELD_WITH_BETS,
+  MAX_STAKE,
+  MIN_SHELLS,
+  SPECTATOR_MAX_SHELLS,
+  SPECTATOR_START_SHELLS,
   SHELL_RULES,
   SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
@@ -102,6 +110,28 @@ function buildSections(tournament: TournamentMeta): RuleSection[][] {
           'El reto sale de una ruleta al momento de tirar la concha.',
           'Puede ser un reto escrito, un campeón al azar, unas runas al azar o una build de seis objetos al azar.',
           `Si te tocó un campeón, quien la tiró puede volver a girar hasta ${MAX_CHAMPION_REROLLS} veces.`,
+        ],
+      },
+      {
+        title: 'Apuestas',
+        items: [
+          `Apostás conchas a las partidas de los demás, nunca a la tuya. Entre 1 y ${MAX_STAKE} por partida.`,
+          `Solo durante los primeros ${Math.round(BET_WINDOW_SECONDS / 60)} minutos de la partida.`,
+          `Hay ${BET_MARKETS.length} cosas a las que apostar: ${BET_MARKETS.map((market) => BET_MARKET_LABEL[market].replace(/^¿|\?$/g, '').toLowerCase()).join(', ')}.`,
+          'Si acertás cobrás lo que arriesgaste más la ganancia. El first blood paga doble, porque es el más difícil.',
+          `Ganando apuestas podés llegar a ${MAX_HELD_WITH_BETS}: el último slot solo se llena así, nunca con logros.`,
+          `Podés apostar sin tener conchas. Si perdés quedás debiendo, hasta ${-MIN_SHELLS}, y ahí no podés apostar más hasta zafar.`,
+          'Lo que ganes tapa la deuda antes de llenar un slot.',
+          'Todo lo que apuesta cada uno se ve en la pestaña En vivo.',
+        ],
+      },
+      {
+        title: 'Espectadores',
+        items: [
+          'No juegan, solo apuestan. No hace falta cuenta de LoL, solo Discord.',
+          `Arrancan con ${SPECTATOR_START_SHELLS} conchas y su techo es ${SPECTATOR_MAX_SHELLS}.`,
+          'No ganan conchas por logros: la única forma de conseguir más es apostando.',
+          'Las conchas que ganan se las pueden tirar a cualquiera del torneo.',
         ],
       },
     ],
