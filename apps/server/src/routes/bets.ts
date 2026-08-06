@@ -1,9 +1,9 @@
 import {
-  BET_MARKETS,
   MAX_STAKE,
   MIN_SHELLS,
+  OFFERED_MARKETS,
   bettingOpen,
-  isBetMarket,
+  isOffered,
   isSelectionOf,
   type BetMarket,
 } from '@challenge/core/domain';
@@ -79,7 +79,7 @@ export function betRoutes(db: Db, config: ServerConfig) {
     return context.json({
       balance,
       maxStake: MAX_STAKE,
-      markets: BET_MARKETS,
+      markets: OFFERED_MARKETS,
       open: openBets(db, user.discordId),
     });
   });
@@ -114,8 +114,10 @@ export function betRoutes(db: Db, config: ServerConfig) {
     const market = body.market ?? '';
     const selection = body.selection ?? '';
 
-    if (!isBetMarket(market)) {
-      return context.json({ error: 'Ese mercado no existe.' }, 400);
+    // Checked against the offer, not the vocabulary: a market that has been
+    // withdrawn still settles the wagers already on it, but takes no new ones.
+    if (!isOffered(market)) {
+      return context.json({ error: 'Ese mercado no está abierto.' }, 400);
     }
     if (!isSelectionOf(market as BetMarket, selection)) {
       return context.json({ error: 'Esa opción no es de ese mercado.' }, 400);

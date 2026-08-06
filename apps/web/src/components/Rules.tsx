@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
-  BET_MARKETS,
   BET_MARKET_LABEL,
+  OFFERED_MARKETS,
   BET_WINDOW_SECONDS,
   MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
@@ -117,8 +117,8 @@ function buildSections(tournament: TournamentMeta): RuleSection[][] {
         items: [
           `Apostás conchas a las partidas de los demás, nunca a la tuya. Entre 1 y ${MAX_STAKE} por partida.`,
           `Solo durante los primeros ${Math.round(BET_WINDOW_SECONDS / 60)} minutos de la partida.`,
-          `Hay ${BET_MARKETS.length} cosas a las que apostar: ${BET_MARKETS.map((market) => BET_MARKET_LABEL[market].replace(/^¿|\?$/g, '').toLowerCase()).join(', ')}.`,
-          'Si acertás cobrás lo que arriesgaste más la ganancia. El first blood paga doble, porque es el más difícil.',
+          `Por ahora se apuesta a una sola cosa: ${OFFERED_MARKETS.map((market) => BET_MARKET_LABEL[market].replace(/^¿|\?$/g, '').toLowerCase()).join(', ')}.`,
+          'Si acertás cobrás lo que arriesgaste más la ganancia.',
           `Ganando apuestas podés llegar a ${MAX_HELD_WITH_BETS}: el último slot solo se llena así, nunca con logros.`,
           `Podés apostar sin tener conchas. Si perdés quedás debiendo, hasta ${-MIN_SHELLS}, y ahí no podés apostar más hasta zafar.`,
           'Lo que ganes tapa la deuda antes de llenar un slot.',

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
-  BET_MARKETS,
   BET_MARKET_LABEL,
   BET_PAYOUT,
   BET_SELECTIONS,
   BET_SELECTION_LABEL,
   MAX_STAKE,
+  OFFERED_MARKETS,
   type BetMarket,
 } from '@challenge/core/domain';
 
@@ -338,7 +338,7 @@ export function BetModal({
           <div>
             <span className="eyebrow text-ink-3">A qué apostás</span>
             <div className="mt-2 space-y-2">
-              {BET_MARKETS.map((option) => (
+              {OFFERED_MARKETS.map((option) => (
                 <button
                   key={option}
                   type="button"

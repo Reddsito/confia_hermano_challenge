@@ -17,6 +17,20 @@ export const BET_MARKETS = [
 export type BetMarket = (typeof BET_MARKETS)[number];
 
 /**
+ * What can be bet on right now.
+ *
+ * Deliberately narrower than BET_MARKETS. Everything ever offered stays in that
+ * list and stays gradable, because wagers already on the table have to settle
+ * however the offer changes — withdrawing a market must never strand somebody's
+ * stake. This is the offer; that one is the vocabulary.
+ */
+export const OFFERED_MARKETS: readonly BetMarket[] = ['WIN'];
+
+export function isOffered(market: string): market is BetMarket {
+  return (OFFERED_MARKETS as readonly string[]).includes(market);
+}
+
+/**
  * Both sides of every market, named from the bettor's point of view. Stored as
  * text on the wager, so a market gaining a third option later cannot silently
  * reinterpret rows already settled.
