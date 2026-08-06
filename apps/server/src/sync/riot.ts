@@ -26,6 +26,7 @@ import {
   type PlayerMatchRow,
 } from '../db/matches';
 import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
+import { settleBetsForMatch } from '../db/bets';
 import { mentionFor } from '../db/users';
 import {
   challengeServedEmbed,
@@ -268,6 +269,22 @@ async function syncPlayer(
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
       winStreak = row.win ? winStreak + 1 : 0;
       insertPlayerMatch(db, row);
+
+      // Wagers are graded before achievements are awarded, so a win that fills
+      // the fourth slot is already in the balance when the milestone rules ask
+      // how much headroom is left. The other order would pay an achievement
+      // into a slot the bet was about to take.
+      const graded = settleBetsForMatch(db, player.id, matchId, {
+        win: row.win,
+        kills: row.kills,
+        firstBlood: row.firstBlood,
+        durationMinutes: row.durationMinutes,
+      });
+      if (graded.settled > 0) {
+        console.log(
+          `[bets] ${player.displayName}: ${graded.settled} settled, ${graded.won} won`,
+        );
+      }
 
       // Progress counters are read after the row is stored, so the milestone
       // rules see the game that just crossed the threshold.

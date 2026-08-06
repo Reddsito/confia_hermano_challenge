@@ -58,6 +58,40 @@ export const SHELL_RULE_AWARD: Record<ShellRule, number> = {
  */
 export const MAX_HELD_SHELLS = 3;
 
+/**
+ * The ceiling once betting is in play.
+ *
+ * Achievements top out at MAX_HELD_SHELLS; the slot above it exists but can
+ * only ever be filled by winning a wager, which is the whole reason to risk
+ * anything when you are already full. Winnings past this are dropped rather
+ * than banked — at the ceiling you bet for the love of the game.
+ */
+export const MAX_HELD_WITH_BETS = 4;
+
+/**
+ * How deep into debt a lost bet can put you.
+ *
+ * Betting uncovered is allowed, so a balance is not clamped at zero the way it
+ * used to be. At the floor you cannot stake anything until you climb out, and
+ * anything earned afterwards pays the debt down before it fills a slot.
+ */
+export const MIN_SHELLS = -2;
+
+/** Nobody stakes more than this on one game, whatever they are holding. */
+export const MAX_STAKE = 2;
+
+/**
+ * Spectators do not play, so they cannot earn from achievements. They are
+ * staked an opening balance instead, and every shell after that has to be won.
+ */
+export const SPECTATOR_START_SHELLS = 5;
+export const SPECTATOR_MAX_SHELLS = 10;
+
+/** The ceiling that applies to whoever is holding. */
+export function shellCeiling(isSpectator: boolean): number {
+  return isSpectator ? SPECTATOR_MAX_SHELLS : MAX_HELD_WITH_BETS;
+}
+
 /** Riot's summoner spell id for Smite. */
 export const SMITE_SPELL_ID = 11;
 

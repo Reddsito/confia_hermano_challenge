@@ -335,6 +335,56 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (clip_id, discord_id)
   );
   `,
+
+  // Betting shells on other people's games.
+  //
+  // Spectators are a flag on the Discord account, not a row in players: they
+  // have no Riot ID, so a players row would need a null puuid and would then
+  // have to be excluded by hand from the ranking, the podium, the filters, the
+  // tier list and every sync pass. A flag is excluded from all of that by
+  // construction, because those queries read players and never look here.
+  `
+  ALTER TABLE discord_users ADD COLUMN is_spectator INTEGER NOT NULL DEFAULT 0;
+
+  -- Spectators fire shells too, and they have no players row to be the source.
+  -- Existing rows keep from_player and leave this null, so nothing about the
+  -- throws already recorded changes meaning.
+  ALTER TABLE shell_throws ADD COLUMN from_discord TEXT;
+
+  -- One row per wager. The stake leaves the balance the moment it is placed,
+  -- which is what stops the same shell being bet on four games at once.
+  --
+  -- Held by discord_id rather than player_id because spectators bet and have
+  -- no player row, and because betting is something an account does, not
+  -- something a roster entry does.
+  CREATE TABLE bets (
+    id          TEXT PRIMARY KEY,
+    discord_id  TEXT NOT NULL REFERENCES discord_users (discord_id) ON DELETE CASCADE,
+    -- Whose game is being bet on. Always a real roster player.
+    player_id   TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    -- The live game this was placed on, so a second bet on the same game by
+    -- the same person in the same market can be rejected.
+    game_id     TEXT NOT NULL,
+    market      TEXT NOT NULL,
+    selection   TEXT NOT NULL,
+    stake       INTEGER NOT NULL,
+    -- OPEN until the game is ingested, then WON, LOST or VOID. A void returns
+    -- the stake: a wager nobody can grade must not cost anybody a shell.
+    status      TEXT NOT NULL DEFAULT 'OPEN',
+    -- Total returned on a win, stake included. Zero on a loss.
+    payout      INTEGER NOT NULL DEFAULT 0,
+    -- Filled in when the game is graded, for the audit trail.
+    match_id    TEXT,
+    placed_at   INTEGER NOT NULL,
+    settled_at  INTEGER,
+    -- One bet per person, per game, per market. Two sides of the same question
+    -- would just be handing yourself a shell back.
+    UNIQUE (discord_id, game_id, market)
+  );
+
+  CREATE INDEX idx_bets_open ON bets (status, player_id);
+  CREATE INDEX idx_bets_holder ON bets (discord_id);
+  `,
 ];
 
 export function openDatabase(path: string): Db {

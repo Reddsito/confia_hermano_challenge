@@ -15,6 +15,7 @@ import { shellRoutes } from './routes/shells';
 import { tierListRoutes } from './routes/tierlist';
 import { clipRoutes } from './routes/clips';
 import { signupRoutes } from './routes/signup';
+import { betRoutes } from './routes/bets';
 import { buildSnapshot } from './snapshot';
 import { Scheduler } from './sync/scheduler';
 
@@ -80,6 +81,7 @@ app.route('/api/shells', shellRoutes(db, config));
 app.route('/api/tierlist', tierListRoutes(db, config));
 app.route('/api/clips', clipRoutes(db, config));
 app.route('/api/signup', signupRoutes(db, config));
+app.route('/api/bets', betRoutes(db, config));
 app.route(
   '/api/live',
   liveRoutes(db, QUEUE_IDS[config.tournament.queue] ?? 420, config.platform),

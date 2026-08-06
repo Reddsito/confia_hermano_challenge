@@ -4,6 +4,7 @@ import { issueSession, readSession } from '../auth/session';
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import { balanceFor } from '../db/shells';
+import { balanceForHolder, holderFor } from '../db/bets';
 import {
   getDiscordUser,
   upsertDiscordUser,
@@ -105,13 +106,19 @@ export function authRoutes(db: Db, config: ServerConfig) {
     const user = currentUser(db, context.req.header('authorization'), config);
     if (!user) return context.json({ error: 'Not signed in' }, 401);
 
+    const holder = holderFor(db, user.discordId);
+
     return context.json({
       discordId: user.discordId,
       username: user.username,
       avatar: user.avatar,
       playerId: user.playerId,
       isAdmin: user.isAdmin,
+      // Read off the account, so a spectator — who has no roster entry and
+      // therefore no balanceFor — still gets a real number instead of null.
+      isSpectator: holder?.isSpectator ?? false,
       shells: user.playerId ? balanceFor(db, user.playerId) : null,
+      wallet: balanceForHolder(db, user.discordId),
     });
   });
 

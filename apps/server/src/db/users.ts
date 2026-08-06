@@ -6,6 +6,7 @@ export interface DiscordUserRow {
   avatar: string | null;
   playerId: string | null;
   isAdmin: boolean;
+  isSpectator: boolean;
   firstSeen: number;
   lastSeen: number;
 }
@@ -16,6 +17,7 @@ interface RawUser {
   avatar: string | null;
   player_id: string | null;
   is_admin: number;
+  is_spectator: number;
   first_seen: number;
   last_seen: number;
 }
@@ -27,6 +29,7 @@ function toUser(row: RawUser): DiscordUserRow {
     avatar: row.avatar,
     playerId: row.player_id,
     isAdmin: row.is_admin === 1,
+    isSpectator: row.is_spectator === 1,
     firstSeen: row.first_seen,
     lastSeen: row.last_seen,
   };
@@ -100,6 +103,26 @@ export function linkDiscordUser(
  * forcing a challenge, firing at yourself. Logging in never sets it, so it can
  * only ever be handed out from the panel.
  */
+/**
+ * Marks an account as a spectator: somebody who bets but does not play.
+ *
+ * Deliberately a flag here rather than a row in players. A spectator has no
+ * Riot ID, so a players row would carry a null puuid and would then have to be
+ * filtered out of the ranking, the podium, the filters, the tier list and every
+ * sync pass by hand. Nothing reads this table for any of that, so a flag is
+ * excluded from all of it for free.
+ */
+export function setDiscordSpectator(
+  db: Db,
+  discordId: string,
+  isSpectator: boolean,
+): boolean {
+  const result = db
+    .prepare('UPDATE discord_users SET is_spectator = ? WHERE discord_id = ?')
+    .run(isSpectator ? 1 : 0, discordId);
+  return result.changes > 0;
+}
+
 export function setDiscordAdmin(
   db: Db,
   discordId: string,

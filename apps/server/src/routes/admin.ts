@@ -25,7 +25,12 @@ import {
   updateChallenge,
   type ChallengeKind,
 } from '../db/shells';
-import { linkDiscordUser, listDiscordUsers, setDiscordAdmin } from '../db/users';
+import {
+  linkDiscordUser,
+  listDiscordUsers,
+  setDiscordAdmin,
+  setDiscordSpectator,
+} from '../db/users';
 import type { Scheduler } from '../sync/scheduler';
 
 /** Constant-time compare so the token cannot be guessed by timing the response. */
@@ -183,6 +188,21 @@ export function adminRoutes(
       db,
       context.req.param('discordId'),
       Boolean(body.isAdmin),
+    );
+    return ok
+      ? context.json({ ok: true })
+      : context.json({ error: 'No such Discord user' }, 404);
+  });
+
+  app.post('/discord-users/:discordId/spectator', async (context) => {
+    const body = await context.req
+      .json<{ isSpectator?: boolean }>()
+      .catch(() => ({}) as { isSpectator?: boolean });
+
+    const ok = setDiscordSpectator(
+      db,
+      context.req.param('discordId'),
+      Boolean(body.isSpectator),
     );
     return ok
       ? context.json({ ok: true })

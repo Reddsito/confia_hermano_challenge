@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
+  MIN_SHELLS,
   type EarnedShell,
   type RunePage,
   type ShellProgress,
@@ -110,6 +111,17 @@ export interface ShellBalance {
   available: number;
 }
 
+/**
+ * What a roster player is holding.
+ *
+ * Betting is settled on the Discord account, not the roster entry, so the
+ * wagers of whoever is linked to this player are folded in here. Leaving them
+ * out would let someone who had staked everything keep earning as though the
+ * shells were still in hand.
+ *
+ * No longer clamped at zero: a lost uncovered bet is a real debt, and flooring
+ * it would forgive it the instant it was incurred.
+ */
 export function balanceFor(db: Db, playerId: string): ShellBalance {
   const earned = (
     db
@@ -119,13 +131,37 @@ export function balanceFor(db: Db, playerId: string): ShellBalance {
       .get(playerId) as { n: number }
   ).n;
 
+  const linked = db
+    .prepare('SELECT discord_id AS discordId FROM discord_users WHERE player_id = ?')
+    .get(playerId) as { discordId: string } | undefined;
+
+  // Counted with OR so a throw carrying both columns is still one throw.
   const thrown = (
     db
-      .prepare('SELECT COUNT(*) AS n FROM shell_throws WHERE from_player = ?')
-      .get(playerId) as { n: number }
+      .prepare(
+        'SELECT COUNT(*) AS n FROM shell_throws WHERE from_player = ? OR from_discord = ?',
+      )
+      .get(playerId, linked?.discordId ?? null) as { n: number }
   ).n;
 
-  return { earned, thrown, available: Math.max(earned - thrown, 0) };
+  const bets = linked
+    ? (
+        db
+          .prepare(
+            `SELECT COALESCE(SUM(payout), 0)
+                  - COALESCE(SUM(CASE WHEN status != 'VOID' THEN stake ELSE 0 END), 0)
+                    AS n
+             FROM bets WHERE discord_id = ?`,
+          )
+          .get(linked.discordId) as { n: number }
+      ).n
+    : 0;
+
+  return {
+    earned,
+    thrown,
+    available: Math.max(earned + bets - thrown, MIN_SHELLS),
+  };
 }
 
 export function listShells(db: Db, playerId: string): ShellRow[] {
@@ -312,12 +348,21 @@ function parsePayload(raw: string | null): ShellPayload | null {
   }
 }
 
+/**
+ * Records one fired shell.
+ *
+ * `fromDiscord` exists because spectators fire too and have no roster entry to
+ * be the source of. For a linked player both are written: the player id is what
+ * the site displays, the Discord id is what the balance is counted against, and
+ * the balance query joins them with OR so the row is still a single throw.
+ */
 export function recordThrow(
   db: Db,
   fromPlayer: string | null,
   toPlayer: string,
   challenge: ChallengeRow,
   payload: ShellPayload | null = null,
+  fromDiscord: string | null = null,
 ): ThrowRow {
   const id = randomUUID();
   const thrownAt = Date.now();
@@ -325,8 +370,8 @@ export function recordThrow(
   db.transaction(() => {
     db.prepare(
       `INSERT INTO shell_throws
-         (id, from_player, to_player, challenge_id, challenge_name, thrown_at, completed_at, payload)
-       VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
+         (id, from_player, to_player, challenge_id, challenge_name, thrown_at, completed_at, payload, from_discord)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     ).run(
       id,
       fromPlayer,
@@ -335,6 +380,7 @@ export function recordThrow(
       challenge.name,
       thrownAt,
       payload ? JSON.stringify(payload) : null,
+      fromDiscord,
     );
 
     // The opening spin is a roll like any other, so it goes in the history too.

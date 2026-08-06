@@ -1,4 +1,9 @@
-import { MAX_HELD_SHELLS, opggUrl } from '@challenge/core/domain';
+import {
+  MAX_HELD_SHELLS,
+  MAX_HELD_WITH_BETS,
+  opggUrl,
+} from '@challenge/core/domain';
+import { balanceForHolder, holderFor } from '../db/bets';
 import { Hono } from 'hono';
 
 import type { ServerConfig } from '../config';
@@ -85,6 +90,7 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     const players = listPlayers(db, 'approved');
     return context.json({
       max: MAX_HELD_SHELLS,
+      ceiling: MAX_HELD_WITH_BETS,
       players: players.map((player) => ({
         playerId: player.id,
         ...balanceFor(db, player.id),
@@ -99,11 +105,14 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     if (!user) {
       return context.json({ error: 'Sign in with Discord first.' }, 401);
     }
-    if (!user.playerId) {
+    // Spectators have no roster entry on purpose, so a linked player is only
+    // required of everybody else.
+    const holder = holderFor(db, user.discordId);
+    if (!user.playerId && !holder?.isSpectator) {
       return context.json(
         {
           error:
-            'Your Discord account is not linked to a player yet. Ask an admin to link it from the panel.',
+            'Tu cuenta de Discord todavía no está enlazada a un jugador. Pedile a un admin que la enlace desde el panel.',
         },
         403,
       );
@@ -126,9 +135,20 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     );
     if (!target) return context.json({ error: 'No such player.' }, 404);
 
-    const balance = balanceFor(db, user.playerId);
+    // Counted against the account rather than the roster entry: it is the only
+    // number a spectator has, and for a player it is the same figure with the
+    // wagers folded in.
+    const balance = balanceForHolder(db, user.discordId);
     if (balance.available <= 0) {
-      return context.json({ error: 'You have no blue shells.' }, 409);
+      return context.json(
+        {
+          error:
+            balance.available < 0
+              ? 'Estás en negativo. Ganá conchas antes de tirar.'
+              : 'No tenés conchas azules.',
+        },
+        409,
+      );
     }
 
     // Admins may name the challenge instead of spinning for it. It is the only
@@ -160,7 +180,14 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     // Rolled before the throw is written so the result and the row are stored
     // together: a shell that has landed must never be missing its champion.
     const payload = await rollFor(db, config, challenge.kind, targetId);
-    const record = recordThrow(db, user.playerId, targetId, challenge, payload);
+    const record = recordThrow(
+      db,
+      user.playerId,
+      targetId,
+      challenge,
+      payload,
+      user.discordId,
+    );
 
     // Announced after the throw is committed, so a Discord outage cannot make a
     // spent shell vanish.
@@ -198,7 +225,7 @@ export function shellRoutes(db: Db, config: ServerConfig) {
       // so there is no "I don't have it" to appeal with.
       rerollsLeft:
         payload?.kind === 'RANDOM_CHAMPION' ? MAX_CHAMPION_REROLLS : 0,
-      remaining: balanceFor(db, user.playerId).available,
+      remaining: balanceForHolder(db, user.discordId).available,
     });
   });
 

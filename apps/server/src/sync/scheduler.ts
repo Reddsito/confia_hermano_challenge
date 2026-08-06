@@ -5,6 +5,7 @@ import { shellStolenEmbed } from '../discord/embeds';
 import { listPlayers } from '../db/players';
 import { mentionFor } from '../db/users';
 import { resolveSteals } from '../db/shells';
+import { voidStaleBets } from '../db/bets';
 
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
@@ -52,6 +53,19 @@ export class Scheduler {
   }
 
   /** Resolves duels between tracked players and announces the outcome. */
+  /**
+   * Returns stakes on games that never produced a match row.
+   *
+   * A dodge, a remake, or a game the ingest simply never saw would otherwise
+   * leave a stake locked forever, which to the bettor is indistinguishable from
+   * a shell that vanished. Three hours is well past the longest game anyone has
+   * played, so nothing still live is touched.
+   */
+  private voidAbandonedBets(): void {
+    const voided = voidStaleBets(this.db, 3 * 60 * 60 * 1000);
+    if (voided > 0) console.log(`[bets] ${voided} stale wager(s) returned`);
+  }
+
   private settleSteals(): void {
     const names = new Map(
       listPlayers(this.db, 'approved').map((player) => [
@@ -104,7 +118,10 @@ export class Scheduler {
 
       // After ingestion, so both sides of a duel are on record before it is
       // settled — the two players are fetched independently.
-      if (!this.config.useMockData) this.settleSteals();
+      if (!this.config.useMockData) {
+        this.settleSteals();
+        this.voidAbandonedBets();
+      }
 
       markCycleComplete(
         this.db,
