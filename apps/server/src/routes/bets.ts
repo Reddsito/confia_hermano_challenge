@@ -14,6 +14,7 @@ import {
   balanceForHolder,
   betStandings,
   holderFor,
+  liveWagers,
   openBets,
   placeBet,
 } from '../db/bets';
@@ -39,6 +40,30 @@ export function betRoutes(db: Db, config: ServerConfig) {
         displayName: row.playerId
           ? (names.get(row.playerId) ?? row.username)
           : row.username,
+      })),
+    });
+  });
+
+  /**
+   * Every open wager on every live game, with names.
+   *
+   * Public: the point of betting on your friends is that they get to see it.
+   * Only what was staked is exposed, never anybody's balance.
+   */
+  app.get('/live', (context) => {
+    const names = new Map(
+      listPlayers(db, 'approved').map((player) => [player.id, player.displayName]),
+    );
+
+    return context.json({
+      wagers: liveWagers(db).map((wager) => ({
+        ...wager,
+        // A spectator has no roster entry, so their Discord name is the only
+        // name they have.
+        bettorName: wager.bettorPlayerId
+          ? (names.get(wager.bettorPlayerId) ?? wager.username)
+          : wager.username,
+        onName: names.get(wager.playerId) ?? 'alguien',
       })),
     });
   });

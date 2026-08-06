@@ -6,7 +6,8 @@ import { BET_WINDOW_SECONDS, bettingOpen } from '@challenge/core/domain';
 
 import { API_URL } from '../lib/api';
 import type { SessionUser } from '../lib/session';
-import { BetModal, BetStandingsTable } from './Bets';
+import { fetchLiveWagers, type LiveWager } from '../lib/bets';
+import { BetModal, BetStandingsTable, GameWagers } from './Bets';
 import { TierCrest } from './icons';
 import { Avatar, classNames, tierColor } from './ui';
 
@@ -74,6 +75,7 @@ export function LiveGames({
   // Bumped after a wager settles the ladder is worth re-reading; the table
   // fetches on its own rather than being handed rows from here.
   const [standingsKey, setStandingsKey] = useState(0);
+  const [wagers, setWagers] = useState<LiveWager[]>([]);
   const [games, setGames] = useState<LiveGame[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -90,11 +92,25 @@ export function LiveGames({
     }
   }, []);
 
+  // The table refreshes on the same beat as the games, so a wager placed by
+  // somebody else shows up without anyone reloading the page.
+  const loadWagers = useCallback(async () => {
+    try {
+      setWagers(await fetchLiveWagers());
+    } catch {
+      setWagers([]);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-    const id = setInterval(() => void load(), POLL_MS);
+    void loadWagers();
+    const id = setInterval(() => {
+      void load();
+      void loadWagers();
+    }, POLL_MS);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, loadWagers, standingsKey]);
 
   if (error) {
     return (
@@ -129,6 +145,10 @@ export function LiveGames({
             onSelect={onSelect}
             canBet={Boolean(user && token)}
             myPlayerId={user?.playerId ?? null}
+            myDiscordId={user?.discordId ?? null}
+            wagers={wagers.filter(
+              (wager) => wager.gameId === String(game.gameId),
+            )}
             onBet={(id, name) => setBetting({ id, name })}
           />
         ))}
@@ -185,6 +205,8 @@ function GameCard({
   onSelect,
   canBet,
   myPlayerId,
+  myDiscordId,
+  wagers,
   onBet,
 }: {
   game: LiveGame;
@@ -192,6 +214,8 @@ function GameCard({
   onSelect?: (playerId: string) => void;
   canBet: boolean;
   myPlayerId: string | null;
+  myDiscordId: string | null;
+  wagers: LiveWager[];
   onBet: (playerId: string, playerName: string) => void;
 }) {
   const elapsed = useElapsed(game.startedAt, game.gameLength);
@@ -267,6 +291,8 @@ function GameCard({
             ))}
         </div>
       )}
+
+      <GameWagers wagers={wagers} myDiscordId={myDiscordId} />
 
       {!game.countsForChallenge && (
         <p

@@ -85,7 +85,7 @@ export const MAX_STAKE = 2;
  * staked an opening balance instead, and every shell after that has to be won.
  */
 export const SPECTATOR_START_SHELLS = 5;
-export const SPECTATOR_MAX_SHELLS = 10;
+export const SPECTATOR_MAX_SHELLS = 6;
 
 /** The ceiling that applies to whoever is holding. */
 export function shellCeiling(isSpectator: boolean): number {

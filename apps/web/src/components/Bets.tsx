@@ -15,6 +15,7 @@ import {
   fetchStandings,
   placeBet,
   type BetStanding,
+  type LiveWager,
   type Wallet,
 } from '../lib/bets';
 import type { SessionUser } from '../lib/session';
@@ -169,6 +170,64 @@ export function BetStandingsTable({ refreshKey }: { refreshKey: number }) {
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The table for one game: who put what on whom.
+ *
+ * Public and loud on purpose — betting against your friends is only fun if
+ * they can see you doing it. Stakes are shown, balances never are.
+ */
+export function GameWagers({
+  wagers,
+  myDiscordId,
+}: {
+  wagers: LiveWager[];
+  myDiscordId: string | null;
+}) {
+  if (wagers.length === 0) return null;
+
+  const pot = wagers.reduce((total, wager) => total + wager.stake, 0);
+
+  return (
+    <div className="border-b border-line px-3 py-2">
+      <p className="eyebrow mb-1.5 flex items-center gap-1.5 text-[0.6rem] text-ink-3">
+        <span
+          aria-hidden="true"
+          className="size-1 rounded-full"
+          style={{ backgroundColor: GOLD }}
+        />
+        En la mesa · {pot} {pot === 1 ? 'concha' : 'conchas'}
+      </p>
+
+      <ul className="space-y-1">
+        {wagers.map((wager) => (
+          <li
+            key={wager.id}
+            className="flex items-baseline gap-1.5 text-[0.68rem] leading-snug"
+          >
+            <span
+              className="shrink-0 font-semibold"
+              style={{
+                color:
+                  wager.discordId === myDiscordId ? GOLD : 'var(--color-ink-2)',
+              }}
+            >
+              {wager.bettorName}
+            </span>
+            <span className="text-ink-3">
+              {wager.stake}× a{' '}
+              <span style={{ color: 'var(--color-ink-2)' }}>
+                {BET_SELECTION_LABEL[wager.selection] ?? wager.selection}
+              </span>
+              {' · '}
+              {BET_MARKET_LABEL[wager.market]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

@@ -57,7 +57,7 @@ export function betDelta(db: Db, discordId: string): number {
 
 export interface HolderBalance {
   available: number;
-  /** The most this holder can hold: 4 for players, 10 for spectators. */
+  /** The most this holder can hold. Players and spectators differ. */
   ceiling: number;
   /** Negative when in debt, so the UI can paint that many slots red. */
   debt: number;
@@ -291,6 +291,49 @@ export function voidStaleBets(db: Db, olderThanMs: number): number {
     .run(Date.now(), Date.now() - olderThanMs);
 
   return result.changes;
+}
+
+export interface LiveWager {
+  id: string;
+  gameId: string;
+  playerId: string;
+  discordId: string;
+  username: string;
+  /** The bettor's own roster entry, if they have one. Null for spectators. */
+  bettorPlayerId: string | null;
+  isSpectator: boolean;
+  market: BetMarket;
+  selection: string;
+  stake: number;
+  placedAt: number;
+}
+
+/**
+ * Every wager still riding, with a name attached.
+ *
+ * Public on purpose: the whole appeal of betting on your friends is that they
+ * can see what you bet against them. Nothing here exposes a balance — only what
+ * was put on the table.
+ */
+export function liveWagers(db: Db): LiveWager[] {
+  return db
+    .prepare(
+      `SELECT b.id, b.game_id AS gameId, b.player_id AS playerId,
+              b.discord_id AS discordId, u.username,
+              u.player_id AS bettorPlayerId, u.is_spectator AS isSpectator,
+              b.market, b.selection, b.stake, b.placed_at AS placedAt
+       FROM bets b
+       JOIN discord_users u ON u.discord_id = b.discord_id
+       WHERE b.status = 'OPEN'
+       ORDER BY b.placed_at ASC`,
+    )
+    .all()
+    .map((row) => {
+      const wager = row as Omit<LiveWager, 'isSpectator'> & {
+        isSpectator: number;
+      };
+      return { ...wager, isSpectator: wager.isSpectator === 1 };
+    });
 }
 
 export interface BetStanding {

@@ -20,6 +20,28 @@ export interface OpenBet {
   placedAt: number;
 }
 
+export interface LiveWager {
+  id: string;
+  gameId: string;
+  /** Whose game it is on. */
+  playerId: string;
+  onName: string;
+  /** Who placed it, so your own wagers can be highlighted. */
+  discordId: string;
+  bettorName: string;
+  isSpectator: boolean;
+  market: BetMarket;
+  selection: string;
+  stake: number;
+  placedAt: number;
+}
+
+export async function fetchLiveWagers(): Promise<LiveWager[]> {
+  const response = await fetch(`${API_URL}/api/bets/live`);
+  if (!response.ok) throw new Error(await readError(response));
+  return ((await response.json()) as { wagers: LiveWager[] }).wagers;
+}
+
 export interface BetStanding {
   discordId: string;
   displayName: string;
