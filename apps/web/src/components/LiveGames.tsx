@@ -57,83 +57,118 @@ const BET_GOLD = '#f2c94c';
 
 const POLL_MS = 30_000;
 
-export function LiveGames({
-  players,
-  onSelect,
-  user,
-  token,
-  onWalletChange,
-}: {
-  players: RankedPlayer[];
-  onSelect?: (playerId: string) => void;
-  user?: SessionUser | null;
-  token?: string | null;
-  onWalletChange?: () => void;
-}) {
-  const [betting, setBetting] = useState<{ id: string; name: string } | null>(
-    null,
-  );
-  // Bumped after a wager settles the ladder is worth re-reading; the table
-  // fetches on its own rather than being handed rows from here.
-  const [standingsKey, setStandingsKey] = useState(0);
-  const [wagers, setWagers] = useState<LiveWager[]>([]);
+export interface LiveFeed {
+  games: LiveGame[] | null;
+  error: boolean;
+  wagers: LiveWager[];
+  reload: () => void;
+}
+
+/**
+ * Polls the live feed and blips when a challenge game appears.
+ *
+ * This lives OUTSIDE the live tab on purpose. `TabPanel` unmounts whatever is
+ * not showing, so a poll owned by `LiveGames` only ran while you sat on that
+ * tab — which is precisely where you do not need to be told a game started.
+ * The Dashboard holds this instead, so the alert works from any tab.
+ */
+export function useLiveFeed(): LiveFeed {
   const [games, setGames] = useState<LiveGame[] | null>(null);
   const [error, setError] = useState(false);
+  const [wagers, setWagers] = useState<LiveWager[]>([]);
+  const [beat, setBeat] = useState(0);
 
   // The ids seen on the previous poll. `null` means we have not polled yet, so
   // the first load never fires the alert — otherwise opening the page during
   // three live games would greet you with three blips.
   const seenRef = useRef<Set<number> | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/live?t=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      if (!response.ok) throw new Error(String(response.status));
-      const next = ((await response.json()) as { games: LiveGame[] }).games;
-      setGames(next);
-      setError(false);
-
-      const ids = new Set(next.map((game) => game.gameId));
-      const seen = seenRef.current;
-      seenRef.current = ids;
-      // One blip per poll, not one per game: five friends queuing together
-      // start five games at once, and that should sound like an event, not an
-      // alarm clock.
-      if (
-        seen &&
-        readEnabled() &&
-        next.some(
-          (game) => game.countsForChallenge && !seen.has(game.gameId),
-        )
-      ) {
-        play();
-      }
-    } catch {
-      setError(true);
-    }
-  }, []);
-
-  // The table refreshes on the same beat as the games, so a wager placed by
-  // somebody else shows up without anyone reloading the page.
-  const loadWagers = useCallback(async () => {
-    try {
-      setWagers(await fetchLiveWagers());
-    } catch {
-      setWagers([]);
-    }
-  }, []);
-
   useEffect(() => {
+    let alive = true;
+
+    const load = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/live?t=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const next = ((await response.json()) as { games: LiveGame[] }).games;
+        if (!alive) return;
+        setGames(next);
+        setError(false);
+
+        const ids = new Set(next.map((game) => game.gameId));
+        const seen = seenRef.current;
+        seenRef.current = ids;
+        // One blip per poll, not one per game: five friends queuing together
+        // start five games at once, and that should sound like an event, not
+        // an alarm clock.
+        if (
+          seen &&
+          readEnabled() &&
+          next.some((game) => game.countsForChallenge && !seen.has(game.gameId))
+        ) {
+          play();
+        }
+      } catch {
+        if (alive) setError(true);
+      }
+    };
+
+    // The wagers refresh on the same beat, so a bet placed by somebody else
+    // shows up without anyone reloading the page.
+    const loadWagers = async () => {
+      try {
+        const next = await fetchLiveWagers();
+        if (alive) setWagers(next);
+      } catch {
+        if (alive) setWagers([]);
+      }
+    };
+
     void load();
     void loadWagers();
     const id = setInterval(() => {
       void load();
       void loadWagers();
     }, POLL_MS);
-    return () => clearInterval(id);
-  }, [load, loadWagers, standingsKey]);
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [beat]);
+
+  return {
+    games,
+    error,
+    wagers,
+    reload: useCallback(() => setBeat((value) => value + 1), []),
+  };
+}
+
+export function LiveGames({
+  players,
+  onSelect,
+  user,
+  token,
+  onWalletChange,
+  feed,
+}: {
+  players: RankedPlayer[];
+  onSelect?: (playerId: string) => void;
+  user?: SessionUser | null;
+  token?: string | null;
+  onWalletChange?: () => void;
+  feed: LiveFeed;
+}) {
+  const [betting, setBetting] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  // Bumped after a wager settles: the ladder is worth re-reading, and the
+  // table fetches on its own rather than being handed rows from here.
+  const [standingsKey, setStandingsKey] = useState(0);
+  const { games, error, wagers } = feed;
 
   // The ladder is a standing scoreboard, not a property of the live games — it
   // stays on screen even when nobody is playing, so these states only replace
@@ -184,6 +219,7 @@ export function LiveGames({
           onPlaced={() => {
             setBetting(null);
             setStandingsKey((key) => key + 1);
+            feed.reload();
             onWalletChange?.();
           }}
         />

@@ -14,7 +14,7 @@ import {
 } from '../lib/session';
 import { BlueShells, ShellMark } from './BlueShells';
 import { TierList } from './TierList';
-import { LiveGames } from './LiveGames';
+import { LiveGames, useLiveFeed } from './LiveGames';
 import { Filters, type FilterState, type SortKey } from './Filters';
 import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
@@ -107,6 +107,11 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
       document.removeEventListener('visibilitychange', tick);
     };
   }, [snapshot.nextUpdateAt, refresh]);
+
+  // Held here rather than inside the live tab: TabPanel unmounts what is not
+  // showing, and an alert that only fires while you are already looking at the
+  // games is not an alert.
+  const liveFeed = useLiveFeed();
 
   const ranking = useMemo(() => buildRanking(snapshot), [snapshot]);
   const liveCount = useMemo(
@@ -244,6 +249,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             user={user}
             token={token}
             onWalletChange={() => void loadSession()}
+            feed={liveFeed}
           />
         </TabPanel>
 
