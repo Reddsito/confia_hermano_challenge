@@ -264,9 +264,13 @@ export function shellRoutes(db: Db, config: ServerConfig) {
    */
   app.get('/received', (context) => {
     const user = currentUser(db, context.req.header('authorization'), config);
-    if (!user?.playerId) {
-      return context.json({ error: 'Sign in with Discord first.' }, 401);
+    if (!user) {
+      return context.json({ error: 'Entrá con Discord primero.' }, 401);
     }
+    // A spectator never plays, so nothing can ever land on them. Answering with
+    // an empty list rather than a 401 keeps the page from erroring on a
+    // question that simply does not apply to them.
+    if (!user.playerId) return context.json({ throws: [] });
 
     const names = new Map(
       listPlayers(db, 'approved').map((player) => [player.id, player.displayName]),

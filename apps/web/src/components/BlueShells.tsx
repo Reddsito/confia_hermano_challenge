@@ -206,7 +206,11 @@ export function BlueShells({
   };
 
   if (!user) return <Gate />;
-  if (!user.playerId) return <Unlinked username={user.username} />;
+  // Spectators have no roster entry by design — that is the whole role. Only
+  // somebody who is meant to be playing can be missing a link.
+  if (!user.playerId && !user.isSpectator) {
+    return <Unlinked username={user.username} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -215,12 +219,16 @@ export function BlueShells({
         actionable, and it used to sit below the wheel where it was only found
         by scrolling past everything you might do to somebody else.
       */}
-      <Received
-        throws={received}
-        champions={champions}
-        runes={runes}
-        items={items}
-      />
+      {/* Nothing can ever land on a spectator, so they are not shown a card
+          that would permanently read "you are all caught up". */}
+      {!isSpectator && (
+        <Received
+          throws={received}
+          champions={champions}
+          runes={runes}
+          items={items}
+        />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
         <Inventory
