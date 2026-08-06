@@ -22,6 +22,21 @@ interface RuleSection {
   items: string[];
 }
 
+/**
+ * The only hand-written rules on this sheet. Everything else is computed from
+ * the modules that enforce it, precisely so it cannot go stale — these have
+ * nothing enforcing them, so they are plain text and edited right here.
+ */
+const PLAY_RULES = [
+  'Jugás con tu cuenta, la que inscribiste. Nada de cuentas prestadas ni compartidas.',
+  'La cuenta arranca desde donde esté: no hay reseteo ni elo de partida igual para todos.',
+  'Si te toca de rival o de aliado otro participante, se juega normal. No se pactan partidas ni se regalan.',
+  'Dodgear para esquivar un reto de concha no vale. El reto sigue pendiente para la próxima.',
+  'Un remake no cuenta para nada: ni suma, ni resta, ni cumple un reto.',
+  'El reto de una concha se cumple en la siguiente partida que juegues, no cuando te venga bien.',
+  'Podés jugar en duo con quien quieras, pero el ranking es individual.',
+];
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es', {
     day: 'numeric',
@@ -62,6 +77,10 @@ function buildSections(tournament: TournamentMeta): RuleSection[][] {
           `Duración: ${days} días.`,
           'Solo cuenta la SoloQ ranked. Flex, normales y customs no suman.',
         ],
+      },
+      {
+        title: 'Cómo se juega',
+        items: PLAY_RULES,
       },
       {
         title: 'Cómo se ganan conchas',
