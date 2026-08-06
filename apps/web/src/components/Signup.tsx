@@ -55,6 +55,7 @@ export function SignupButton() {
 }
 
 function SignupModal({ onClose }: { onClose: () => void }) {
+  const [displayName, setDisplayName] = useState('');
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [role, setRole] = useState<Role | ''>('');
@@ -89,7 +90,7 @@ function SignupModal({ onClose }: { onClose: () => void }) {
       const response = await fetch(SIGNUP_ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ gameName, tagLine, role }),
+        body: JSON.stringify({ displayName, gameName, tagLine, role }),
       });
       const body = (await response.json().catch(() => null)) as {
         error?: string;
@@ -150,6 +151,20 @@ function SignupModal({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-4 p-4">
+            <label className="flex flex-col">
+              <span className="eyebrow mb-1 text-ink-3">Nombre</span>
+              <input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Cómo querés que te llamen"
+                className="w-full rounded-lg border border-line bg-void px-3 py-2 text-fluid-sm outline-none focus:border-line-strong"
+              />
+              <span className="mt-1 text-fluid-xs text-ink-3">
+                Es el nombre que se ve en la tabla. Si lo dejás vacío, se usa tu
+                nombre de invocador.
+              </span>
+            </label>
+
             {/*
               Both columns are sized by the grid, and every input is w-full
               inside its own column. Sizing an input directly (w-24) left it
@@ -203,6 +218,24 @@ function SignupModal({ onClose }: { onClose: () => void }) {
             <p className="text-fluid-xs text-ink-3">
               Se verifica tu Riot ID contra Riot al enviarlo. Después queda en
               revisión hasta que un admin lo apruebe.
+            </p>
+
+            {/*
+              Signing up and signing in are separate things, and people assume
+              the form logged them in. It did not: the account is what links
+              them to their roster entry, and without it the shells, the tier
+              list and the clips are all read-only.
+            */}
+            <p
+              className="rounded-lg border px-3 py-2 text-fluid-xs"
+              style={{
+                color: GOLD,
+                borderColor: `color-mix(in oklab, ${GOLD} 35%, transparent)`,
+                backgroundColor: `color-mix(in oklab, ${GOLD} 8%, transparent)`,
+              }}
+            >
+              Acordate de entrar con Discord — es el botón de arriba a la
+              derecha. Sin eso no podés tirar conchas ni subir clips.
             </p>
 
             {error && (
