@@ -5,6 +5,8 @@ import {
   SHELL_RULES,
   SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
+  SPECTATOR_MAX_SHELLS,
+  SPECTATOR_START_SHELLS,
   type RankedPlayer,
 } from '@challenge/core/domain';
 
@@ -135,7 +137,11 @@ export function BlueShells({
   );
 
   const mine = user?.playerId ? balances.get(user.playerId) : null;
-  const available = mine?.available ?? 0;
+  // Read off the wallet, not the roster row: it is the only balance a spectator
+  // has, and for a player it is the same figure with the wagers folded in.
+  const available = user?.wallet?.available ?? mine?.available ?? 0;
+  const ceiling = user?.wallet?.ceiling ?? MAX_HELD_SHELLS;
+  const isSpectator = user?.isSpectator ?? false;
   const targetPlayer = target ? byId.get(target) : null;
 
   const fire = async () => {
@@ -217,7 +223,12 @@ export function BlueShells({
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <Inventory available={available} shells={mine?.shells ?? []} />
+        <Inventory
+          available={available}
+          shells={mine?.shells ?? []}
+          ceiling={ceiling}
+          isSpectator={isSpectator}
+        />
 
         <Wheel
           odds={odds}
@@ -857,11 +868,16 @@ function arc(
 function Inventory({
   available,
   shells,
+  ceiling,
+  isSpectator,
 }: {
   available: number;
   shells: Array<{ id: string; rule: string; amount: number; detail: string }>;
+  ceiling: number;
+  isSpectator: boolean;
 }) {
-  const full = available >= MAX_HELD_SHELLS;
+  const full = available >= ceiling;
+  const owed = available < 0 ? -available : 0;
   // Newest first, straight from the query, so this is the shell most recently
   // earned — the reason the counter above moved.
   const latest = shells[0] ?? null;
@@ -870,13 +886,21 @@ function Inventory({
     <section className="rounded-2xl border border-line bg-carbon p-5">
       <p className="eyebrow text-ink-3">Tu arsenal</p>
 
-      <div className="mt-3 flex items-center gap-2">
-        {Array.from({ length: MAX_HELD_SHELLS }, (_, index) => (
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/*
+          Debt is drawn as its own red marks rather than as a minus sign. The
+          rack exists so a balance can be read without reading, and a negative
+          number is the one thing that breaks that.
+        */}
+        {Array.from({ length: owed }, (_, index) => (
+          <ShellMark key={`debt-${index}`} size={36} filled owed />
+        ))}
+        {Array.from({ length: ceiling }, (_, index) => (
           <ShellMark key={index} size={36} filled={index < available} />
         ))}
         <span className="tabular ml-auto text-[2.5rem] leading-none font-semibold">
           {available}
-          <span className="eyebrow ml-1 text-ink-3">/{MAX_HELD_SHELLS}</span>
+          <span className="eyebrow ml-1 text-ink-3">/{ceiling}</span>
         </span>
       </div>
 
@@ -884,14 +908,55 @@ function Inventory({
         className="mt-3 text-fluid-xs"
         style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
       >
-        {full
-          ? 'Llena. Nada más cuenta hasta que tires una.'
-          : available > 0
-            ? `Te queda${available > 1 ? 'n' : ''} ${available} para tirar.`
-            : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
+        {available < 0
+          ? `Debés ${owed}. Lo que ganes tapa la deuda antes de llenar un slot.`
+          : full
+            ? 'Llena. Nada más cuenta hasta que tires una.'
+            : available > 0
+              ? `Te queda${available > 1 ? 'n' : ''} ${available} para tirar.`
+              : isSpectator
+                ? 'Vacío. La única forma de recuperar es apostando.'
+                : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
       </p>
-      <Earn latest={latest} />
+      {isSpectator ? <EarnBetting /> : <Earn latest={latest} />}
     </section>
+  );
+}
+
+/**
+ * The spectator's version of the same card.
+ *
+ * Spectators never play, so every achievement in the list next door is
+ * unreachable for them — showing it would be telling somebody to go get a
+ * pentakill in a game they are not allowed to be in. Betting is their whole
+ * economy, so that is what this explains.
+ */
+function EarnBetting() {
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <p className="eyebrow text-ink-3">Cómo conseguir más</p>
+
+      <ul className="mt-2 space-y-1.5">
+        {[
+          'Apostás a las partidas de los demás, en la pestaña En vivo.',
+          'Ganás la apuesta y cobrás lo que arriesgaste más la ganancia.',
+          'Podés apostar aunque estés en cero: si perdés, quedás debiendo.',
+          `Arrancaste con ${SPECTATOR_START_SHELLS} y podés llegar hasta ${SPECTATOR_MAX_SHELLS}.`,
+        ].map((line) => (
+          <li key={line} className="flex items-baseline gap-2 text-fluid-xs">
+            <span aria-hidden="true" className="shrink-0 text-ink-3">
+              ›
+            </span>
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-3 text-[0.68rem] text-ink-3">
+        No jugás, así que las metas de partida no te aplican. Las conchas que
+        ganes las podés tirar a cualquiera del torneo.
+      </p>
+    </div>
   );
 }
 
@@ -1147,11 +1212,18 @@ function Unlinked({ username }: { username: string }) {
 export function ShellMark({
   size = 24,
   filled = false,
+  owed = false,
 }: {
   size?: number;
   filled?: boolean;
+  /** A shell you owe rather than hold. Drawn red, and always filled. */
+  owed?: boolean;
 }) {
-  const colour = filled ? 'var(--color-accent)' : 'var(--color-line-strong)';
+  const colour = owed
+    ? 'var(--color-mark-red)'
+    : filled
+      ? 'var(--color-accent)'
+      : 'var(--color-line-strong)';
 
   return (
     <svg
@@ -1162,7 +1234,9 @@ export function ShellMark({
       aria-hidden="true"
       style={
         filled
-          ? { filter: 'drop-shadow(0 0 8px color-mix(in oklab, var(--color-accent) 60%, transparent))' }
+          ? {
+              filter: `drop-shadow(0 0 8px color-mix(in oklab, ${owed ? 'var(--color-mark-red)' : 'var(--color-accent)'} 60%, transparent))`,
+            }
           : undefined
       }
     >

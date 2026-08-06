@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Division, Rank, RankedPlayer, Tier } from '@challenge/core/domain';
 
+import { BET_WINDOW_SECONDS, bettingOpen } from '@challenge/core/domain';
+
 import { API_URL } from '../lib/api';
+import type { SessionUser } from '../lib/session';
+import { BetModal, BetStandingsTable } from './Bets';
 import { TierCrest } from './icons';
 import { Avatar, classNames, tierColor } from './ui';
 
@@ -47,15 +51,29 @@ interface LiveGame {
 }
 
 /** Matches the sync cadence: fetching faster would only show the same answer. */
+const BET_GOLD = '#f2c94c';
+
 const POLL_MS = 30_000;
 
 export function LiveGames({
   players,
   onSelect,
+  user,
+  token,
+  onWalletChange,
 }: {
   players: RankedPlayer[];
   onSelect?: (playerId: string) => void;
+  user?: SessionUser | null;
+  token?: string | null;
+  onWalletChange?: () => void;
 }) {
+  const [betting, setBetting] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  // Bumped after a wager settles the ladder is worth re-reading; the table
+  // fetches on its own rather than being handed rows from here.
+  const [standingsKey, setStandingsKey] = useState(0);
   const [games, setGames] = useState<LiveGame[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -101,15 +119,37 @@ export function LiveGames({
   }
 
   return (
-    <div className="grid gap-3 xl:grid-cols-2">
-      {games.map((game) => (
-        <GameCard
-          key={game.gameId}
-          game={game}
-          players={players}
-          onSelect={onSelect}
+    <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
+      <div className="grid gap-3 2xl:grid-cols-2">
+        {games.map((game) => (
+          <GameCard
+            key={game.gameId}
+            game={game}
+            players={players}
+            onSelect={onSelect}
+            canBet={Boolean(user && token)}
+            myPlayerId={user?.playerId ?? null}
+            onBet={(id, name) => setBetting({ id, name })}
+          />
+        ))}
+      </div>
+
+      <BetStandingsTable refreshKey={standingsKey} />
+
+      {betting && user && token && (
+        <BetModal
+          user={user}
+          token={token}
+          playerId={betting.id}
+          playerName={betting.name}
+          onClose={() => setBetting(null)}
+          onPlaced={() => {
+            setBetting(null);
+            setStandingsKey((key) => key + 1);
+            onWalletChange?.();
+          }}
         />
-      ))}
+      )}
     </div>
   );
 }
@@ -143,10 +183,16 @@ function GameCard({
   game,
   players,
   onSelect,
+  canBet,
+  myPlayerId,
+  onBet,
 }: {
   game: LiveGame;
   players: RankedPlayer[];
   onSelect?: (playerId: string) => void;
+  canBet: boolean;
+  myPlayerId: string | null;
+  onBet: (playerId: string, playerName: string) => void;
 }) {
   const elapsed = useElapsed(game.startedAt, game.gameLength);
   const tracked = players.filter((player) =>
@@ -191,6 +237,36 @@ function GameCard({
           EN VIVO
         </span>
       </header>
+
+      {/*
+        The window is short on purpose, so the row disappears rather than
+        offering a button the server is about to refuse. Betting on your own
+        game is not a bet, so you are never offered your own name.
+      */}
+      {canBet && game.countsForChallenge && bettingOpen(elapsed) && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+          <span className="eyebrow text-[0.6rem] text-ink-3">
+            Cierra en {clock(Math.max(BET_WINDOW_SECONDS - elapsed, 0))}
+          </span>
+          {tracked
+            .filter((player) => player.id !== myPlayerId)
+            .map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                onClick={() => onBet(player.id, player.displayName)}
+                className="eyebrow min-h-7 rounded-full border px-2.5 text-[0.6rem] transition-colors"
+                style={{
+                  color: BET_GOLD,
+                  borderColor: `color-mix(in oklab, ${BET_GOLD} 45%, transparent)`,
+                  backgroundColor: `color-mix(in oklab, ${BET_GOLD} 10%, transparent)`,
+                }}
+              >
+                Apostar a {player.displayName}
+              </button>
+            ))}
+        </div>
+      )}
 
       {!game.countsForChallenge && (
         <p

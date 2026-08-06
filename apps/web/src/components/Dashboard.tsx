@@ -236,7 +236,13 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         </TabPanel>
 
         <TabPanel id="live" active={section === 'live'}>
-          <LiveGames players={ranking} onSelect={setSelectedId} />
+          <LiveGames
+            players={ranking}
+            onSelect={setSelectedId}
+            user={user}
+            token={token}
+            onWalletChange={() => void loadSession()}
+          />
         </TabPanel>
 
         <TabPanel id="stats" active={section === 'stats'}>

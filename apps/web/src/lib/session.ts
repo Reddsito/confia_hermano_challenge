@@ -1,12 +1,21 @@
 import { API_URL } from './api';
 
+import type { Wallet } from './bets';
+
 export interface SessionUser {
   discordId: string;
   username: string;
   avatar: string | null;
   playerId: string | null;
   isAdmin: boolean;
+  /** Spectators bet but never play, so they have no roster entry at all. */
+  isSpectator: boolean;
   shells: { earned: number; thrown: number; available: number } | null;
+  /**
+   * The account's balance, wagers included. Present for spectators too, who
+   * have no `shells` because that one is read off a roster entry.
+   */
+  wallet: Wallet | null;
 }
 
 const STORAGE_KEY = 'challenge.session';

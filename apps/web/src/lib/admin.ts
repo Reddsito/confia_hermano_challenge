@@ -134,6 +134,7 @@ export interface DiscordUser {
   avatar: string | null;
   playerId: string | null;
   isAdmin: boolean;
+  isSpectator: boolean;
   lastSeen: number;
 }
 
@@ -167,6 +168,21 @@ export function setDiscordAdmin(
   return request(code, `/api/admin/discord-users/${discordId}/admin`, {
     method: 'POST',
     body: JSON.stringify({ isAdmin }),
+  });
+}
+
+/**
+ * Marks somebody as a spectator: they bet but never play, start with an opening
+ * balance and have no roster entry at all.
+ */
+export function setDiscordSpectator(
+  code: string,
+  discordId: string,
+  isSpectator: boolean,
+): Promise<{ ok: true }> {
+  return request(code, `/api/admin/discord-users/${discordId}/spectator`, {
+    method: 'POST',
+    body: JSON.stringify({ isSpectator }),
   });
 }
 

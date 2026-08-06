@@ -8,6 +8,7 @@ import {
   patchChallenge,
   removeChallenge,
   setDiscordAdmin,
+  setDiscordSpectator,
   type AdminChallenge,
   type DiscordUser,
   type RosterPlayer,
@@ -159,6 +160,38 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                   aria-pressed={user.isAdmin}
                 >
                   Admin
+                </button>
+
+                {/*
+                  A spectator has no Riot ID and never appears on the ladder, so
+                  this is deliberately independent of the roster link below.
+                */}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        setDiscordSpectator(
+                          code,
+                          user.discordId,
+                          !user.isSpectator,
+                        ),
+                      user.discordId,
+                    )
+                  }
+                  className={classNames(
+                    'eyebrow min-h-10 shrink-0 rounded-full border px-3 transition-colors',
+                    user.isSpectator
+                      ? 'border-transparent text-void'
+                      : 'border-line text-ink-3 hover:text-ink',
+                  )}
+                  style={
+                    user.isSpectator ? { background: '#f2c94c' } : undefined
+                  }
+                  aria-pressed={user.isSpectator}
+                >
+                  Espectador
                 </button>
 
                 <label className="flex items-center gap-2">
