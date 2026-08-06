@@ -19,6 +19,7 @@ import {
   type PanelInfo,
   type RosterPlayer,
 } from '../lib/admin';
+import { SoundLab } from './Notify';
 import { PanelLinks } from './PanelLinks';
 import { RoleIcon } from './icons';
 import { OpggLink, ROLE_LABEL, classNames } from './ui';
@@ -203,6 +204,8 @@ export function Panel() {
       )}
 
       <ThrowsAdmin code={code} busy={busy} onRun={run} />
+
+      <SoundLab />
 
       <PanelLinks code={code} roster={roster} onError={setError} />
     </div>

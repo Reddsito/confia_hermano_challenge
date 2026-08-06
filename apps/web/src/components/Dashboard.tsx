@@ -20,6 +20,7 @@ import { PlayerDetail } from './PlayerDetail';
 import { Podium } from './Podium';
 import { RankingTable } from './RankingTable';
 import { RefreshMeter } from './RefreshMeter';
+import { NotifyButton } from './Notify';
 import { RulesButton } from './Rules';
 import { Clips } from './Clips';
 import { DiscordLink, SignupButton } from './Signup';
@@ -187,6 +188,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <NotifyButton />
           <RulesButton tournament={snapshot.tournament} />
           <SignupButton />
           <DiscordLink />

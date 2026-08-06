@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Division, Rank, RankedPlayer, Tier } from '@challenge/core/domain';
 
@@ -7,6 +7,7 @@ import { BET_WINDOW_SECONDS, bettingOpen } from '@challenge/core/domain';
 import { API_URL } from '../lib/api';
 import type { SessionUser } from '../lib/session';
 import { fetchLiveWagers, type LiveWager } from '../lib/bets';
+import { play, readEnabled } from '../lib/sound';
 import { BetModal, BetStandingsTable, GameWagers } from './Bets';
 import { TierCrest } from './icons';
 import { Avatar, classNames, tierColor } from './ui';
@@ -79,14 +80,36 @@ export function LiveGames({
   const [games, setGames] = useState<LiveGame[] | null>(null);
   const [error, setError] = useState(false);
 
+  // The ids seen on the previous poll. `null` means we have not polled yet, so
+  // the first load never fires the alert — otherwise opening the page during
+  // three live games would greet you with three blips.
+  const seenRef = useRef<Set<number> | null>(null);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/live?t=${Date.now()}`, {
         cache: 'no-store',
       });
       if (!response.ok) throw new Error(String(response.status));
-      setGames(((await response.json()) as { games: LiveGame[] }).games);
+      const next = ((await response.json()) as { games: LiveGame[] }).games;
+      setGames(next);
       setError(false);
+
+      const ids = new Set(next.map((game) => game.gameId));
+      const seen = seenRef.current;
+      seenRef.current = ids;
+      // One blip per poll, not one per game: five friends queuing together
+      // start five games at once, and that should sound like an event, not an
+      // alarm clock.
+      if (
+        seen &&
+        readEnabled() &&
+        next.some(
+          (game) => game.countsForChallenge && !seen.has(game.gameId),
+        )
+      ) {
+        play();
+      }
     } catch {
       setError(true);
     }
