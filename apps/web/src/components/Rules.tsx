@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import {
+  MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
   SHELL_RULES,
   SHELL_RULE_AWARD,
@@ -59,28 +60,29 @@ function buildSections(tournament: TournamentMeta): RuleSection[][] {
           `Inicio: ${formatDate(tournament.startsAt)} a las ${formatTime(tournament.startsAt)}.`,
           `Cierre: ${formatDate(tournament.endsAt)} a las ${formatTime(tournament.endsAt)}.`,
           `Duración: ${days} días.`,
-        ],
-      },
-      {
-        title: 'Partidas',
-        items: [
           'Solo cuenta la SoloQ ranked. Flex, normales y customs no suman.',
-          'Sin límite de partidas.',
-          'El ranking se ordena por elo, y se actualiza solo cada pocos minutos.',
         ],
       },
-    ],
-    [
       {
         title: 'Cómo se ganan conchas',
         items: earning,
       },
+    ],
+    [
       {
-        title: 'Cómo se usan',
+        title: 'Cómo se tiran',
         items: [
-          `Podés tener hasta ${MAX_HELD_SHELLS} conchas sin gastar. En el tope dejás de ganar hasta tirar una.`,
-          'Tirás una concha a otro participante y le cae un reto que tiene que cumplir en una partida.',
-          'El reto se resuelve al momento de tirarla: campeón al azar, runas al azar o build al azar, según cuál toque.',
+          `Podés guardar hasta ${MAX_HELD_SHELLS} conchas sin gastar. En el tope dejás de ganar hasta tirar una.`,
+          'Le tirás una concha a otro participante y le cae un reto que tiene que cumplir en su próxima partida.',
+          'No podés tirarte una a vos mismo.',
+        ],
+      },
+      {
+        title: 'Los retos',
+        items: [
+          'El reto sale de una ruleta al momento de tirar la concha.',
+          'Puede ser un reto escrito, un campeón al azar, unas runas al azar o una build de seis objetos al azar.',
+          `Si te tocó un campeón, quien la tiró puede volver a girar hasta ${MAX_CHAMPION_REROLLS} veces.`,
         ],
       },
     ],
