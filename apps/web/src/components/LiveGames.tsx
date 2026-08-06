@@ -112,47 +112,42 @@ export function LiveGames({
     return () => clearInterval(id);
   }, [load, loadWagers, standingsKey]);
 
-  if (error) {
-    return (
-      <Empty
-        title="No se puede conectar al backend"
-        detail="Las partidas en vivo vienen del servidor, que ahora no responde."
-      />
-    );
-  }
-
-  if (games === null) {
-    return <Empty title="Buscando partidas…" detail="Un momento." />;
-  }
-
-  if (games.length === 0) {
-    return (
-      <Empty
-        title="Nadie está jugando"
-        detail="Las partidas aparecen acá a los pocos minutos de empezar. La herramienta de práctica nunca aparece — Riot solo publica partidas que se pueden espectar."
-      />
-    );
-  }
+  // The ladder is a standing scoreboard, not a property of the live games — it
+  // stays on screen even when nobody is playing, so these states only replace
+  // the games column instead of returning early for the whole section.
+  const column = error ? (
+    <Empty
+      title="No se puede conectar al backend"
+      detail="Las partidas en vivo vienen del servidor, que ahora no responde."
+    />
+  ) : games === null ? (
+    <Empty title="Buscando partidas…" detail="Un momento." />
+  ) : games.length === 0 ? (
+    <Empty
+      title="Nadie está jugando"
+      detail="Las partidas aparecen acá a los pocos minutos de empezar. La herramienta de práctica nunca aparece — Riot solo publica partidas que se pueden espectar."
+    />
+  ) : (
+    <div className="grid gap-3 2xl:grid-cols-2">
+      {games.map((game) => (
+        <GameCard
+          key={game.gameId}
+          game={game}
+          players={players}
+          onSelect={onSelect}
+          canBet={Boolean(user && token)}
+          myPlayerId={user?.playerId ?? null}
+          myDiscordId={user?.discordId ?? null}
+          wagers={wagers.filter((wager) => wager.gameId === String(game.gameId))}
+          onBet={(id, name) => setBetting({ id, name })}
+        />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_20rem]">
-      <div className="grid gap-3 2xl:grid-cols-2">
-        {games.map((game) => (
-          <GameCard
-            key={game.gameId}
-            game={game}
-            players={players}
-            onSelect={onSelect}
-            canBet={Boolean(user && token)}
-            myPlayerId={user?.playerId ?? null}
-            myDiscordId={user?.discordId ?? null}
-            wagers={wagers.filter(
-              (wager) => wager.gameId === String(game.gameId),
-            )}
-            onBet={(id, name) => setBetting({ id, name })}
-          />
-        ))}
-      </div>
+    <div className="grid items-start gap-4 xl:grid-cols-[1fr_20rem]">
+      {column}
 
       <BetStandingsTable refreshKey={standingsKey} />
 

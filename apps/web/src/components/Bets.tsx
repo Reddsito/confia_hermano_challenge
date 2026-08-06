@@ -114,59 +114,98 @@ export function BetStandingsTable({ refreshKey }: { refreshKey: number }) {
     void load();
   }, [load, refreshKey]);
 
+  // The podium gets its own metals; everyone else gets a plain number, so the
+  // top three read at a glance without needing to compare figures.
+  const PODIUM = [GOLD, '#c9d2dd', '#cd8a52'];
+  const settled = standings?.filter((row) => row.won + row.lost > 0) ?? [];
+  const best = Math.max(1, ...settled.map((row) => Math.abs(row.net)));
+
   return (
-    <section className="rounded-2xl border border-line bg-carbon">
+    <section className="overflow-hidden rounded-2xl border border-line bg-carbon xl:sticky xl:top-4">
       <header
-        className="flex items-center gap-2 border-b border-line px-4 py-3"
-        style={{ boxShadow: `inset 0 2px 0 0 ${GOLD}` }}
+        className="flex items-baseline gap-2 border-b border-line px-4 py-3"
+        style={{
+          boxShadow: `inset 0 2px 0 0 ${GOLD}`,
+          background: `linear-gradient(180deg, color-mix(in oklab, ${GOLD} 9%, transparent), transparent)`,
+        }}
       >
-        <span
-          aria-hidden="true"
-          className="size-1.5 rounded-full"
-          style={{ backgroundColor: GOLD }}
-        />
-        <h3 className="eyebrow" style={{ color: GOLD }}>
+        <h3 className="display text-fluid-base leading-none" style={{ color: GOLD }}>
           Ranking de apuestas
         </h3>
+        {settled.length > 0 && (
+          <span className="eyebrow ml-auto text-[0.6rem] text-ink-3">
+            {settled.length}
+          </span>
+        )}
       </header>
 
       {standings === null ? (
-        <p className="px-4 py-6 text-center text-fluid-xs text-ink-3">Cargando…</p>
-      ) : standings.length === 0 ? (
-        <p className="px-4 py-8 text-center text-fluid-xs text-ink-3">
-          Todavía no se resolvió ninguna apuesta.
-        </p>
+        <p className="px-4 py-8 text-center text-fluid-xs text-ink-3">Cargando…</p>
+      ) : settled.length === 0 ? (
+        <div className="px-4 py-8 text-center">
+          <ShellRack available={0} ceiling={4} size={9} />
+          <p className="mt-3 text-fluid-xs text-ink-3">
+            Todavía no se resolvió ninguna apuesta. El que gane conchas apostando
+            aparece acá.
+          </p>
+        </div>
       ) : (
         <ul className="divide-y divide-line">
-          {standings.map((row, index) => (
-            <li
-              key={row.discordId}
-              className="flex items-center gap-3 px-4 py-2.5"
-            >
-              <span className="w-4 shrink-0 text-fluid-xs text-ink-3">
-                {index + 1}
-              </span>
+          {settled.map((row, index) => {
+            const medal = PODIUM[index] ?? null;
+            const tone =
+              row.net > 0 ? TEAL : row.net < 0 ? RED : 'var(--color-ink-3)';
 
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-fluid-sm">
-                  {row.displayName}
-                </span>
-                <span className="block text-fluid-xs text-ink-3">
-                  {row.won}G · {row.lost}P
-                  {row.isSpectator && ' · espectador'}
-                </span>
-              </span>
-
-              <span
-                className="display shrink-0 text-fluid-sm"
-                style={{
-                  color: row.net > 0 ? TEAL : row.net < 0 ? RED : 'var(--color-ink-3)',
-                }}
+            return (
+              <li
+                key={row.discordId}
+                className="relative flex items-center gap-3 px-4 py-2.5"
               >
-                {row.net > 0 ? `+${row.net}` : row.net}
-              </span>
-            </li>
-          ))}
+                {/* The bar is the story: how far ahead or behind, not just by how much. */}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0"
+                  style={{
+                    width: `${(Math.abs(row.net) / best) * 100}%`,
+                    background: `linear-gradient(90deg, color-mix(in oklab, ${tone} 14%, transparent), transparent)`,
+                  }}
+                />
+
+                <span
+                  className="tabular relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-semibold"
+                  style={
+                    medal
+                      ? { backgroundColor: medal, color: '#05070a' }
+                      : { color: 'var(--color-ink-3)' }
+                  }
+                >
+                  {index + 1}
+                </span>
+
+                <span className="relative z-10 min-w-0 flex-1">
+                  <span className="block truncate text-fluid-sm leading-tight">
+                    {row.displayName}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[0.62rem] text-ink-3">
+                    <span style={{ color: TEAL }}>{row.won}G</span>
+                    <span style={{ color: RED }}>{row.lost}P</span>
+                    {row.isSpectator && <span>· espectador</span>}
+                  </span>
+                </span>
+
+                <span
+                  className="tabular relative z-10 shrink-0 rounded-full border px-2 py-0.5 text-fluid-xs font-semibold"
+                  style={{
+                    color: tone,
+                    borderColor: `color-mix(in oklab, ${tone} 40%, transparent)`,
+                    backgroundColor: `color-mix(in oklab, ${tone} 10%, transparent)`,
+                  }}
+                >
+                  {row.net > 0 ? `+${row.net}` : row.net}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
