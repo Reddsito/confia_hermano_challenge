@@ -527,6 +527,26 @@ export function getThrow(db: Db, id: string): ThrowRow | null {
 }
 
 /** Everything fired at one player, newest first, with each spin it went through. */
+/**
+ * Everything this player fired.
+ *
+ * Matched on `from_player` alone, unlike `balanceFor`, which also counts throws
+ * carrying only a Discord id. That is not an oversight: a throw with no
+ * `from_player` was fired by somebody with no roster entry, so it can never
+ * belong to the player being asked about here.
+ */
+export function throwsBy(db: Db, playerId: string): ThrowRow[] {
+  const rows = db
+    .prepare(
+      `SELECT id, from_player AS fromPlayer, to_player AS toPlayer,
+              challenge_id AS challengeId, challenge_name AS challengeName,
+              thrown_at AS thrownAt, completed_at AS completedAt, payload
+       FROM shell_throws WHERE from_player = ? ORDER BY thrown_at DESC`,
+    )
+    .all(playerId) as RawThrow[];
+  return rows.map(toThrow);
+}
+
 export function throwsAgainst(db: Db, playerId: string): ThrowRow[] {
   const rows = db
     .prepare(

@@ -166,6 +166,73 @@ function longestStreaks(db: Db, playerId: string): {
   return { win, loss };
 }
 
+export interface MatchRow {
+  matchId: string;
+  playedAt: number;
+  durationMinutes: number;
+  win: boolean;
+  championId: number;
+  championName: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  creepScore: number;
+  visionScore: number;
+  goldEarned: number;
+  damageToChampions: number;
+  pentaKills: number;
+  quadraKills: number;
+  tripleKills: number;
+  firstBlood: boolean;
+  surrendered: boolean;
+  killParticipation: number | null;
+}
+
+/**
+ * One player's games, newest first.
+ *
+ * Everything here is a column we already store. There are no items, no summoner
+ * spells and no opponent, because the sync never kept them — the match history
+ * is a record of what each player did, not a replay of the game around them.
+ * Anything richer is a schema change and a re-sync, not a query.
+ */
+export function recentMatches(
+  db: Db,
+  playerId: string,
+  limit = 50,
+): MatchRow[] {
+  const rows = db
+    .prepare(
+      `SELECT match_id AS matchId, played_at AS playedAt,
+              duration_minutes AS durationMinutes, win,
+              champion_id AS championId, champion_name AS championName,
+              kills, deaths, assists, creep_score AS creepScore,
+              vision_score AS visionScore, gold_earned AS goldEarned,
+              damage_to_champions AS damageToChampions,
+              penta_kills AS pentaKills, quadra_kills AS quadraKills,
+              triple_kills AS tripleKills, first_blood AS firstBlood,
+              surrendered, kill_participation AS killParticipation
+       FROM player_matches
+       WHERE player_id = ?
+       ORDER BY played_at DESC
+       LIMIT ?`,
+    )
+    .all(playerId, limit) as Array<
+    Omit<MatchRow, 'win' | 'firstBlood' | 'surrendered'> & {
+      win: number;
+      firstBlood: number;
+      surrendered: number;
+    }
+  >;
+
+  return rows.map((row) => ({
+    ...row,
+    win: row.win === 1,
+    firstBlood: row.firstBlood === 1,
+    surrendered: row.surrendered === 1,
+  }));
+}
+
 export function extraTotalsFor(db: Db, playerId: string): ExtraTotals {
   const row = db
     .prepare(

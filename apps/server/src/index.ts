@@ -17,6 +17,7 @@ import { clipRoutes } from './routes/clips';
 import { signupRoutes } from './routes/signup';
 import { betRoutes } from './routes/bets';
 import { coinRoutes } from './routes/coins';
+import { playerRoutes } from './routes/players';
 import { buildSnapshot } from './snapshot';
 import { Scheduler } from './sync/scheduler';
 
@@ -78,6 +79,7 @@ app.get('/api/snapshot', (context) => {
 });
 
 app.route('/api/auth', authRoutes(db, config));
+app.route('/api/players', playerRoutes(db));
 app.route('/api/shells', shellRoutes(db, config));
 app.route('/api/tierlist', tierListRoutes(db, config));
 app.route('/api/clips', clipRoutes(db, config));
