@@ -5,6 +5,7 @@ import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import { balanceFor } from '../db/shells';
 import { balanceForHolder, holderFor } from '../db/bets';
+import { coinWallet } from '../db/coins';
 import {
   getDiscordUser,
   upsertDiscordUser,
@@ -119,6 +120,9 @@ export function authRoutes(db: Db, config: ServerConfig) {
       isSpectator: holder?.isSpectator ?? false,
       shells: user.playerId ? balanceFor(db, user.playerId) : null,
       wallet: balanceForHolder(db, user.discordId),
+      // Reading the wallet is also what pays out any daily coins that are due,
+      // so signing in is enough to collect.
+      coins: coinWallet(db, user.discordId),
     });
   });
 

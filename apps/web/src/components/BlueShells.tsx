@@ -5,8 +5,9 @@ import {
   SHELL_RULES,
   SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
-  SPECTATOR_MAX_SHELLS,
-  SPECTATOR_START_SHELLS,
+  COIN_WALLET_CAP,
+  SHELL_PRICE_COINS,
+  SPECTATOR_DAILY_GRANT,
   type RankedPlayer,
 } from '@challenge/core/domain';
 
@@ -32,6 +33,7 @@ import {
   type ShellsState,
 } from '../lib/session';
 import { TierCrest } from './icons';
+import { CoinShop } from './CoinShop';
 import { PayloadView } from './ShellRoll';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
@@ -231,12 +233,24 @@ export function BlueShells({
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <Inventory
-          available={available}
-          shells={mine?.shells ?? []}
-          ceiling={ceiling}
-          isSpectator={isSpectator}
-        />
+        <div className="space-y-4">
+          <Inventory
+            available={available}
+            shells={mine?.shells ?? []}
+            ceiling={ceiling}
+            isSpectator={isSpectator}
+          />
+
+          <CoinShop
+            wallet={user.coins}
+            heldShells={available}
+            token={token}
+            onBought={async () => {
+              await reload();
+              onBalanceChange();
+            }}
+          />
+        </div>
 
         <Wheel
           odds={odds}
@@ -946,10 +960,10 @@ function EarnBetting() {
 
       <ul className="mt-2 space-y-1.5">
         {[
+          `Ganás ${SPECTATOR_DAILY_GRANT} monedas por día, hasta llegar a ${COIN_WALLET_CAP}.`,
           'Apostás a las partidas de los demás, en la pestaña En vivo.',
-          'Ganás la apuesta y cobrás lo que arriesgaste más la ganancia.',
-          'Podés apostar aunque estés en cero: si perdés, quedás debiendo.',
-          `Arrancaste con ${SPECTATOR_START_SHELLS} y podés llegar hasta ${SPECTATOR_MAX_SHELLS}.`,
+          'Ganando apuestas sí podés pasarte del tope: es tu única forma de despegar.',
+          `Con ${SHELL_PRICE_COINS} monedas comprás una concha azul.`,
         ].map((line) => (
           <li key={line} className="flex items-baseline gap-2 text-fluid-xs">
             <span aria-hidden="true" className="shrink-0 text-ink-3">

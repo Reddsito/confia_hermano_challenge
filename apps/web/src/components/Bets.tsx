@@ -6,8 +6,12 @@ import {
   BET_PAYOUT,
   BET_SELECTIONS,
   BET_SELECTION_LABEL,
+  COIN_WALLET_CAP,
+  MAX_HELD_SHELLS,
   MAX_STAKE,
+  MIN_STAKE,
   OFFERED_MARKETS,
+  SPECTATOR_DAILY_GRANT,
   type BetMarket,
 } from '@challenge/core/domain';
 
@@ -18,6 +22,7 @@ import {
   type LiveWager,
   type Wallet,
 } from '../lib/bets';
+import type { CoinWallet } from '../lib/coins';
 import type { SessionUser } from '../lib/session';
 import { classNames } from './ui';
 
@@ -26,11 +31,10 @@ const RED = 'var(--color-mark-red)';
 const TEAL = 'var(--color-mark-teal)';
 
 /**
- * The shell rack: filled, empty and owed.
+ * The shell rack: filled and empty slots.
  *
- * Debt is drawn as its own red slots to the left of the rack rather than as a
- * negative number, because the whole point of the rack is that you read your
- * balance without reading anything.
+ * Shells cannot go negative any more — betting is paid in monedas — so the red
+ * debt slots this used to draw have nothing left to represent.
  */
 export function ShellRack({
   available,
@@ -41,23 +45,10 @@ export function ShellRack({
   ceiling: number;
   size?: number;
 }) {
-  const owed = available < 0 ? -available : 0;
   const held = Math.max(available, 0);
 
   return (
     <span className="inline-flex items-center gap-1" aria-hidden="true">
-      {Array.from({ length: owed }, (_, index) => (
-        <span
-          key={`debt-${index}`}
-          className="rounded-full"
-          style={{
-            width: size,
-            height: size,
-            backgroundColor: RED,
-            boxShadow: `0 0 6px color-mix(in oklab, ${RED} 60%, transparent)`,
-          }}
-        />
-      ))}
       {Array.from({ length: ceiling }, (_, index) => (
         <span
           key={index}
@@ -81,13 +72,46 @@ export function WalletChip({ wallet }: { wallet: Wallet }) {
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-line bg-carbon/80 px-3 py-1.5 backdrop-blur">
       <ShellRack available={wallet.available} ceiling={wallet.ceiling} size={8} />
+      <span className="eyebrow text-[0.62rem] text-ink-2">
+        {wallet.available}/{wallet.ceiling}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The coin wallet, as a number rather than a rack.
+ *
+ * Fifteen dots would be a smear at this size, and unlike shells the interesting
+ * thing about a coin balance is how far it is from buying something.
+ */
+export function CoinChip({ wallet }: { wallet: CoinWallet }) {
+  const full = wallet.coins >= wallet.cap;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-carbon/80 px-3 py-1.5 backdrop-blur"
+      title={
+        wallet.isSpectator
+          ? `Ganás ${SPECTATOR_DAILY_GRANT} monedas por día hasta llegar a ${wallet.cap}.`
+          : `Ganaste ${wallet.earnedToday} de ${wallet.dailyCap} monedas hoy.`
+      }
+    >
+      <span
+        className="rounded-full"
+        style={{
+          width: 9,
+          height: 9,
+          backgroundColor: GOLD,
+          boxShadow: `0 0 6px color-mix(in oklab, ${GOLD} 55%, transparent)`,
+        }}
+        aria-hidden="true"
+      />
       <span
         className="eyebrow text-[0.62rem]"
-        style={{ color: wallet.available < 0 ? RED : 'var(--color-ink-2)' }}
+        style={{ color: full ? GOLD : 'var(--color-ink-2)' }}
       >
-        {wallet.available < 0
-          ? `Debés ${wallet.debt}`
-          : `${wallet.available}/${wallet.ceiling}`}
+        {wallet.coins}/{wallet.cap}
       </span>
     </span>
   );
@@ -143,9 +167,9 @@ export function BetStandingsTable({ refreshKey }: { refreshKey: number }) {
         <p className="px-4 py-8 text-center text-fluid-xs text-ink-3">Cargando…</p>
       ) : settled.length === 0 ? (
         <div className="px-4 py-8 text-center">
-          <ShellRack available={0} ceiling={4} size={9} />
+          <ShellRack available={0} ceiling={MAX_HELD_SHELLS} size={9} />
           <p className="mt-3 text-fluid-xs text-ink-3">
-            Todavía no se resolvió ninguna apuesta. El que gane conchas apostando
+            Todavía no se resolvió ninguna apuesta. El que gane monedas apostando
             aparece acá.
           </p>
         </div>
@@ -237,7 +261,7 @@ export function GameWagers({
           className="size-1 rounded-full"
           style={{ backgroundColor: GOLD }}
         />
-        En la mesa · {pot} {pot === 1 ? 'concha' : 'conchas'}
+        En la mesa · {pot} {pot === 1 ? 'moneda' : 'monedas'}
       </p>
 
       <ul className="space-y-1">
@@ -289,7 +313,7 @@ export function BetModal({
   playerId: string;
   playerName: string;
   onClose: () => void;
-  onPlaced: (wallet: Wallet) => void;
+  onPlaced: (wallet: CoinWallet) => void;
 }) {
   const [market, setMarket] = useState<BetMarket>('WIN');
   const [selection, setSelection] = useState<string>(BET_SELECTIONS.WIN[0]);
@@ -298,7 +322,7 @@ export function BetModal({
   const [error, setError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const wallet = user.wallet;
+  const coins = user.coins;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -328,7 +352,13 @@ export function BetModal({
     }
   };
 
-  const payout = stake * (BET_PAYOUT[selection] ?? 1);
+  // What a win actually returns: the stake plus the profit. The stake is gone
+  // from the wallet the moment the bet is placed, so the ceiling is measured
+  // against what is left behind, not against what is held now.
+  const payout = stake + stake * (BET_PAYOUT[selection] ?? 1);
+  const headroom = coins ? COIN_WALLET_CAP - (coins.coins - stake) : payout;
+  const burned =
+    coins && !coins.isSpectator ? Math.max(0, payout - headroom) : 0;
 
   return createPortal(
     <div
@@ -367,10 +397,10 @@ export function BetModal({
         </header>
 
         <div className="space-y-4 p-4">
-          {wallet && (
+          {coins && (
             <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-void px-3 py-2">
               <span className="eyebrow text-ink-3">Tenés</span>
-              <ShellRack available={wallet.available} ceiling={wallet.ceiling} />
+              <CoinChip wallet={coins} />
             </div>
           )}
 
@@ -429,29 +459,49 @@ export function BetModal({
           <div>
             <span className="eyebrow text-ink-3">Cuánto</span>
             <div className="mt-2 flex gap-2">
-              {Array.from({ length: MAX_STAKE }, (_, index) => index + 1).map(
-                (amount) => (
+              {Array.from(
+                { length: MAX_STAKE - MIN_STAKE + 1 },
+                (_, index) => index + MIN_STAKE,
+              ).map((amount) => {
+                const affordable = !coins || coins.coins >= amount;
+                return (
                   <button
                     key={amount}
                     type="button"
+                    disabled={!affordable}
+                    title={affordable ? undefined : 'No te alcanza'}
                     onClick={() => setStake(amount)}
-                    className="flex-1 rounded-xl border py-2 text-fluid-sm transition-colors"
+                    className="flex-1 rounded-xl border py-2 text-fluid-sm transition-colors disabled:opacity-35"
                     style={{
                       color: stake === amount ? '#05070a' : 'var(--color-ink-2)',
                       backgroundColor: stake === amount ? GOLD : 'transparent',
                       borderColor: stake === amount ? GOLD : 'var(--color-line)',
                     }}
                   >
-                    {amount} {amount === 1 ? 'concha' : 'conchas'}
+                    {amount} {amount === 1 ? 'moneda' : 'monedas'}
                   </button>
-                ),
-              )}
+                );
+              })}
             </div>
           </div>
 
+          {/*
+            The ceiling is a hard stop for players, so a win placed near it is
+            worth less than it looks. Said before the bet is placed rather than
+            explained afterwards by a number that did not move.
+          */}
+          {burned > 0 && (
+            <p className="text-fluid-xs" style={{ color: GOLD }}>
+              Estás en {coins!.coins}. El tope es {COIN_WALLET_CAP}, así que de
+              esta apuesta cobrás {payout - burned} y se te queman {burned}.
+              Mejor comprá la concha antes.
+            </p>
+          )}
+
           <p className="text-fluid-xs text-ink-3">
-            Si acertás cobrás {payout} de más. Si fallás perdés {stake}, y podés
-            quedar debiendo — hasta 2.
+            Si acertás cobrás {payout} {payout === 1 ? 'moneda' : 'monedas'}. Si
+            fallás perdés {stake}. No podés quedar debiendo.
+            {coins?.isSpectator && ' Como espectador, ganando apuestas podés pasarte de ' + COIN_WALLET_CAP + '.'}
           </p>
 
           {error && (

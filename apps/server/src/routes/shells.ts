@@ -1,6 +1,5 @@
 import {
   MAX_HELD_SHELLS,
-  MAX_HELD_WITH_BETS,
   opggUrl,
 } from '@challenge/core/domain';
 import { balanceForHolder, holderFor } from '../db/bets';
@@ -90,7 +89,7 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     const players = listPlayers(db, 'approved');
     return context.json({
       max: MAX_HELD_SHELLS,
-      ceiling: MAX_HELD_WITH_BETS,
+      ceiling: MAX_HELD_SHELLS,
       players: players.map((player) => ({
         playerId: player.id,
         ...balanceFor(db, player.id),
@@ -136,17 +135,12 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     if (!target) return context.json({ error: 'No such player.' }, 404);
 
     // Counted against the account rather than the roster entry: it is the only
-    // number a spectator has, and for a player it is the same figure with the
-    // wagers folded in.
+    // number a spectator has, and for a player it is the same figure with any
+    // shop purchases folded in.
     const balance = balanceForHolder(db, user.discordId);
     if (balance.available <= 0) {
       return context.json(
-        {
-          error:
-            balance.available < 0
-              ? 'Estás en negativo. Ganá conchas antes de tirar.'
-              : 'No tenés conchas azules.',
-        },
+        { error: 'No tenés conchas azules. Ganá una o compralas por 15 monedas.' },
         409,
       );
     }

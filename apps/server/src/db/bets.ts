@@ -1,15 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 import {
-  MIN_SHELLS,
+  MAX_HELD_SHELLS,
   payoutFor,
   settleBet,
-  shellCeiling,
-  SPECTATOR_START_SHELLS,
   type BetMarket,
   type BetOutcome,
 } from '@challenge/core/domain';
 
+import { creditCoins, debitCoins } from './coins';
 import type { Db } from './index';
 
 export interface Holder {
@@ -35,47 +34,25 @@ export function holderFor(db: Db, discordId: string): Holder | null {
   return { ...row, isSpectator: row.isSpectator === 1 };
 }
 
-/**
- * What betting has done to a balance, in one number.
- *
- * The stake leaves the moment a bet is placed, which is what stops one shell
- * being ridden on four games at once — so an OPEN wager already counts against
- * you. A void returns the stake by subtracting nothing and paying nothing,
- * which nets to zero without a special case anywhere else.
- */
-export function betDelta(db: Db, discordId: string): number {
-  const row = db
-    .prepare(
-      `SELECT COALESCE(SUM(payout), 0) AS paid,
-              COALESCE(SUM(CASE WHEN status != 'VOID' THEN stake ELSE 0 END), 0) AS staked
-       FROM bets WHERE discord_id = ?`,
-    )
-    .get(discordId) as { paid: number; staked: number };
-
-  return row.paid - row.staked;
-}
-
 export interface HolderBalance {
   available: number;
-  /** The most this holder can hold. Players and spectators differ. */
+  /** The most this holder can hold. One number for everybody now. */
   ceiling: number;
-  /** Negative when in debt, so the UI can paint that many slots red. */
-  debt: number;
   isSpectator: boolean;
 }
 
 /**
- * The full picture for one account: achievements, the spectator's opening
- * stake, every wager, and every shell already fired.
+ * The shells one account is holding: what it earned, what it was granted or
+ * bought, minus what it already fired.
  *
- * Not clamped at zero any more. Betting uncovered is allowed down to
- * MIN_SHELLS, and a balance that silently floored at zero would have quietly
- * forgiven every debt the moment it was incurred.
+ * Bets are absent from this sum on purpose. They pay monedas now, so the debt
+ * this function used to be able to report has nowhere to come from — which is
+ * also why it is floored at zero again.
  */
 export function balanceForHolder(db: Db, discordId: string): HolderBalance {
   const holder = holderFor(db, discordId);
   if (!holder) {
-    return { available: 0, ceiling: 0, debt: 0, isSpectator: false };
+    return { available: 0, ceiling: 0, isSpectator: false };
   }
 
   const earned = holder.playerId
@@ -88,6 +65,16 @@ export function balanceForHolder(db: Db, discordId: string): HolderBalance {
       ).n
     : 0;
 
+  // Where a spectator's shells live: they have no players row, so blue_shells
+  // cannot hold them.
+  const granted = (
+    db
+      .prepare(
+        'SELECT COALESCE(SUM(amount), 0) AS n FROM shell_grants WHERE discord_id = ?',
+      )
+      .get(discordId) as { n: number }
+  ).n;
+
   // Counted with OR rather than two queries so a row carrying both columns is
   // still one throw, not two.
   const thrown = (
@@ -98,14 +85,9 @@ export function balanceForHolder(db: Db, discordId: string): HolderBalance {
       .get(holder.playerId, discordId) as { n: number }
   ).n;
 
-  const seed = holder.isSpectator ? SPECTATOR_START_SHELLS : 0;
-  const raw = earned + seed + betDelta(db, discordId) - thrown;
-  const available = Math.max(raw, MIN_SHELLS);
-
   return {
-    available,
-    ceiling: shellCeiling(holder.isSpectator),
-    debt: available < 0 ? -available : 0,
+    available: Math.max(0, earned + granted - thrown),
+    ceiling: MAX_HELD_SHELLS,
     isSpectator: holder.isSpectator,
   };
 }
@@ -137,22 +119,51 @@ export function placeBet(
   },
 ): BetRow {
   const id = randomUUID();
-  db.prepare(
-    `INSERT INTO bets (id, discord_id, player_id, game_id, market, selection,
-                       stake, placed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    bet.discordId,
-    bet.playerId,
-    bet.gameId,
-    bet.market,
-    bet.selection,
-    bet.stake,
-    Date.now(),
-  );
+
+  db.transaction(() => {
+    // The stake leaves the wallet the moment the bet is placed, which is what
+    // stops the same coin being ridden on four games at once. The route has
+    // already checked the balance; this is the guard against a double submit
+    // slipping two bets through on one coin.
+    const paid = debitCoins(db, bet.discordId, {
+      source: 'BET_STAKE',
+      ref: id,
+      amount: bet.stake,
+      detail: 'Apuesta',
+    });
+    if (!paid) throw new Error('INSUFFICIENT_COINS');
+
+    db.prepare(
+      `INSERT INTO bets (id, discord_id, player_id, game_id, market, selection,
+                         stake, placed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      bet.discordId,
+      bet.playerId,
+      bet.gameId,
+      bet.market,
+      bet.selection,
+      bet.stake,
+      Date.now(),
+    );
+  })();
 
   return getBet(db, id)!;
+}
+
+/**
+ * Hands a stake back. Bypasses the wallet ceiling on purpose: a refund is not
+ * income, and a full wallet must not swallow a stake it is returning.
+ */
+function refundStake(db: Db, bet: { id: string; discordId: string; stake: number }): void {
+  creditCoins(db, bet.discordId, {
+    source: 'BET_REFUND',
+    ref: bet.id,
+    amount: bet.stake,
+    detail: 'Apuesta anulada',
+    bypassCap: true,
+  });
 }
 
 export function getBet(db: Db, id: string): BetRow | null {
@@ -241,6 +252,7 @@ export function settleBetsForMatch(
           `UPDATE bets SET status = 'VOID', payout = 0, match_id = ?,
                            settled_at = ? WHERE id = ?`,
         ).run(matchId, Date.now(), bet.id);
+        refundStake(db, bet);
         continue;
       }
 
@@ -252,21 +264,26 @@ export function settleBetsForMatch(
         continue;
       }
 
-      // The stake always comes back; the winnings only fill what fits. At the
-      // ceiling that means a win pays nothing extra, which is the deal for
-      // betting while full.
+      // Stake and winnings come back together, trimmed to what the wallet can
+      // hold. A player at the ceiling collects nothing extra — that is the deal
+      // for betting while full, and the reason to spend before you wager.
+      // A spectator's winnings are the one thing in this economy allowed past
+      // fifteen, because they have no other way to get there.
       const holder = holderFor(db, bet.discordId);
-      const ceiling = shellCeiling(holder?.isSpectator ?? false);
-      const balanceWithoutStake = balanceForHolder(db, bet.discordId).available;
+      const credited = creditCoins(db, bet.discordId, {
+        source: 'BET_PAYOUT',
+        ref: bet.id,
+        amount: payoutFor(bet.selection, bet.stake),
+        detail: 'Apuesta ganada',
+        bypassCap: holder?.isSpectator ?? false,
+      });
 
-      const full = payoutFor(bet.selection, bet.stake);
-      const headroom = ceiling - (balanceWithoutStake + bet.stake);
-      const winnings = Math.max(0, Math.min(full - bet.stake, headroom));
-
+      // payout records what actually landed rather than what was owed, so the
+      // standings' net is the truth about somebody's wallet.
       db.prepare(
         `UPDATE bets SET status = 'WON', payout = ?, match_id = ?,
                          settled_at = ? WHERE id = ?`,
-      ).run(bet.stake + winnings, matchId, Date.now(), bet.id);
+      ).run(credited, matchId, Date.now(), bet.id);
 
       won += 1;
     }
@@ -283,14 +300,33 @@ export function settleBetsForMatch(
  * that vanished.
  */
 export function voidStaleBets(db: Db, olderThanMs: number): number {
-  const result = db
+  // Walked row by row rather than voided in bulk, because the refund is now an
+  // explicit ledger entry. It used to be implicit — the old balance derivation
+  // simply stopped counting a voided stake — and a bulk UPDATE here would
+  // quietly keep everybody's coins.
+  const stale = db
     .prepare(
-      `UPDATE bets SET status = 'VOID', payout = 0, settled_at = ?
+      `SELECT id, discord_id AS discordId, stake FROM bets
        WHERE status = 'OPEN' AND placed_at < ?`,
     )
-    .run(Date.now(), Date.now() - olderThanMs);
+    .all(Date.now() - olderThanMs) as Array<{
+    id: string;
+    discordId: string;
+    stake: number;
+  }>;
 
-  return result.changes;
+  if (stale.length === 0) return 0;
+
+  db.transaction(() => {
+    for (const bet of stale) {
+      db.prepare(
+        "UPDATE bets SET status = 'VOID', payout = 0, settled_at = ? WHERE id = ?",
+      ).run(Date.now(), bet.id);
+      refundStake(db, bet);
+    }
+  })();
+
+  return stale.length;
 }
 
 export interface LiveWager {

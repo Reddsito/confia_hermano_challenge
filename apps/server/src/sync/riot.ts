@@ -27,6 +27,7 @@ import {
 } from '../db/matches';
 import { awardShells, fulfillOldestThrow, progressFor } from '../db/shells';
 import { settleBetsForMatch } from '../db/bets';
+import { grantWinCoin } from '../db/coins';
 import { mentionFor } from '../db/users';
 import {
   challengeServedEmbed,
@@ -270,10 +271,16 @@ async function syncPlayer(
       winStreak = row.win ? winStreak + 1 : 0;
       insertPlayerMatch(db, row);
 
-      // Wagers are graded before achievements are awarded, so a win that fills
-      // the fourth slot is already in the balance when the milestone rules ask
-      // how much headroom is left. The other order would pay an achievement
-      // into a slot the bet was about to take.
+      // The coin for winning lands before any wager is paid, so it is the
+      // player's own result that gets first call on the wallet's headroom
+      // rather than a bet they happened to place on somebody else.
+      if (row.win) {
+        const coins = grantWinCoin(db, player.id, matchId);
+        if (coins > 0) {
+          console.log(`[coins] ${player.displayName}: +${coins} por victoria`);
+        }
+      }
+
       const graded = settleBetsForMatch(db, player.id, matchId, {
         win: row.win,
         kills: row.kills,

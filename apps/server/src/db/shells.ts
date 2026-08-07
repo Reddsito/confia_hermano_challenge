@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import {
   MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
-  MIN_SHELLS,
   type EarnedShell,
   type RunePage,
   type ShellProgress,
@@ -119,8 +118,8 @@ export interface ShellBalance {
  * out would let someone who had staked everything keep earning as though the
  * shells were still in hand.
  *
- * No longer clamped at zero: a lost uncovered bet is a real debt, and flooring
- * it would forgive it the instant it was incurred.
+ * Bets are absent: they pay monedas now, so nothing here can go negative and
+ * the floor is zero again.
  */
 export function balanceFor(db: Db, playerId: string): ShellBalance {
   const earned = (
@@ -144,14 +143,14 @@ export function balanceFor(db: Db, playerId: string): ShellBalance {
       .get(playerId, linked?.discordId ?? null) as { n: number }
   ).n;
 
-  const bets = linked
+  // Shells bought in the shop by somebody whose account has no roster entry.
+  // A linked player's purchases land in blue_shells instead, so they are
+  // already in `earned` above.
+  const granted = linked
     ? (
         db
           .prepare(
-            `SELECT COALESCE(SUM(payout), 0)
-                  - COALESCE(SUM(CASE WHEN status != 'VOID' THEN stake ELSE 0 END), 0)
-                    AS n
-             FROM bets WHERE discord_id = ?`,
+            'SELECT COALESCE(SUM(amount), 0) AS n FROM shell_grants WHERE discord_id = ?',
           )
           .get(linked.discordId) as { n: number }
       ).n
@@ -160,7 +159,7 @@ export function balanceFor(db: Db, playerId: string): ShellBalance {
   return {
     earned,
     thrown,
-    available: Math.max(earned + bets - thrown, MIN_SHELLS),
+    available: Math.max(0, earned + granted - thrown),
   };
 }
 

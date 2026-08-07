@@ -52,45 +52,26 @@ export const SHELL_RULE_AWARD: Record<ShellRule, number> = {
 };
 
 /**
- * Nobody can sit on more than this many unspent shells. Earning is capped, not
- * queued: at the cap, further achievements pay nothing until one is fired, so
- * the cap is what stops a good week from being banked instead of played.
+ * Nobody can sit on more than this many unspent shells, however they got them.
+ * Earning is capped, not queued: at the cap, further achievements pay nothing
+ * and the shop refuses to sell, so the cap is what stops a good week from being
+ * banked instead of played.
+ *
+ * One ceiling for everybody. There used to be a second, higher one that only
+ * bet winnings could reach — bets pay monedas now, so the slot above has no
+ * source and the two numbers collapse back into one.
  */
 export const MAX_HELD_SHELLS = 3;
 
 /**
- * The ceiling once betting is in play.
+ * A shell bought in the shop rather than earned.
  *
- * Achievements top out at MAX_HELD_SHELLS; the slot above it exists but can
- * only ever be filled by winning a wager, which is the whole reason to risk
- * anything when you are already full. Winnings past this are dropped rather
- * than banked — at the ceiling you bet for the love of the game.
+ * Not a member of SHELL_RULES: it is not something a game can satisfy, and
+ * putting it there would have earnedShells ranking it against real
+ * achievements. It shares the ledger so a bought shell can be thrown and
+ * stolen exactly like an earned one.
  */
-export const MAX_HELD_WITH_BETS = 4;
-
-/**
- * How deep into debt a lost bet can put you.
- *
- * Betting uncovered is allowed, so a balance is not clamped at zero the way it
- * used to be. At the floor you cannot stake anything until you climb out, and
- * anything earned afterwards pays the debt down before it fills a slot.
- */
-export const MIN_SHELLS = -2;
-
-/** Nobody stakes more than this on one game, whatever they are holding. */
-export const MAX_STAKE = 2;
-
-/**
- * Spectators do not play, so they cannot earn from achievements. They are
- * staked an opening balance instead, and every shell after that has to be won.
- */
-export const SPECTATOR_START_SHELLS = 5;
-export const SPECTATOR_MAX_SHELLS = 6;
-
-/** The ceiling that applies to whoever is holding. */
-export function shellCeiling(isSpectator: boolean): number {
-  return isSpectator ? SPECTATOR_MAX_SHELLS : MAX_HELD_WITH_BETS;
-}
+export const SHELL_SHOP_RULE = 'SHOP_PURCHASE';
 
 /** Riot's summoner spell id for Smite. */
 export const SMITE_SPELL_ID = 11;

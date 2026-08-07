@@ -6,6 +6,7 @@ import { listPlayers } from '../db/players';
 import { mentionFor } from '../db/users';
 import { resolveSteals } from '../db/shells';
 import { voidStaleBets } from '../db/bets';
+import { earningAccounts, ensureAccrual } from '../db/coins';
 
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/index';
@@ -66,6 +67,20 @@ export class Scheduler {
     if (voided > 0) console.log(`[bets] ${voided} stale wager(s) returned`);
   }
 
+  /**
+   * Pays out the daily coin to everybody, not just to whoever happens to open
+   * the site.
+   *
+   * Not load-bearing — accrual is lazy and happens on any read — but without it
+   * a wallet only catches up when its owner looks at it, and the standings
+   * would show yesterday's numbers for anybody who was away.
+   */
+  private accrueCoins(): void {
+    for (const discordId of earningAccounts(this.db)) {
+      ensureAccrual(this.db, discordId);
+    }
+  }
+
   private settleSteals(): void {
     const names = new Map(
       listPlayers(this.db, 'approved').map((player) => [
@@ -121,6 +136,7 @@ export class Scheduler {
       if (!this.config.useMockData) {
         this.settleSteals();
         this.voidAbandonedBets();
+        this.accrueCoins();
       }
 
       markCycleComplete(

@@ -1,12 +1,11 @@
 import type { BetMarket } from '@challenge/core/domain';
 
 import { API_URL } from './api';
+import type { CoinWallet } from './coins';
 
 export interface Wallet {
   available: number;
   ceiling: number;
-  /** How many shells are owed. Zero unless the balance went negative. */
-  debt: number;
   isSpectator: boolean;
 }
 
@@ -70,14 +69,18 @@ export async function fetchStandings(): Promise<BetStanding[]> {
   return ((await response.json()) as { standings: BetStanding[] }).standings;
 }
 
-export async function fetchMyBets(
-  token: string,
-): Promise<{ balance: Wallet; open: OpenBet[]; maxStake: number }> {
+export async function fetchMyBets(token: string): Promise<{
+  wallet: CoinWallet;
+  balance: Wallet;
+  open: OpenBet[];
+  maxStake: number;
+}> {
   const response = await fetch(`${API_URL}/api/bets/me`, {
     headers: authHeaders(token),
   });
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as {
+    wallet: CoinWallet;
     balance: Wallet;
     open: OpenBet[];
     maxStake: number;
@@ -92,12 +95,12 @@ export async function placeBet(
     selection: string;
     stake: number;
   },
-): Promise<Wallet> {
+): Promise<CoinWallet> {
   const response = await fetch(`${API_URL}/api/bets`, {
     method: 'POST',
     headers: { ...authHeaders(token), 'content-type': 'application/json' },
     body: JSON.stringify(bet),
   });
   if (!response.ok) throw new Error(await readError(response));
-  return ((await response.json()) as { balance: Wallet }).balance;
+  return ((await response.json()) as { wallet: CoinWallet }).wallet;
 }

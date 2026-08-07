@@ -385,6 +385,100 @@ const MIGRATIONS: string[] = [
   CREATE INDEX idx_bets_open ON bets (status, player_id);
   CREATE INDEX idx_bets_holder ON bets (discord_id);
   `,
+
+  // Monedas: the betting currency, split out of blue shells.
+  //
+  // Shells were both the chip and the prize, which forced debt, two ceilings on
+  // one number, and a spectator seed that lived inside a calculation instead of
+  // a row. Now shells are only earned or bought, and monedas carry the casino.
+  `
+  -- Held by discord_id rather than player_id because spectators bet and have no
+  -- roster entry, and because a wallet is something an account owns, not
+  -- something a roster entry owns.
+  --
+  -- Append-only. Every cap is applied when the row is written and the row
+  -- records what was actually credited, which is what lets a balance be a plain
+  -- SUM: the fifteen-coin ceiling and the five-a-day ceiling both depend on the
+  -- order events happened in, and re-deriving them on read would mean replaying
+  -- the whole tournament to answer "how many coins do I have".
+  CREATE TABLE coin_ledger (
+    id         TEXT PRIMARY KEY,
+    discord_id TEXT NOT NULL REFERENCES discord_users (discord_id) ON DELETE CASCADE,
+    -- DAILY | WIN | BET_STAKE | BET_PAYOUT | BET_REFUND | SHOP_SHELL | ADMIN
+    source     TEXT NOT NULL,
+    -- What this row is about, and the whole idempotency story: the day key for
+    -- DAILY, the match id for WIN, the bet id for the three BET_ sources, a
+    -- uuid for the rest. Re-running a sync cycle or a settling pass therefore
+    -- cannot pay twice, the same way blue_shells already works.
+    ref        TEXT NOT NULL,
+    -- Signed. Negative for stakes and purchases. May be zero when the wallet
+    -- ceiling ate the grant: the row still marks that day as paid.
+    amount     INTEGER NOT NULL,
+    -- The Panama calendar day (UTC-5) this belongs to, as YYYY-MM-DD. Stored
+    -- rather than derived because the five-a-day cap groups by it and SQLite
+    -- has no notion of the tournament's timezone.
+    day        TEXT NOT NULL,
+    detail     TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    UNIQUE (discord_id, source, ref)
+  );
+
+  CREATE INDEX idx_coin_ledger_holder ON coin_ledger (discord_id);
+  CREATE INDEX idx_coin_ledger_day ON coin_ledger (discord_id, day);
+
+  -- Blue shells held by somebody with no roster entry.
+  --
+  -- blue_shells.player_id is NOT NULL by design, and spectators can now buy
+  -- shells, so they need somewhere to live. This is also where the old
+  -- spectator seed gets written down: it used to be a constant added inside
+  -- balanceForHolder, and deleting the constant would have silently taken five
+  -- shells off everybody who had them.
+  CREATE TABLE shell_grants (
+    id         TEXT PRIMARY KEY,
+    discord_id TEXT NOT NULL REFERENCES discord_users (discord_id) ON DELETE CASCADE,
+    amount     INTEGER NOT NULL,
+    source     TEXT NOT NULL,
+    detail     TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX idx_shell_grants_holder ON shell_grants (discord_id);
+
+  INSERT INTO shell_grants (id, discord_id, amount, source, detail, created_at)
+  SELECT 'seed-' || discord_id, discord_id, 5, 'LEGACY_SEED',
+         'Conchas de espectador de antes de las monedas', unixepoch() * 1000
+  FROM discord_users WHERE is_spectator = 1;
+
+  -- Wagers still riding were staked in shells, and there are no monedas to
+  -- refund them with. Voiding returns the stake by construction: after this
+  -- migration nothing subtracts a stake from a shell balance any more.
+  UPDATE bets SET status = 'VOID', payout = 0, settled_at = unixepoch() * 1000
+   WHERE status = 'OPEN';
+
+  -- One bet per person per game, whatever the market. The old key allowed one
+  -- per market, which was the same thing only for as long as WIN was the only
+  -- market on offer.
+  --
+  -- Settled history can already hold two rows for one game from back when two
+  -- markets were open, and the index would refuse to build over them. Void the
+  -- later one first: it is a graded wager either way, so it stays in the
+  -- standings, and nobody's coins move because this predates the ledger.
+  UPDATE bets SET status = 'VOID' WHERE id IN (
+    SELECT b.id FROM bets b
+    WHERE b.status != 'VOID' AND EXISTS (
+      SELECT 1 FROM bets earlier
+      WHERE earlier.discord_id = b.discord_id
+        AND earlier.game_id = b.game_id
+        AND earlier.status != 'VOID'
+        AND (earlier.placed_at < b.placed_at
+             OR (earlier.placed_at = b.placed_at AND earlier.id < b.id))
+    )
+  );
+
+  -- Partial so a voided wager frees its game up again.
+  CREATE UNIQUE INDEX idx_bets_one_per_game
+    ON bets (discord_id, game_id) WHERE status != 'VOID';
+  `,
 ];
 
 export function openDatabase(path: string): Db {

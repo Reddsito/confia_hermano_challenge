@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "sync": "tsx src/cli/sync-once.ts",
     "doctor": "tsx src/cli/doctor.ts",
+    "coins:check": "tsx src/cli/coins-check.ts",
     "typecheck": "tsc --noEmit",
     "reset": "tsx src/cli/reset.ts",
     "backfill": "tsx src/cli/backfill.ts",

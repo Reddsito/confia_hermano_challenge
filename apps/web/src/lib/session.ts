@@ -1,6 +1,7 @@
 import { API_URL } from './api';
 
 import type { Wallet } from './bets';
+import type { CoinWallet } from './coins';
 
 export interface SessionUser {
   discordId: string;
@@ -12,10 +13,12 @@ export interface SessionUser {
   isSpectator: boolean;
   shells: { earned: number; thrown: number; available: number } | null;
   /**
-   * The account's balance, wagers included. Present for spectators too, who
-   * have no `shells` because that one is read off a roster entry.
+   * The account's shell balance. Present for spectators too, who have no
+   * `shells` because that one is read off a roster entry.
    */
   wallet: Wallet | null;
+  /** The coin wallet: what this account bets and buys with. */
+  coins: CoinWallet | null;
 }
 
 const STORAGE_KEY = 'challenge.session';

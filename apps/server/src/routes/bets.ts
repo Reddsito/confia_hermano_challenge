@@ -1,8 +1,9 @@
 import {
   MAX_STAKE,
-  MIN_SHELLS,
+  MIN_STAKE,
   OFFERED_MARKETS,
   bettingOpen,
+  canAfford,
   isOffered,
   isSelectionOf,
   type BetMarket,
@@ -18,6 +19,7 @@ import {
   openBets,
   placeBet,
 } from '../db/bets';
+import { coinWallet } from '../db/coins';
 import type { Db } from '../db/index';
 import { activeGames } from '../db/matches';
 import { listPlayers } from '../db/players';
@@ -75,9 +77,9 @@ export function betRoutes(db: Db, config: ServerConfig) {
       return context.json({ error: 'Entrá con Discord primero.' }, 401);
     }
 
-    const balance = balanceForHolder(db, user.discordId);
     return context.json({
-      balance,
+      wallet: coinWallet(db, user.discordId),
+      balance: balanceForHolder(db, user.discordId),
       maxStake: MAX_STAKE,
       markets: OFFERED_MARKETS,
       open: openBets(db, user.discordId),
@@ -124,9 +126,9 @@ export function betRoutes(db: Db, config: ServerConfig) {
     }
 
     const stake = Math.trunc(Number(body.stake));
-    if (!Number.isFinite(stake) || stake < 1 || stake > MAX_STAKE) {
+    if (!Number.isFinite(stake) || stake < MIN_STAKE || stake > MAX_STAKE) {
       return context.json(
-        { error: `Podés apostar entre 1 y ${MAX_STAKE} conchas.` },
+        { error: `Podés apostar ${MIN_STAKE} o ${MAX_STAKE} monedas.` },
         400,
       );
     }
@@ -151,29 +153,29 @@ export function betRoutes(db: Db, config: ServerConfig) {
 
     const gameId = String(live.game.gameId);
 
+    // One bet per game, whatever the market. activeGames merges live rows by
+    // gameId, so two roster players in the same match are one entry with one
+    // game_id — betting on "the game" rather than on each of them falls out of
+    // that for free, and the partial unique index backs it at the schema level.
     const already = db
       .prepare(
         `SELECT 1 FROM bets
-         WHERE discord_id = ? AND game_id = ? AND market = ? AND status != 'VOID'`,
+         WHERE discord_id = ? AND game_id = ? AND status != 'VOID'`,
       )
-      .get(user.discordId, gameId, market);
+      .get(user.discordId, gameId);
     if (already) {
-      return context.json(
-        { error: 'Ya apostaste a eso en esta partida.' },
-        409,
-      );
+      return context.json({ error: 'Ya apostaste a esta partida.' }, 409);
     }
 
-    // Uncovered betting is allowed, but only down to the floor. Checked against
-    // what the stake would leave behind, not against what is held now.
-    const balance = balanceForHolder(db, user.discordId);
-    if (balance.available - stake < MIN_SHELLS) {
+    // No debt anywhere: you bet what you have or you do not bet.
+    const wallet = coinWallet(db, user.discordId);
+    if (!canAfford(wallet.coins, stake)) {
       return context.json(
         {
           error:
-            balance.available <= MIN_SHELLS
-              ? 'Estás en el fondo. Ganá una concha antes de volver a apostar.'
-              : `No podés bajar de ${MIN_SHELLS}. Te alcanza para ${balance.available - MIN_SHELLS}.`,
+            wallet.coins === 0
+              ? 'No tenés monedas. Jugá o esperá a mañana.'
+              : `No te alcanza. Tenés ${wallet.coins} ${wallet.coins === 1 ? 'moneda' : 'monedas'}.`,
         },
         409,
       );
@@ -189,7 +191,7 @@ export function betRoutes(db: Db, config: ServerConfig) {
     });
 
     return context.json(
-      { bet, balance: balanceForHolder(db, user.discordId) },
+      { bet, wallet: coinWallet(db, user.discordId) },
       201,
     );
   });
