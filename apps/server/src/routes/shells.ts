@@ -16,6 +16,7 @@ import {
   listRolls,
   listShells,
   listThrows,
+  throwStandings,
   recordThrow,
   rollCount,
   spinChallenge,
@@ -95,7 +96,11 @@ export function shellRoutes(db: Db, config: ServerConfig) {
         ...balanceFor(db, player.id),
         shells: listShells(db, player.id),
       })),
+      // The feed stays capped — it is a "what just happened" list. The
+      // standings beside it are counted over every row, which is why they are
+      // computed here instead of tallied from this array.
       throws: listThrows(db),
+      standings: throwStandings(db),
     });
   });
 

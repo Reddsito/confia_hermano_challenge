@@ -480,6 +480,70 @@ export function recordThrow(
   };
 }
 
+export interface ThrowerStanding {
+  /** Set when a roster player fired it. */
+  playerId: string | null;
+  /** Set when the thrower has a Discord account, roster entry or not. */
+  discordId: string | null;
+  /** The Discord username, for a thrower with no roster entry. */
+  username: string | null;
+  thrown: number;
+}
+
+export interface TargetStanding {
+  playerId: string;
+  hits: number;
+  pending: number;
+}
+
+export interface ThrowStandings {
+  throwers: ThrowerStanding[];
+  targets: TargetStanding[];
+}
+
+/**
+ * Who throws the most and who catches the most, counted in SQL over the whole
+ * throw log.
+ *
+ * Aggregated here rather than tallied in the browser for a reason worth
+ * remembering: the feed the page already had is capped at the newest fifty
+ * throws, so a ranking built from it silently became a ranking of the last few
+ * days. A leaderboard has to see every row or it is not one.
+ *
+ * Throwers are grouped by roster id where there is one and by Discord id
+ * otherwise, because the same person's throws are not stored uniformly — a
+ * linked player's rows carry both columns, and older rows carry only
+ * `from_player`. Grouping on the pair would split one person in two.
+ */
+export function throwStandings(db: Db): ThrowStandings {
+  const throwers = db
+    .prepare(
+      `SELECT MAX(t.from_player) AS playerId,
+              MAX(t.from_discord) AS discordId,
+              MAX(u.username)     AS username,
+              COUNT(*)            AS thrown
+       FROM shell_throws t
+       LEFT JOIN discord_users u ON u.discord_id = t.from_discord
+       WHERE t.from_player IS NOT NULL OR t.from_discord IS NOT NULL
+       GROUP BY COALESCE(t.from_player, 'discord:' || t.from_discord)
+       ORDER BY thrown DESC`,
+    )
+    .all() as ThrowerStanding[];
+
+  const targets = db
+    .prepare(
+      `SELECT to_player AS playerId,
+              COUNT(*)  AS hits,
+              SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) AS pending
+       FROM shell_throws
+       GROUP BY to_player
+       ORDER BY hits DESC, pending DESC`,
+    )
+    .all() as TargetStanding[];
+
+  return { throwers, targets };
+}
+
 export function listThrows(db: Db, limit = 50): ThrowRow[] {
   const rows = db
     .prepare(

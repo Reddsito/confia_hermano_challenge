@@ -121,6 +121,19 @@ export interface ShellsState {
     thrownAt: number;
     completedAt: number | null;
   }>;
+  /**
+   * Counted server-side over every throw ever recorded. `throws` above is the
+   * newest fifty only, so it must never be used to rank anybody.
+   */
+  standings: {
+    throwers: Array<{
+      playerId: string | null;
+      discordId: string | null;
+      username: string | null;
+      thrown: number;
+    }>;
+    targets: Array<{ playerId: string; hits: number; pending: number }>;
+  };
 }
 
 export async function fetchShells(): Promise<ShellsState | null> {
