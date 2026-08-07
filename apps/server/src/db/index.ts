@@ -499,6 +499,55 @@ const MIGRATIONS: string[] = [
   INSERT INTO meta (key, value)
   VALUES ('shell_retribution_epoch', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
   `,
+
+  // Closes the three shell debts left over from betting in shells.
+  //
+  // The amounts are literals rather than a computed deficit, because the number
+  // owed is not the deficit. `balanceFor` clamps at zero, so a holder sitting at
+  // -2 had also been quietly losing every shell earned on the way down. Paying
+  // the deficit alone would leave them at zero holding nothing, still short the
+  // shells the debt ate. Each amount below is a replay of that holder's ledger
+  // with the uncovered throws forgiven — an ordered walk over earnings and
+  // throws against the arsenal cap, which no single SQL expression can state.
+  //
+  // Naming three holders in a migration is only tolerable because this repairs
+  // a closed set of historical rows and can never need a fourth: bets pay
+  // monedas now, and POST /throw refuses an empty arsenal, so no balance can go
+  // negative again. The WHERE EXISTS guards keep a fresh database untouched,
+  // where these ids do not exist and there is nothing to repair.
+  `
+  INSERT OR IGNORE INTO blue_shells
+    (id, player_id, match_id, rule, amount, detail, earned_at)
+  SELECT
+    'repair-debt-' || owed.player_id,
+    owed.player_id,
+    'repair:shell-debt',
+    'DEBT_REPAIR',
+    owed.amount,
+    'Conchas que se había tragado la deuda',
+    CAST(strftime('%s', 'now') AS INTEGER) * 1000
+  FROM (
+    SELECT '6a4d7bd7-b6cb-4908-a895-5f0f57e6158e' AS player_id, 5 AS amount
+    UNION ALL
+    SELECT '5bed1e25-3155-4618-af93-f6d68c60ec8c', 3
+  ) AS owed
+  WHERE EXISTS (SELECT 1 FROM players WHERE id = owed.player_id);
+  `,
+
+  // JACo has no roster entry, so his shells live in shell_grants instead.
+  `
+  INSERT OR IGNORE INTO shell_grants
+    (id, discord_id, amount, source, detail, created_at)
+  SELECT
+    'repair-debt-' || discord_id,
+    discord_id,
+    4,
+    'DEBT_REPAIR',
+    'Conchas que se había tragado la deuda',
+    CAST(strftime('%s', 'now') AS INTEGER) * 1000
+  FROM discord_users
+  WHERE discord_id = '398877892270096384';
+  `,
 ];
 
 export function openDatabase(path: string): Db {

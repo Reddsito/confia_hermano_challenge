@@ -87,6 +87,23 @@ export const SHELL_RETRIBUTION_RULE = 'FIVE_SHELLS_TAKEN';
 
 export const SHELL_RETRIBUTION_LABEL = 'Te cayeron 5 conchas';
 
+/**
+ * A one-time credit that closed the shell debts left by the betting era.
+ *
+ * Back when wagers were paid in shells, a lost bet could push a balance below
+ * zero, and `balanceFor` clamps the display at zero. The effect was silent and
+ * corrosive: those players kept earning shells that went to paying down a debt
+ * nobody had ever been shown, so the arsenal read 0 while the ledger announced
+ * a shell had just been earned.
+ *
+ * The debts were settled by treating the over-thrown shells as legitimately
+ * spent — they were fired, the challenges were served, clawing them back would
+ * punish people for a bug — and re-crediting only what the debt had swallowed
+ * since. Nothing here can happen again: bets pay monedas, and the throw route
+ * refuses to fire on an empty arsenal, so a balance has no way back below zero.
+ */
+export const SHELL_DEBT_REPAIR_RULE = 'DEBT_REPAIR';
+
 /** Shells you have to eat before the sixth one is yours to throw. */
 export const SHELLS_TAKEN_FOR_SHELL = 5;
 
