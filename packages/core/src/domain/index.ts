@@ -6,3 +6,4 @@ export * from './coins';
 export * from './bets';
 export * from './spins';
 export * from './tierlist';
+export * from './lineup';

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Division, Rank, RankedPlayer, Tier } from '@challenge/core/domain';
+import type {
+  Division,
+  Rank,
+  RankedPlayer,
+  Role,
+  Tier,
+} from '@challenge/core/domain';
 
 import { BET_WINDOW_SECONDS, bettingOpen } from '@challenge/core/domain';
 
@@ -26,6 +32,12 @@ interface LiveParticipant {
   riotId: string | null;
   playerId: string | null;
   displayName: string | null;
+  /**
+   * Only ever set for a tracked player — the spectator API reports no position.
+   * Both teams arrive already seated in lane order, so this is here to label a
+   * row, never to sort one.
+   */
+  role: Role | null;
   spellIcons: string[];
   perkIcons: string[];
   rank: LiveRank | null;

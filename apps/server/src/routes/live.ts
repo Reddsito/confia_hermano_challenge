@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
-import { opggUrl } from '@challenge/core/domain';
-import type { PlatformId } from '@challenge/core/riot';
+import { opggUrl, orderByLane } from '@challenge/core/domain';
+import { SMITE_SPELL_ID, type PlatformId } from '@challenge/core/riot';
 
 import type { Db } from '../db/index';
 import { activeGames, cachedRanks } from '../db/matches';
@@ -92,6 +92,10 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
             riotId: participant.riotId,
             playerId: tracked?.id ?? null,
             displayName: tracked?.displayName ?? null,
+            // Only a tracked player has a role we can state. Everyone else is
+            // null, and the lane ordering below is what copes with that.
+            role: tracked?.role ?? null,
+            hasSmite: (participant.spellIds ?? []).includes(SMITE_SPELL_ID),
             spellIcons: (participant.spellIds ?? [])
               .map((id) => assets.spells.get(id) ?? null)
               .filter((icon): icon is string => icon !== null),
@@ -111,6 +115,19 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
 
         const ours = anchor?.teamId ?? 100;
 
+        // Riot hands back pick order, not lane order. Both sides are reseated
+        // so the two columns read top-jungle-mid-adc-support against each
+        // other instead of drifting apart. `hasSmite` was only ever evidence
+        // for that seating, so it does not travel to the client.
+        const lineup = (teamId: number, mine: boolean) =>
+          orderByLane(
+            game.participants
+              .filter((participant) =>
+                mine ? participant.teamId === teamId : participant.teamId !== teamId,
+              )
+              .map(describe),
+          ).map(({ hasSmite: _hasSmite, ...participant }) => participant);
+
         return {
           gameId: game.gameId,
           queueId: game.queueId,
@@ -129,12 +146,8 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
           inChampSelect: game.gameLength < 0,
           countsForChallenge: game.queueId === challengeQueueId,
           trackedPlayerIds: playerIds,
-          allies: game.participants
-            .filter((participant) => participant.teamId === ours)
-            .map(describe),
-          enemies: game.participants
-            .filter((participant) => participant.teamId !== ours)
-            .map(describe),
+          allies: lineup(ours, true),
+          enemies: lineup(ours, false),
         };
       }),
     });
