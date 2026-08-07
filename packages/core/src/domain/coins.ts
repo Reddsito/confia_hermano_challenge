@@ -110,11 +110,10 @@ export function winEntitlement(earnedToday: number): number {
 /**
  * Trims a grant to what the wallet can still hold.
  *
- * `bypassCap` is the whole player/spectator asymmetry in one argument. Passive
- * income never bypasses: at fifteen coins it simply stops. Bet winnings bypass
- * for spectators, which is the only way any wallet goes past the cap, and
- * refunds bypass for everybody, because handing back a stake is not income and
- * must not be confiscated by a full wallet.
+ * `bypassCap` is the whole player/spectator asymmetry in one argument. Nothing
+ * a player does bypasses: at fifteen coins every source simply stops, winnings
+ * and voided stakes included. Only a spectator bypasses, and only through a
+ * bet, which is the one way any wallet goes past the cap at all.
  */
 export function clampGrant(balance: number, wanted: number, bypassCap = false): number {
   if (bypassCap) return Math.max(0, wanted);

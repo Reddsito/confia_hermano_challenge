@@ -428,10 +428,11 @@ export function auditCoinLedger(db: Db): string[] {
         break;
       }
 
-      // Only a spectator's winnings and anybody's refund may exceed the cap.
+      // A spectator's wallet is the only one allowed past the ceiling, and only
+      // through a bet. Nothing a player can do puts them over fifteen.
       const mayExceed =
-        row.source === 'BET_REFUND' ||
-        (row.source === 'BET_PAYOUT' && account.isSpectator === 1);
+        account.isSpectator === 1 &&
+        (row.source === 'BET_PAYOUT' || row.source === 'BET_REFUND');
       if (running > COIN_WALLET_CAP && !mayExceed) {
         problems.push(
           `${account.username}: ${running} monedas tras un ${row.source}, por encima de ${COIN_WALLET_CAP}`,

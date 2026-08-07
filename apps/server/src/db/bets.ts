@@ -153,16 +153,31 @@ export function placeBet(
 }
 
 /**
- * Hands a stake back. Bypasses the wallet ceiling on purpose: a refund is not
- * income, and a full wallet must not swallow a stake it is returning.
+ * Hands a stake back.
+ *
+ * Held to the wallet ceiling for a player, exactly like winnings. It used to
+ * bypass for everybody, on the argument that a refund is not income and a full
+ * wallet should not swallow a stake it is returning — which was true, and which
+ * still made it the one door a player could walk through to fifteen-plus. A
+ * voided bet was quietly minting the coin the cap exists to refuse.
+ *
+ * The cost is real and worth stating: a player who was at the ceiling when a
+ * bet was voided does not get that stake back. It is the same deal the ceiling
+ * already offers wins and winnings — at fifteen you collect nothing — and one
+ * rule that holds everywhere beats a fair exception nobody can predict.
+ *
+ * Spectators still bypass, because their wallet is allowed past fifteen in the
+ * first place.
  */
 function refundStake(db: Db, bet: { id: string; discordId: string; stake: number }): void {
+  const holder = holderFor(db, bet.discordId);
+
   creditCoins(db, bet.discordId, {
     source: 'BET_REFUND',
     ref: bet.id,
     amount: bet.stake,
     detail: 'Apuesta anulada',
-    bypassCap: true,
+    bypassCap: holder?.isSpectator ?? false,
   });
 }
 
