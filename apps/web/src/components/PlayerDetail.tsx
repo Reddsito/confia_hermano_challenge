@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
   MAX_HELD_SHELLS,
-  SHELL_RULE_LABEL,
   titleCase,
   type RankedPlayer,
   type Snapshot,
@@ -62,12 +61,14 @@ function formatAgo(timestamp: number): string {
   return days === 1 ? 'ayer' : `hace ${days} días`;
 }
 
+/** "06 ago 17:32" — short enough to sit on the same line as the challenge. */
 function formatStamp(timestamp: number): string {
   return new Date(timestamp).toLocaleString('es', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 
@@ -185,7 +186,7 @@ export function PlayerDetail({
         aria-modal="true"
         aria-label={`Ficha de ${player.displayName}`}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-line bg-carbon sm:rounded-2xl"
+        className="max-h-[92dvh] w-full max-w-5xl overflow-y-auto rounded-t-2xl border border-line bg-carbon sm:rounded-2xl"
         style={{ '--tier': accent } as React.CSSProperties}
       >
         <header
@@ -604,6 +605,14 @@ function Badge({ label, strong }: { label: string; strong?: boolean }) {
   );
 }
 
+/**
+ * Rows per page. Chosen so a full page of one column is about as tall as the
+ * summary strip plus the other column's header — the panel keeps one height
+ * whichever page you are on, instead of the list growing and shrinking under
+ * the cursor.
+ */
+const SHELL_PAGE_SIZE = 10;
+
 function ShellsTab({
   shells,
   failed,
@@ -613,126 +622,220 @@ function ShellsTab({
 }) {
   if (!shells) return <Placeholder failed={failed} />;
 
-  const { balance, earned, thrown, received } = shells;
-  const pending = received.filter((record) => !record.completedAt).length;
+  const { balance, thrown, received } = shells;
+  const owed = received.filter((record) => !record.completedAt).length;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div className="rounded-lg border border-line bg-carbon-2 p-2.5">
-          <p className="text-[0.68rem] text-ink-3">En inventario</p>
-          <p className="tabular mt-1 text-fluid-lg font-semibold">
-            {balance.available}
-            <span className="text-fluid-xs text-ink-3"> / {MAX_HELD_SHELLS}</span>
-          </p>
-        </div>
-        <Stat label="Conseguidas" value={String(balance.earned)} />
-        <Stat label="Lanzadas" value={String(balance.thrown)} />
-        <Stat
+      {/*
+        One strip rather than four cards: these are four numbers, and a card
+        each spent most of its area on padding.
+      */}
+      <div className="flex flex-wrap items-stretch gap-px overflow-hidden rounded-xl border border-line bg-line">
+        <Tally
+          label="En inventario"
+          value={`${balance.available}`}
+          suffix={`/ ${MAX_HELD_SHELLS}`}
+          accent
+        />
+        <Tally label="Conseguidas" value={String(balance.earned)} />
+        <Tally label="Lanzadas" value={String(balance.thrown)} />
+        <Tally
           label="Recibidas"
-          value={
-            pending > 0
-              ? `${received.length} · ${pending} pendiente${pending === 1 ? '' : 's'}`
-              : String(received.length)
-          }
+          value={String(received.length)}
+          suffix={owed > 0 ? `· ${owed} sin cumplir` : undefined}
         />
       </div>
 
-      <section>
-        <h3 className="eyebrow mb-2 text-ink-3">Conseguidas · cómo</h3>
-        <ShellList
-          rows={earned.map((row) => ({
-            key: row.id,
-            lead: `+${row.amount}`,
-            title:
-              SHELL_RULE_LABEL[row.rule as keyof typeof SHELL_RULE_LABEL] ??
-              row.detail,
-            note: formatStamp(row.earnedAt),
-          }))}
-          empty="Todavía no ganó ninguna."
-        />
-      </section>
-
-      <section>
-        <h3 className="eyebrow mb-2 text-ink-3">Lanzadas</h3>
-        <ShellList
+      {/*
+        Side by side on a wide screen, because the two lists are read against
+        each other — what he threw versus what came back.
+      */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ShellFeed
+          title="Lanzadas"
           rows={thrown.map((row) => ({
-            key: row.id,
-            lead: '→',
-            title: `a ${row.toName ?? 'alguien'} · ${row.challengeName}`,
-            note: formatStamp(row.thrownAt),
-            tag: row.completedAt ? 'Cumplido' : 'Pendiente',
+            id: row.id,
+            who: row.toName ?? 'alguien',
+            challenge: row.challengeName,
+            at: row.thrownAt,
             done: Boolean(row.completedAt),
           }))}
           empty="Todavía no tiró ninguna."
         />
-      </section>
-
-      <section>
-        <h3 className="eyebrow mb-2 text-ink-3">Recibidas</h3>
-        <ShellList
+        <ShellFeed
+          title="Recibidas"
           rows={received.map((row: ThrowRecord) => ({
-            key: row.id,
-            lead: '◎',
-            title: `de ${row.fromName ?? 'un espectador'} · ${row.challengeName}`,
-            note: formatStamp(row.thrownAt),
-            tag: row.completedAt ? 'Cumplido' : 'Pendiente',
+            id: row.id,
+            who: row.fromName ?? 'un espectador',
+            challenge: row.challengeName,
+            at: row.thrownAt,
             done: Boolean(row.completedAt),
           }))}
           empty="Todavía no le cayó ninguna."
         />
-      </section>
+      </div>
     </div>
   );
 }
 
-interface ShellListRow {
-  key: string;
-  lead: string;
-  title: string;
-  note: string;
-  tag?: string;
-  done?: boolean;
+function Tally({
+  label,
+  value,
+  suffix,
+  accent,
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="min-w-[7.5rem] flex-1 bg-carbon-2 px-3 py-2">
+      <p className="text-[0.62rem] tracking-wide text-ink-3 uppercase">{label}</p>
+      <p
+        className="tabular mt-0.5 text-fluid-lg leading-none font-semibold"
+        style={accent ? { color: 'var(--color-accent)' } : undefined}
+      >
+        {value}
+        {suffix && (
+          <span className="ml-1 text-[0.68rem] font-normal text-ink-3">
+            {suffix}
+          </span>
+        )}
+      </p>
+    </div>
+  );
 }
 
-function ShellList({ rows, empty }: { rows: ShellListRow[]; empty: string }) {
-  if (rows.length === 0) {
-    return <p className="text-fluid-xs text-ink-3">{empty}</p>;
-  }
+interface FeedRow {
+  id: string;
+  who: string;
+  challenge: string;
+  at: number;
+  done: boolean;
+}
+
+/**
+ * A paged list of shells, one line per shell.
+ *
+ * Single line on purpose. The name, the punishment and the date are the whole
+ * story, and stacking them cost three times the height to say the same thing —
+ * which is why so few fit before. Status is a dot rather than a pill: it is one
+ * bit of information and it was taking the width of a word.
+ */
+function ShellFeed({
+  title,
+  rows,
+  empty,
+}: {
+  title: string;
+  rows: FeedRow[];
+  empty: string;
+}) {
+  const [page, setPage] = useState(0);
+
+  const pages = Math.max(1, Math.ceil(rows.length / SHELL_PAGE_SIZE));
+  // Clamped rather than reset by an effect: switching to a shorter player's
+  // list while parked on page 4 should show that player's last page, not
+  // flash an empty one and then correct itself.
+  const current = Math.min(page, pages - 1);
+  const slice = rows.slice(
+    current * SHELL_PAGE_SIZE,
+    current * SHELL_PAGE_SIZE + SHELL_PAGE_SIZE,
+  );
 
   return (
-    <ul className="space-y-1.5">
-      {rows.map((row) => (
-        <li
-          key={row.key}
-          className="flex items-center gap-2.5 rounded-lg bg-carbon-2 p-2"
-        >
-          <span
-            className="tabular shrink-0 text-fluid-xs font-semibold"
-            style={{ color: 'var(--color-accent)' }}
-          >
-            {row.lead}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-fluid-xs">{row.title}</span>
-            <span className="block text-[0.68rem] text-ink-3">{row.note}</span>
-          </span>
-          {row.tag && (
-            <span
-              className="eyebrow shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem]"
-              style={{
-                borderColor: row.done
-                  ? 'var(--color-mark-teal)'
-                  : 'var(--color-line)',
-                color: row.done ? 'var(--color-mark-teal)' : 'var(--color-ink-3)',
-              }}
-            >
-              {row.tag}
+    <section className="rounded-xl border border-line bg-carbon-2/40">
+      <header className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <h3 className="eyebrow flex-1 text-ink-2">
+          {title}
+          <span className="ml-1.5 text-ink-3">{rows.length}</span>
+        </h3>
+
+        {pages > 1 && (
+          <div className="flex items-center gap-1">
+            <PageButton
+              label="Anteriores"
+              glyph="‹"
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+            />
+            <span className="tabular text-[0.68rem] text-ink-3">
+              {current + 1}/{pages}
             </span>
-          )}
-        </li>
-      ))}
-    </ul>
+            <PageButton
+              label="Siguientes"
+              glyph="›"
+              disabled={current >= pages - 1}
+              onClick={() => setPage(current + 1)}
+            />
+          </div>
+        )}
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="px-3 py-6 text-center text-fluid-xs text-ink-3">{empty}</p>
+      ) : (
+        <ul>
+          {slice.map((row) => (
+            <li
+              key={row.id}
+              className="flex items-center gap-2 border-b border-line/50 px-3 py-1.5 transition-colors last:border-0 hover:bg-carbon-3/50"
+            >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{
+                  background: row.done
+                    ? 'var(--color-mark-teal)'
+                    : 'var(--color-accent)',
+                }}
+              />
+              <span className="min-w-0 flex-1 truncate text-fluid-xs">
+                <span className="font-medium">{row.who}</span>
+                <span className="text-ink-3"> · {row.challenge}</span>
+              </span>
+              <span className="sr-only">
+                {row.done ? 'Cumplido' : 'Pendiente'}
+              </span>
+              <span className="tabular shrink-0 text-[0.62rem] text-ink-3">
+                {formatStamp(row.at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PageButton({
+  label,
+  glyph,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  glyph: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={classNames(
+        'flex h-6 w-6 items-center justify-center rounded-md border border-line text-fluid-xs transition-colors',
+        disabled
+          ? 'cursor-default text-ink-3/40'
+          : 'text-ink-2 hover:border-line-strong hover:text-ink',
+      )}
+    >
+      {glyph}
+    </button>
   );
 }
 
