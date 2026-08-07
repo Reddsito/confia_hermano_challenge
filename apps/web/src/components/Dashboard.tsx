@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildRanking } from '@challenge/core/domain';
-import { ROLES, type Role, type Snapshot } from '@challenge/core/domain';
+import { ROLES, SPECTATOR_DAILY_GRANT, type Role, type Snapshot } from '@challenge/core/domain';
 import { SNAPSHOT_ENDPOINT } from '../lib/api';
 import {
   captureSessionFromUrl,
@@ -12,7 +12,7 @@ import {
   avatarUrl,
   type SessionUser,
 } from '../lib/session';
-import { BlueShells, ShellMark } from './BlueShells';
+import { BlueShells, CoinMark, COIN_GOLD, ShellMark } from './BlueShells';
 import { TierList } from './TierList';
 import { LiveGames, useLiveFeed } from './LiveGames';
 import { Filters, type FilterState, type SortKey } from './Filters';
@@ -347,6 +347,25 @@ function AccountChip({
         >
           <ShellMark size={11} />
           {user.shells.available}
+        </span>
+      )}
+
+      {user.coins && (
+        <span
+          className="tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold"
+          style={{
+            color: COIN_GOLD,
+            background: `color-mix(in oklab, ${COIN_GOLD} 14%, transparent)`,
+          }}
+          title={
+            user.coins.isSpectator
+              ? `Monedas. Ganás ${SPECTATOR_DAILY_GRANT} por día hasta ${user.coins.cap}.`
+              : `Monedas. Hoy llevás ${user.coins.earnedToday} de ${user.coins.dailyCap}.`
+          }
+        >
+          <CoinMark size={11} />
+          {user.coins.coins}
+          <span className="font-normal opacity-60">/{user.coins.cap}</span>
         </span>
       )}
 

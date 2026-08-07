@@ -7,6 +7,7 @@ import {
   canBuyShell,
 } from '@challenge/core/domain';
 
+import { CoinRack } from './BlueShells';
 import { buyShell } from '../lib/coins';
 import type { CoinWallet } from '../lib/coins';
 
@@ -34,7 +35,6 @@ export function CoinShop({
   if (!wallet || !token) return null;
 
   const check = canBuyShell(wallet.coins, heldShells, MAX_HELD_SHELLS);
-  const progress = Math.min(1, wallet.coins / SHELL_PRICE_COINS);
 
   const buy = async () => {
     setBuying(true);
@@ -59,24 +59,15 @@ export function CoinShop({
         </span>
       </div>
 
-      <p className="mt-2 text-fluid-sm">
+      {/* Fifteen marks filling up is the whole read: how many you have and how
+          far the next shell is, without doing the arithmetic. */}
+      <div className="mt-3">
+        <CoinRack coins={wallet.coins} cap={wallet.cap} />
+      </div>
+
+      <p className="mt-3 text-fluid-sm">
         Una concha azul cuesta {SHELL_PRICE_COINS} monedas.
       </p>
-
-      {/* The bar is against the price, not against the wallet cap: what matters
-          here is how close the next shell is. */}
-      <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-void"
-        role="presentation"
-      >
-        <div
-          className="h-full rounded-full transition-[width] duration-500"
-          style={{
-            width: `${progress * 100}%`,
-            backgroundColor: 'var(--color-accent)',
-          }}
-        />
-      </div>
 
       <button
         type="button"

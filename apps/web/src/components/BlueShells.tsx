@@ -861,6 +861,74 @@ function Wheel({
   );
 }
 
+export const COIN_GOLD = '#f2c94c';
+
+/**
+ * One moneda. A struck coin rather than a flat dot, so it reads as currency
+ * next to the shell and not as another progress pip.
+ */
+export function CoinMark({
+  size = 16,
+  filled = false,
+}: {
+  size?: number;
+  filled?: boolean;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+      style={
+        filled
+          ? {
+              filter: `drop-shadow(0 0 5px color-mix(in oklab, ${COIN_GOLD} 55%, transparent))`,
+            }
+          : undefined
+      }
+    >
+      <circle
+        cx="16"
+        cy="16"
+        r="13"
+        fill={filled ? COIN_GOLD : 'transparent'}
+        stroke={filled ? COIN_GOLD : 'var(--color-line-strong)'}
+        strokeWidth="2"
+      />
+      {/* The inner ring only shows on a struck coin; an empty slot stays a
+          plain outline so a full rack is legible at a glance. */}
+      {filled && (
+        <circle
+          cx="16"
+          cy="16"
+          r="7.5"
+          fill="none"
+          stroke="color-mix(in oklab, #05070a 45%, transparent)"
+          strokeWidth="2"
+        />
+      )}
+    </svg>
+  );
+}
+
+/**
+ * The coin rack: fifteen of them, filled up to what is held.
+ *
+ * Fifteen marks is a lot, so they are drawn small and allowed to wrap. Anything
+ * a spectator wins above the cap is appended past the rack rather than dropped,
+ * since exceeding it is the one thing their winnings can do.
+ */
+export function CoinRack({ coins, cap }: { coins: number; cap: number }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1" aria-hidden="true">
+      {Array.from({ length: Math.max(cap, coins) }, (_, index) => (
+        <CoinMark key={index} size={14} filled={index < coins} />
+      ))}
+    </span>
+  );
+}
+
 /** SVG path for one slice, measured clockwise from twelve o'clock. */
 function arc(
   cx: number,
@@ -899,7 +967,6 @@ function Inventory({
   isSpectator: boolean;
 }) {
   const full = available >= ceiling;
-  const owed = available < 0 ? -available : 0;
   // Newest first, straight from the query, so this is the shell most recently
   // earned — the reason the counter above moved.
   const latest = shells[0] ?? null;
@@ -909,14 +976,6 @@ function Inventory({
       <p className="eyebrow text-ink-3">Tu arsenal</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {/*
-          Debt is drawn as its own red marks rather than as a minus sign. The
-          rack exists so a balance can be read without reading, and a negative
-          number is the one thing that breaks that.
-        */}
-        {Array.from({ length: owed }, (_, index) => (
-          <ShellMark key={`debt-${index}`} size={36} filled owed />
-        ))}
         {Array.from({ length: ceiling }, (_, index) => (
           <ShellMark key={index} size={36} filled={index < available} />
         ))}
@@ -930,15 +989,13 @@ function Inventory({
         className="mt-3 text-fluid-xs"
         style={{ color: full ? 'var(--color-mark-amber)' : 'var(--color-ink-3)' }}
       >
-        {available < 0
-          ? `Debés ${owed}. Lo que ganes tapa la deuda antes de llenar un slot.`
-          : full
-            ? 'Llena. Nada más cuenta hasta que tires una.'
-            : available > 0
-              ? `Te queda${available > 1 ? 'n' : ''} ${available} para tirar.`
-              : isSpectator
-                ? 'Vacío. La única forma de recuperar es apostando.'
-                : 'Vacío. Ganá una, o robásela a alguien al que le ganes.'}
+        {full
+          ? 'Llena. Nada más cuenta hasta que tires una.'
+          : available > 0
+            ? `Te queda${available > 1 ? 'n' : ''} ${available} para tirar.`
+            : isSpectator
+              ? `Vacío. Comprá una con ${SHELL_PRICE_COINS} monedas.`
+              : `Vacío. Ganá una, comprala con ${SHELL_PRICE_COINS} monedas, o robásela a alguien al que le ganes.`}
       </p>
       {isSpectator ? <EarnBetting /> : <Earn latest={latest} />}
     </section>
