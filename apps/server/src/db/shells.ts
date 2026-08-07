@@ -3,12 +3,14 @@ import { randomUUID } from 'node:crypto';
 import {
   MAX_CHAMPION_REROLLS,
   MAX_HELD_SHELLS,
+  SHELLS_TAKEN_FOR_SHELL,
+  SHELL_RETRIBUTION_RULE,
   type EarnedShell,
   type RunePage,
   type ShellProgress,
 } from '@challenge/core/domain';
 
-import type { Db } from './index';
+import { getMeta, type Db } from './index';
 
 export interface ShellRow {
   id: string;
@@ -76,13 +78,6 @@ export function awardShells(
 
 /** Counters that span games, read after the current match has been stored. */
 export function progressFor(db: Db, playerId: string): Omit<ShellProgress, 'winStreak'> {
-  const row = db
-    .prepare(
-      `SELECT COALESCE(SUM(CASE WHEN win = 1 AND used_smite = 1 THEN 1 ELSE 0 END), 0) AS smiteWins
-       FROM player_matches WHERE player_id = ?`,
-    )
-    .get(playerId) as { smiteWins: number };
-
   // The last five games, newest first. Counted here rather than in SQL because
   // the count only means anything if all five were wins, and that condition is
   // clearer as a check on the rows than as a CASE inside the aggregate.
@@ -100,7 +95,6 @@ export function progressFor(db: Db, playerId: string): Omit<ShellProgress, 'winS
     streakChampions: allWins
       ? new Set(recent.map((game) => game.championId)).size
       : 0,
-    smiteWins: row.smiteWins,
   };
 }
 
@@ -348,6 +342,88 @@ function parsePayload(raw: string | null): ShellPayload | null {
 }
 
 /**
+ * Shells taken since the last payout.
+ *
+ * Deliberately not exported and deliberately not shown anywhere: the progress
+ * toward the next one is meant to be felt, not tracked. Nothing outside the
+ * payout below has any business reading it.
+ *
+ * Counted as "everything received since the rule shipped, minus the five each
+ * payout already consumed" rather than "everything received since the last
+ * payout's timestamp". The timestamp version is what this was first written as,
+ * and it was wrong: a payout stamps itself with the triggering throw's
+ * millisecond, so any throw landing in that same millisecond fell on the wrong
+ * side of the boundary and was never counted. Two shells fired at once is not a
+ * hypothetical — the tests hit it on the first run.
+ *
+ * Arithmetic has no boundary to fall on. It is also still fully derived: there
+ * is no counter column to forget to reset, and re-reading history can only ever
+ * produce the same number.
+ */
+function shellsTakenToward(db: Db, playerId: string): number {
+  // The floor exists because the throw log predates the rule. Without it, the
+  // people who have been eating shells all tournament would be paid at once.
+  const epoch = Number(getMeta(db, 'shell_retribution_epoch') ?? 0);
+
+  const taken = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM shell_throws
+       WHERE to_player = ? AND thrown_at > ?`,
+    )
+    .get(playerId, epoch) as { n: number };
+
+  const paid = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM blue_shells
+       WHERE player_id = ? AND rule = ?`,
+    )
+    .get(playerId, SHELL_RETRIBUTION_RULE) as { n: number };
+
+  return taken.n - paid.n * SHELLS_TAKEN_FOR_SHELL;
+}
+
+/**
+ * Pays the shell owed for eating five of them, if this throw was the fifth.
+ *
+ * The row goes against a synthetic match id so the ledger's idempotency key
+ * still holds for something no game produced — the same trick the shop uses —
+ * and carries the triggering throw's timestamp so the history reads in the
+ * order it happened.
+ */
+function payRetribution(
+  db: Db,
+  playerId: string,
+  throwId: string,
+  at: number,
+): void {
+  const taken = shellsTakenToward(db, playerId);
+  if (taken < SHELLS_TAKEN_FOR_SHELL) return;
+
+  // Capped, not queued, like every other way of earning: at the ceiling the
+  // payout is written for zero rather than skipped. The row is what resets the
+  // count, so writing it regardless stops a full arsenal from banking
+  // retribution and cashing it all the moment a slot opens.
+  const headroom = MAX_HELD_SHELLS - balanceFor(db, playerId).available;
+  const amount = headroom > 0 ? 1 : 0;
+
+  db.prepare(
+    `INSERT INTO blue_shells
+       (id, player_id, match_id, rule, amount, detail, earned_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    randomUUID(),
+    playerId,
+    `throw:${throwId}`,
+    SHELL_RETRIBUTION_RULE,
+    amount,
+    amount > 0
+      ? `${taken} conchas recibidas`
+      : `${taken} conchas recibidas, con el arsenal lleno`,
+    at,
+  );
+}
+
+/**
  * Records one fired shell.
  *
  * `fromDiscord` exists because spectators fire too and have no roster entry to
@@ -386,6 +462,10 @@ export function recordThrow(
     // Without it the log would start at the first reroll and read as though the
     // original result had never happened.
     if (payload) recordRoll(db, id, payload, '');
+
+    // Settled here, in the same transaction as the throw that triggers it, so a
+    // shell can never land without its count moving.
+    payRetribution(db, toPlayer, id, thrownAt);
   })();
 
   return {

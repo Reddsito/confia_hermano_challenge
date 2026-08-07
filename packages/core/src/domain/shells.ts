@@ -17,7 +17,6 @@ export const SHELL_RULES = [
   'PERFECT_KDA_20',
   'LONG_WIN_40',
   'FIVE_CHAMPION_WINS',
-  'FIVE_SMITE_WINS',
 ] as const;
 
 export type ShellRule = (typeof SHELL_RULES)[number];
@@ -31,7 +30,6 @@ export const SHELL_RULE_LABEL: Record<ShellRule, string> = {
   PERFECT_KDA_20: 'KDA perfecto arriba de 20',
   LONG_WIN_40: 'Ganar una partida de 40 minutos',
   FIVE_CHAMPION_WINS: '5 victorias seguidas con 5 campeones distintos',
-  FIVE_SMITE_WINS: '5 victorias llevando Castigo',
 };
 
 /**
@@ -48,7 +46,6 @@ export const SHELL_RULE_AWARD: Record<ShellRule, number> = {
   PERFECT_KDA_20: 1,
   LONG_WIN_40: 1,
   FIVE_CHAMPION_WINS: 1,
-  FIVE_SMITE_WINS: 1,
 };
 
 /**
@@ -73,8 +70,25 @@ export const MAX_HELD_SHELLS = 3;
  */
 export const SHELL_SHOP_RULE = 'SHOP_PURCHASE';
 
-/** Riot's summoner spell id for Smite. */
-export const SMITE_SPELL_ID = 11;
+/**
+ * A shell earned by being on the receiving end of enough of them.
+ *
+ * Not a member of SHELL_RULES for the same reason the shop rule is not: no
+ * finished game can satisfy it. It is settled the moment the fifth shell lands,
+ * which is why it lives outside `earnedShells` entirely — the pure module only
+ * ever sees one game plus counters, and "how many were thrown at me" is neither.
+ *
+ * It replaces a rule that paid a shell every five wins carrying Smite. That one
+ * asked for nothing notable: it counted lifetime wins with a summoner spell, so
+ * a jungler collected on schedule just by playing, while every other rule wants
+ * a pentakill or a streak. This one at least costs somebody five shells.
+ */
+export const SHELL_RETRIBUTION_RULE = 'FIVE_SHELLS_TAKEN';
+
+export const SHELL_RETRIBUTION_LABEL = 'Te cayeron 5 conchas';
+
+/** Shells you have to eat before the sixth one is yours to throw. */
+export const SHELLS_TAKEN_FOR_SHELL = 5;
 
 export interface ShellGame {
   win: boolean;
@@ -85,7 +99,6 @@ export interface ShellGame {
   pentaKills: number;
   quadraKills: number;
   championId: number;
-  usedSmite: boolean;
 }
 
 /** Counters that only make sense across several games. */
@@ -98,8 +111,6 @@ export interface ShellProgress {
    * was broken by a loss.
    */
   streakChampions: number;
-  /** Total wins carrying Smite, after this game. */
-  smiteWins: number;
 }
 
 export interface EarnedShell {
@@ -125,9 +136,9 @@ const MILESTONE_STEP = 5;
  * let one good game fill the whole arsenal. The rarest rule wins, ranked by
  * position in SHELL_RULES, so the game is remembered for its best moment.
  *
- * The milestone rules (5 champions, 5 smite wins) are awarded on the game that
- * crosses the threshold, which is why they need the post-game counters rather
- * than the game alone.
+ * The milestone rule (5 champions) is awarded on the game that crosses the
+ * threshold, which is why it needs the post-game counters rather than the game
+ * alone.
  */
 export function earnedShells(
   game: ShellGame,
@@ -216,19 +227,6 @@ export function earnedShells(
       rule: 'FIVE_CHAMPION_WINS',
       amount: 1,
       detail: '5 victorias seguidas con 5 campeones distintos',
-    });
-  }
-
-  if (
-    game.win &&
-    game.usedSmite &&
-    progress.smiteWins > 0 &&
-    progress.smiteWins % MILESTONE_STEP === 0
-  ) {
-    earned.push({
-      rule: 'FIVE_SMITE_WINS',
-      amount: 1,
-      detail: `${progress.smiteWins} victorias con Castigo`,
     });
   }
 

@@ -1,13 +1,13 @@
 import type { ChampionUsage, MatchTotals } from '@challenge/core/domain';
 import {
   RiotApiError,
+  SMITE_SPELL_ID,
   type ActiveGameDto,
   type MatchDto,
   type RiotClient,
 } from '@challenge/core/riot';
 
 import {
-  SMITE_SPELL_ID,
   earnedShells,
   opggUrl,
   toLadderPoints,
@@ -305,7 +305,6 @@ async function syncPlayer(
           pentaKills: row.pentaKills,
           quadraKills: row.quadraKills,
           championId: row.championId,
-          usedSmite: row.usedSmite,
         },
         {
           winStreak,

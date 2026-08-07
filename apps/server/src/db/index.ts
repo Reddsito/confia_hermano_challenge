@@ -160,7 +160,10 @@ const MIGRATIONS: string[] = [
   `,
 
   // Added after player_matches already existed, so it has to be an ALTER.
-  // Needed to count wins carrying Smite without re-reading every match.
+  //
+  // Added for a shell rule that paid for wins carrying Smite. That rule is gone
+  // and nothing reads this today, but it is the only record of who was jungling
+  // in a given game, so it keeps being written rather than dropped.
   `ALTER TABLE player_matches ADD COLUMN used_smite INTEGER NOT NULL DEFAULT 0;`,
 
   // Which game actually paid off a challenge. Nullable while it is still owed.
@@ -478,6 +481,23 @@ const MIGRATIONS: string[] = [
   -- Partial so a voided wager frees its game up again.
   CREATE UNIQUE INDEX idx_bets_one_per_game
     ON bets (discord_id, game_id) WHERE status != 'VOID';
+  `,
+
+  // Being hit by five shells now earns one back, replacing the Smite rule.
+  //
+  // The counter is derived from shell_throws rather than stored: "shells taken
+  // since the last payout" is exactly a COUNT with a lower bound, and a real
+  // column would be a second copy of a number the throw log already holds — one
+  // that a deleted or backfilled throw would silently desync.
+  //
+  // That lower bound needs a floor for the very first payout, because the throw
+  // log predates the rule and several people are already sitting on more than
+  // five received. Without it, everyone would be paid on the next throw for
+  // shells eaten under rules that offered nothing back. Everybody starts at zero
+  // from here.
+  `
+  INSERT INTO meta (key, value)
+  VALUES ('shell_retribution_epoch', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
   `,
 ];
 

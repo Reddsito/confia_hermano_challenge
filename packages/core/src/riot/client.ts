@@ -17,6 +17,9 @@ export class RiotApiError extends Error {
   }
 }
 
+/** Riot's summoner spell id for Smite. */
+export const SMITE_SPELL_ID = 11;
+
 export interface AccountDto {
   puuid: string;
   gameName: string;
@@ -58,6 +61,7 @@ export interface MatchParticipantDto {
   totalMinionsKilled: number;
   neutralMinionsKilled: number;
   teamPosition: string;
+  /** Compare against SMITE_SPELL_ID to tell a jungler from everyone else. */
   summoner1Id: number;
   summoner2Id: number;
   goldEarned: number;

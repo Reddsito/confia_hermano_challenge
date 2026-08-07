@@ -15,6 +15,7 @@ import {
   PLAYER_WIN_GRANT,
   SHELL_PRICE_COINS,
   SPECTATOR_DAILY_GRANT,
+  SHELL_RETRIBUTION_LABEL,
   SHELL_RULES,
   SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
@@ -77,6 +78,12 @@ function buildSections(tournament: TournamentMeta): RuleSection[][] {
     const award = SHELL_RULE_AWARD[rule];
     return `${SHELL_RULE_LABEL[rule]}${award > 1 ? ` — ${award} conchas` : ''}.`;
   });
+
+  // Listed by hand because it is not in SHELL_RULES: no partida can satisfy it,
+  // so it has no entry to be generated from.
+  earning.push(
+    `${SHELL_RETRIBUTION_LABEL} y ganás una. La cuenta arranca de nuevo cada vez que cobrás, y si estabas en el tope se pierde igual.`,
+  );
 
   return [
     [
