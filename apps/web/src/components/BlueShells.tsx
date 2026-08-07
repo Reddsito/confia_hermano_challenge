@@ -232,7 +232,7 @@ export function BlueShells({
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr] xl:grid-cols-[minmax(0,22rem)_1fr_minmax(0,20rem)]">
         <div className="space-y-4">
           <Inventory
             available={available}
@@ -258,6 +258,10 @@ export function BlueShells({
           landed={landed}
           targetName={targetPlayer?.displayName ?? null}
         />
+
+        {/* Third column only from xl up. Below that the wheel already fills the
+            row, and a 20rem list beside it would squeeze both. */}
+        <HitRanking throws={state?.throws ?? []} players={players} />
       </div>
 
       {rolled && (
@@ -856,6 +860,128 @@ function Wheel({
         <p className="mt-1 text-center text-fluid-sm text-ink-2">
           {landed.detail}
         </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Who has been hit the most.
+ *
+ * The wheel says what a shell does; this says who keeps catching them. It reads
+ * off the throw log rather than a stored counter, so a deleted throw stops
+ * counting the moment it is gone.
+ *
+ * Ranked by hits taken, then by how many are still owed — between two people on
+ * four shells each, the one who has not paid them off yet is the better story.
+ */
+function HitRanking({
+  throws,
+  players,
+}: {
+  throws: ShellsState['throws'];
+  players: RankedPlayer[];
+}) {
+  const ranked = useMemo(() => {
+    const tally = new Map<string, { hits: number; pending: number }>();
+
+    for (const row of throws) {
+      const entry = tally.get(row.toPlayer) ?? { hits: 0, pending: 0 };
+      entry.hits += 1;
+      if (row.completedAt === null) entry.pending += 1;
+      tally.set(row.toPlayer, entry);
+    }
+
+    return [...tally.entries()]
+      .map(([playerId, counts]) => ({
+        player: players.find((entry) => entry.id === playerId) ?? null,
+        ...counts,
+      }))
+      .filter((row) => row.player !== null)
+      .sort((a, b) => b.hits - a.hits || b.pending - a.pending)
+      .slice(0, 10);
+  }, [throws, players]);
+
+  const most = ranked[0]?.hits ?? 0;
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <p className="eyebrow text-ink-3">Los más castigados</p>
+
+      {ranked.length === 0 ? (
+        <p className="mt-3 text-fluid-xs text-ink-3">
+          Todavía no le cayó una concha a nadie. Alguien tiene que empezar.
+        </p>
+      ) : (
+        <ol className="mt-3 space-y-2">
+          {ranked.map((row, index) => {
+            const player = row.player!;
+            // The bar is relative to the worst-hit player, not to a fixed
+            // ceiling: what this list is about is who is ahead of whom.
+            const share = most > 0 ? row.hits / most : 0;
+            const podium = index < 3;
+
+            return (
+              <li key={player.id} className="flex items-center gap-3">
+                <span
+                  className="tabular w-5 shrink-0 text-right text-fluid-xs font-semibold"
+                  style={{
+                    color: podium ? 'var(--color-accent)' : 'var(--color-ink-3)',
+                  }}
+                >
+                  {index + 1}
+                </span>
+
+                <Avatar
+                  name={player.displayName}
+                  iconId={player.profileIconId}
+                  size={28}
+                  ring={podium ? 'var(--color-accent)' : undefined}
+                  inGame={player.inGame}
+                />
+
+                <span className="min-w-0 flex-1">
+                  <span className="display block truncate text-fluid-xs">
+                    {player.displayName}
+                  </span>
+                  {/* Drawn under the name so the whole list reads as one shape
+                      rather than as ten separate rows of numbers. */}
+                  <span className="mt-1 block h-1 overflow-hidden rounded-full bg-void">
+                    <span
+                      className="block h-full rounded-full transition-[width] duration-700"
+                      style={{
+                        width: `${Math.max(share * 100, 6)}%`,
+                        backgroundColor: podium
+                          ? 'var(--color-accent)'
+                          : 'var(--color-line-strong)',
+                      }}
+                    />
+                  </span>
+                </span>
+
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {row.pending > 0 && (
+                    <span
+                      className="eyebrow rounded-full px-1.5 py-0.5 text-[0.55rem]"
+                      style={{
+                        color: 'var(--color-mark-amber)',
+                        background:
+                          'color-mix(in oklab, var(--color-mark-amber) 14%, transparent)',
+                      }}
+                      title={`${row.pending} sin cumplir`}
+                    >
+                      {row.pending} debe
+                    </span>
+                  )}
+                  <ShellMark size={14} filled />
+                  <span className="tabular text-fluid-xs font-semibold">
+                    {row.hits}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </section>
   );
