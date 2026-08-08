@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 
 import { opggUrl, orderByLane } from '@challenge/core/domain';
-import { SMITE_SPELL_ID, type PlatformId } from '@challenge/core/riot';
+import {
+  HEAL_SPELL_ID,
+  SMITE_SPELL_ID,
+  TELEPORT_SPELL_ID,
+  type PlatformId,
+} from '@challenge/core/riot';
 
 import type { Db } from '../db/index';
 import { activeGames, cachedRanks } from '../db/matches';
@@ -95,7 +100,10 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
             // Only a tracked player has a role we can state. Everyone else is
             // null, and the lane ordering below is what copes with that.
             role: tracked?.role ?? null,
+            // Spell evidence for the lane ordering below, and nothing else.
             hasSmite: (participant.spellIds ?? []).includes(SMITE_SPELL_ID),
+            hasHeal: (participant.spellIds ?? []).includes(HEAL_SPELL_ID),
+            hasTeleport: (participant.spellIds ?? []).includes(TELEPORT_SPELL_ID),
             spellIcons: (participant.spellIds ?? [])
               .map((id) => assets.spells.get(id) ?? null)
               .filter((icon): icon is string => icon !== null),
@@ -117,8 +125,9 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
 
         // Riot hands back pick order, not lane order. Both sides are reseated
         // so the two columns read top-jungle-mid-adc-support against each
-        // other instead of drifting apart. `hasSmite` was only ever evidence
-        // for that seating, so it does not travel to the client.
+        // other instead of drifting apart. The spell flags were only ever
+        // evidence for that seating, so they do not travel to the client — it
+        // already has the spell icons it renders.
         const lineup = (teamId: number, mine: boolean) =>
           orderByLane(
             game.participants
@@ -126,7 +135,14 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
                 mine ? participant.teamId === teamId : participant.teamId !== teamId,
               )
               .map(describe),
-          ).map(({ hasSmite: _hasSmite, ...participant }) => participant);
+          ).map(
+            ({
+              hasSmite: _hasSmite,
+              hasHeal: _hasHeal,
+              hasTeleport: _hasTeleport,
+              ...participant
+            }) => participant,
+          );
 
         return {
           gameId: game.gameId,

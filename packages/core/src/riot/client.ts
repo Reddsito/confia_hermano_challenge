@@ -20,6 +20,12 @@ export class RiotApiError extends Error {
 /** Riot's summoner spell id for Smite. */
 export const SMITE_SPELL_ID = 11;
 
+/** Heal. Almost always the bot lane carry in SoloQ. */
+export const HEAL_SPELL_ID = 7;
+
+/** Teleport. Leans top, but a mid takes it often enough to be weak evidence. */
+export const TELEPORT_SPELL_ID = 12;
+
 export interface AccountDto {
   puuid: string;
   gameName: string;

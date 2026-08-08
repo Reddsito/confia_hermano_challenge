@@ -6,6 +6,8 @@ interface Member {
   name: string;
   role?: 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT' | null;
   hasSmite?: boolean;
+  hasHeal?: boolean;
+  hasTeleport?: boolean;
 }
 
 const names = (team: Member[]) => team.map((member) => member.name);
@@ -20,8 +22,20 @@ describe('laneOf', () => {
     expect(laneOf({ role: null, hasSmite: true })).toBe('JUNGLE');
   });
 
+  it('reads Heal as bot lane and Teleport as top', () => {
+    expect(laneOf({ hasHeal: true })).toBe('ADC');
+    expect(laneOf({ hasTeleport: true })).toBe('TOP');
+  });
+
+  it('prefers the stronger evidence when a player carries two', () => {
+    expect(laneOf({ hasSmite: true, hasTeleport: true })).toBe('JUNGLE');
+    expect(laneOf({ hasHeal: true, hasTeleport: true })).toBe('ADC');
+    expect(laneOf({ role: 'SUPPORT', hasHeal: true })).toBe('SUPPORT');
+  });
+
   it('admits it does not know', () => {
     expect(laneOf({})).toBeNull();
+    expect(laneOf({ hasSmite: false, hasHeal: false })).toBeNull();
   });
 });
 
@@ -82,6 +96,43 @@ describe('orderByLane', () => {
     expect(ordered).toHaveLength(5);
     expect(names(ordered)).toContain('alsoSmiting');
     expect(ordered[1]!.name).toBe('rosterJungler');
+  });
+
+  it('decides a contested lane by evidence, not by Riot order', () => {
+    // The Teleport is listed first, but the roster knows who the top is.
+    const team: Member[] = [
+      { name: 'randomTp', hasTeleport: true },
+      { name: 'rosterTop', role: 'TOP' },
+      { name: 'x' },
+      { name: 'y' },
+      { name: 'z' },
+    ];
+
+    const ordered = orderByLane(team);
+    expect(ordered[0]!.name).toBe('rosterTop');
+    expect(names(ordered)).toContain('randomTp');
+    expect(ordered).toHaveLength(5);
+  });
+
+  it('seats a whole enemy team from spells alone', () => {
+    // What the live tab actually gets: no roster roles on the enemy side.
+    const team: Member[] = [
+      { name: 'heal', hasHeal: true },
+      { name: 'unknownA' },
+      { name: 'tp', hasTeleport: true },
+      { name: 'smite', hasSmite: true },
+      { name: 'unknownB' },
+    ];
+
+    // top, jungle and adc are claimed; the two unknowns fill mid and support in
+    // the order Riot listed them.
+    expect(names(orderByLane(team))).toEqual([
+      'tp',
+      'smite',
+      'unknownA',
+      'heal',
+      'unknownB',
+    ]);
   });
 
   it('round-trips a team that is not five people', () => {
