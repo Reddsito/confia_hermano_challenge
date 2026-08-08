@@ -13,6 +13,7 @@ import {
   type PlayerDetailData,
   type ThrowRecord,
 } from '../lib/players';
+import { oneOf } from '../lib/route';
 import { RoleIcon, TierCrest } from './icons';
 import { Tabs, type TabDefinition } from './Tabs';
 import {
@@ -90,12 +91,17 @@ interface PlayerDetailProps {
   player: RankedPlayer;
   snapshot: Snapshot;
   allPlayers: RankedPlayer[];
+  /** Raw tab id from the URL; anything unknown falls back to the history. */
+  tab: string | null;
+  onTabChange: (tab: TabId) => void;
   onClose: () => void;
 }
 
 /**
- * A modal dialog rather than a route: the standings stay in place behind it, so
- * closing returns you exactly where you were in a long table.
+ * A modal dialog rather than a page, but still addressable: the standings stay
+ * in place behind it, so closing returns you exactly where you were in a long
+ * table, while the open card lives in the URL so a refresh or a shared link
+ * reopens it.
  *
  * The three tabs are fed by one request made when the modal opens. Splitting
  * them into a fetch per tab would trade a single wait for a stutter on every
@@ -106,13 +112,19 @@ export function PlayerDetail({
   player,
   snapshot,
   allPlayers,
+  tab: requestedTab,
+  onTabChange,
   onClose,
 }: PlayerDetailProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const accent = tierColor(player.rank);
   const extras = player.extras;
 
-  const [tab, setTab] = useState<TabId>('historial');
+  const tab = oneOf(
+    requestedTab,
+    TABS.map((entry) => entry.id),
+    'historial',
+  );
   const [detail, setDetail] = useState<PlayerDetailData | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -230,7 +242,7 @@ export function PlayerDetail({
             <Tabs
               tabs={TABS}
               active={tab}
-              onChange={setTab}
+              onChange={onTabChange}
               label="Secciones de la ficha"
               size="sm"
             />

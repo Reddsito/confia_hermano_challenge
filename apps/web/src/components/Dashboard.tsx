@@ -27,19 +27,27 @@ import { DiscordLink, SignupButton } from './Signup';
 import { BestDays, EloEvolution } from './EloCharts';
 import { StatsPanel } from './StatsPanel';
 import { Tabs, TabPanel } from './Tabs';
+import { navigate, oneOf, useRoute } from '../lib/route';
 import { TournamentClock, TournamentProgress } from './TournamentClock';
 
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-type Section = 'ranking' | 'live' | 'stats' | 'shells' | 'tierlist' | 'clips';
+const SECTIONS = [
+  'ranking',
+  'live',
+  'stats',
+  'shells',
+  'tierlist',
+  'clips',
+] as const;
+
+type Section = (typeof SECTIONS)[number];
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [section, setSection] = useState<Section>('ranking');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -48,6 +56,8 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     sort: 'ladder',
     liveOnly: false,
   });
+
+  const route = useRoute();
 
   // Guards against overlapping fetches when a slow request meets the interval.
   const inFlight = useRef(false);
@@ -143,11 +153,24 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     return [...filtered].sort(comparatorFor(filters.sort));
   }, [ranking, filters]);
 
+  // Derived rather than stored: an unknown section in the URL lands on the
+  // ranking, and the shells tab reverts on its own the moment there is no
+  // session behind it — including on first paint, while the session is still
+  // loading.
+  const requested = oneOf(route.tab, SECTIONS, 'ranking');
+  const section: Section =
+    requested === 'shells' && !user ? 'ranking' : requested;
+
   // Resolved from the live ranking rather than stored, so an open card keeps
-  // updating when a refresh lands mid-view.
-  const selected = selectedId
-    ? (ranking.find((player) => player.id === selectedId) ?? null)
+  // updating when a refresh lands mid-view. A player id that is not on the
+  // board (stale link, removed player) simply shows no card.
+  const selected = route.player
+    ? (ranking.find((player) => player.id === route.player) ?? null)
     : null;
+
+  const openPlayer = useCallback((id: string) => {
+    navigate({ player: id, view: null });
+  }, []);
 
   const sections = [
     { id: 'ranking' as const, label: 'Ranking' },
@@ -187,7 +210,9 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           <Tabs
             tabs={sections}
             active={section}
-            onChange={setSection}
+            // Changing section closes any open card: the card belongs to the
+            // ranking, and leaving it floating over another tab makes no sense.
+            onChange={(id) => navigate({ tab: id, player: null, view: null })}
             label="Secciones de la página"
           />
         </div>
@@ -204,7 +229,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
               signOut();
               setToken(null);
               setUser(null);
-              setSection('ranking');
+              navigate({ tab: null, player: null, view: null }, 'replace');
             }}
           />
         </div>
@@ -226,7 +251,7 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
       <div className="mt-6">
         <TabPanel id="ranking" active={section === 'ranking'}>
           {/* The podium always shows the true top three, never the filtered view. */}
-          <Podium players={ranking} onSelect={(p) => setSelectedId(p.id)} />
+          <Podium players={ranking} onSelect={(p) => openPlayer(p.id)} />
           <Filters
             value={filters}
             onChange={setFilters}
@@ -238,14 +263,14 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             players={visible}
             rosterSize={ranking.length}
             loading={isRefreshing}
-            onSelect={(p) => setSelectedId(p.id)}
+            onSelect={(p) => openPlayer(p.id)}
           />
         </TabPanel>
 
         <TabPanel id="live" active={section === 'live'}>
           <LiveGames
             players={ranking}
-            onSelect={setSelectedId}
+            onSelect={openPlayer}
             user={user}
             token={token}
             onWalletChange={() => void loadSession()}
@@ -287,7 +312,11 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
           player={selected}
           snapshot={snapshot}
           allPlayers={ranking}
-          onClose={() => setSelectedId(null)}
+          tab={route.view}
+          // Replace, not push: the inner tabs should not become stops the back
+          // button has to walk through before it closes the card.
+          onTabChange={(id) => navigate({ view: id }, 'replace')}
+          onClose={() => navigate({ player: null, view: null })}
         />
       )}
     </div>
