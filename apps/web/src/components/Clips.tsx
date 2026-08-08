@@ -34,9 +34,11 @@ interface ClipsProps {
   user: SessionUser | null;
   token: string | null;
   players: RankedPlayer[];
+  /** Bumped by the dashboard's refresh cycle; a change refetches the grid. */
+  revision: number;
 }
 
-export function Clips({ user, token, players }: ClipsProps) {
+export function Clips({ user, token, players, revision }: ClipsProps) {
   const [clips, setClips] = useState<Clip[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [sort, setSort] = useState<ClipSort>('recent');
@@ -57,9 +59,10 @@ export function Clips({ user, token, players }: ClipsProps) {
     }
   }, [token, sort]);
 
+  // Picks up new clips and other people's likes on the dashboard's heartbeat.
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, revision]);
 
   /**
    * The count moves before the request lands. A like is cheap and reversible,

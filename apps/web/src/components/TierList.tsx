@@ -37,9 +37,11 @@ interface TierListProps {
   players: RankedPlayer[];
   user: SessionUser | null;
   token: string | null;
+  /** Bumped by the dashboard's refresh cycle; a change refetches the board. */
+  revision: number;
 }
 
-export function TierList({ players, user, token }: TierListProps) {
+export function TierList({ players, user, token, revision }: TierListProps) {
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [moves, setMoves] = useState<TierMove[]>([]);
   const [query, setQuery] = useState('');
@@ -55,10 +57,6 @@ export function TierList({ players, user, token }: TierListProps) {
     setPlacements(board.placements);
     setMoves(board.moves);
   }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const byId = useMemo(
     () => new Map(players.map((player) => [player.id, player])),
@@ -110,6 +108,14 @@ export function TierList({ players, user, token }: TierListProps) {
   const { drag, start, justDragged } = useDragDrop<string>((playerId, zone) => {
     void move(playerId, zone);
   });
+
+  // The dashboard's heartbeat pulls in other people's moves, but never mid-drag
+  // or mid-pick: replacing the board under a held card would drop it somewhere
+  // the user never chose.
+  useEffect(() => {
+    if (drag || armed) return;
+    void reload();
+  }, [revision, drag, armed, reload]);
 
   const onZone = (zone: string) => {
     if (!armed) return;

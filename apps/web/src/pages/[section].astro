@@ -1,0 +1,17 @@
+---
+/**
+ * One prerendered document per section, so `/shells` is a URL you can refresh,
+ * bookmark and paste to somebody. The ranking is not here: it is the root, and
+ * `index.astro` serves it.
+ */
+import DashboardPage from '../components/DashboardPage.astro';
+import { HOME_SECTION, SECTIONS } from '../components/Dashboard';
+
+export function getStaticPaths() {
+  return SECTIONS.filter((section) => section !== HOME_SECTION).map(
+    (section) => ({ params: { section } }),
+  );
+}
+---
+
+<DashboardPage />

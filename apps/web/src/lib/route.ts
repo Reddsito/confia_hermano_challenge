@@ -1,14 +1,19 @@
 import { useMemo, useSyncExternalStore } from 'react';
 
 /**
- * The dashboard is one island holding one snapshot, so its sections cannot be
- * separate Astro pages without refetching everything on every click. Instead the
- * query string is the source of truth and the view is derived from it: a refresh
- * lands on the same section, the back button walks the sections you visited, and
- * a link to an open player card actually opens that card.
+ * The dashboard is one island holding one snapshot, not a client-routed SPA —
+ * so a hard load rebuilds it from scratch and any state living only in React is
+ * gone. That is why the URL is the source of truth here and the view is derived
+ * from it: a refresh lands on the same section, back and forward walk the
+ * sections, and a link to an open player card reopens that card.
+ *
+ * Sections are real paths (`/shells`), each prerendered to the same island, so
+ * moving between them is a pushState with no reload and no refetch. The open
+ * card stays a query parameter on purpose: a path would have to be prerendered
+ * per player, and the build cannot even reach the backend to enumerate them.
  */
 export interface Route {
-  /** Dashboard section. */
+  /** First path segment — the dashboard section, or null at the root. */
   tab: string | null;
   /** Player whose detail modal is open. */
   player: string | null;
@@ -16,20 +21,19 @@ export interface Route {
   view: string | null;
 }
 
-const KEYS: Record<keyof Route, string> = {
-  tab: 'tab',
+const KEYS = {
   player: 'player',
   view: 'view',
-};
+} as const;
 
 const listeners = new Set<() => void>();
 
 /**
  * The snapshot has to be referentially stable between reads, so we hand out the
- * raw query string and let callers parse it in a memo.
+ * raw location and let callers parse it in a memo.
  */
-function readSearch(): string {
-  return window.location.search;
+function readLocation(): string {
+  return window.location.pathname + window.location.search;
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -43,10 +47,13 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-function parse(search: string): Route {
+function parse(location: string): Route {
+  const [path = '', search = ''] = location.split('?');
   const params = new URLSearchParams(search);
+
   return {
-    tab: params.get(KEYS.tab),
+    // Only the first segment matters, and a trailing slash is not a section.
+    tab: path.split('/').filter(Boolean)[0] ?? null,
     player: params.get(KEYS.player),
     view: params.get(KEYS.view),
   };
@@ -56,13 +63,14 @@ function parse(search: string): Route {
 export function useRoute(): Route {
   // On the server there is no URL to read, so everything defaults and the first
   // client render corrects it.
-  const search = useSyncExternalStore(subscribe, readSearch, () => '');
-  return useMemo(() => parse(search), [search]);
+  const location = useSyncExternalStore(subscribe, readLocation, () => '/');
+  return useMemo(() => parse(location), [location]);
 }
 
 /**
- * Merges a patch into the query string. Keys set to null are removed, so
- * `{ player: null }` is how a modal closes.
+ * Merges a patch into the URL. `tab` becomes the path (null is the root); the
+ * rest become query parameters, and a null removes one — `{ player: null }` is
+ * how a modal closes.
  *
  * `push` adds a history entry (back returns to the previous view); `replace`
  * rewrites the current one, for changes that should not become a stop on the way
@@ -74,17 +82,20 @@ export function navigate(
 ): void {
   const params = new URLSearchParams(window.location.search);
 
-  for (const [name, value] of Object.entries(patch) as Array<
-    [keyof Route, string | null | undefined]
-  >) {
+  for (const name of ['player', 'view'] as const) {
+    if (!(name in patch)) continue;
+    const value = patch[name];
     if (value) params.set(KEYS[name], value);
     else params.delete(KEYS[name]);
   }
 
-  const query = params.toString();
-  const url = `${window.location.pathname}${query ? `?${query}` : ''}`;
+  const path =
+    'tab' in patch ? (patch.tab ? `/${patch.tab}` : '/') : window.location.pathname;
 
-  if (mode === 'push' && url === `${window.location.pathname}${window.location.search}`) {
+  const query = params.toString();
+  const url = `${path}${query ? `?${query}` : ''}`;
+
+  if (mode === 'push' && url === readLocation()) {
     // Nothing moved: pushing here would stack duplicate entries and make the
     // back button feel stuck.
     return;

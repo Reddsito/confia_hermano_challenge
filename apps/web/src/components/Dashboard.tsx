@@ -33,7 +33,7 @@ import { TournamentClock, TournamentProgress } from './TournamentClock';
 /** How often we check whether the backend has published a newer snapshot. */
 const POLL_CHECK_MS = 15_000;
 
-const SECTIONS = [
+export const SECTIONS = [
   'ranking',
   'live',
   'stats',
@@ -43,6 +43,9 @@ const SECTIONS = [
 ] as const;
 
 type Section = (typeof SECTIONS)[number];
+
+/** Lives at `/` rather than at a segment of its own; every other section is `/<id>`. */
+export const HOME_SECTION: Section = 'ranking';
 
 export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
@@ -56,6 +59,11 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     sort: 'ladder',
     liveOnly: false,
   });
+
+  // Bumped once per refresh cycle. The tabs that own their own data watch it and
+  // refetch, so one heartbeat keeps the whole page current instead of each panel
+  // showing whatever was true when you opened it.
+  const [revision, setRevision] = useState(0);
 
   const route = useRoute();
 
@@ -95,6 +103,16 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     }
   }, []);
 
+  /**
+   * The whole page at once: the standings, your wallet, and every panel that
+   * keeps its own data. Settled rather than raced so a failing session request
+   * cannot hold back the rest.
+   */
+  const refreshAll = useCallback(async () => {
+    await Promise.allSettled([refresh(), loadSession()]);
+    setRevision((value) => value + 1);
+  }, [refresh, loadSession]);
+
   // The HTML was pre-rendered at build time, so whatever it carries is stale by
   // definition — and empty if the backend was down during the build. Fetch once
   // on mount rather than waiting for the first interval tick.
@@ -107,16 +125,23 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
 
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
-      if (Date.now() >= dueAt) void refresh();
+      if (Date.now() >= dueAt) void refreshAll();
+    };
+
+    // Coming back to the tab refreshes unconditionally. The snapshot may still
+    // be current, but your coins and the boards moved while you were away, and
+    // that is exactly the moment people reach for reload.
+    const onReturn = () => {
+      if (document.visibilityState === 'visible') void refreshAll();
     };
 
     const id = setInterval(tick, POLL_CHECK_MS);
-    document.addEventListener('visibilitychange', tick);
+    document.addEventListener('visibilitychange', onReturn);
     return () => {
       clearInterval(id);
-      document.removeEventListener('visibilitychange', tick);
+      document.removeEventListener('visibilitychange', onReturn);
     };
-  }, [snapshot.nextUpdateAt, refresh]);
+  }, [snapshot.nextUpdateAt, refreshAll]);
 
   // Held here rather than inside the live tab: TabPanel unmounts what is not
   // showing, and an alert that only fires while you are already looking at the
@@ -212,7 +237,14 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             active={section}
             // Changing section closes any open card: the card belongs to the
             // ranking, and leaving it floating over another tab makes no sense.
-            onChange={(id) => navigate({ tab: id, player: null, view: null })}
+            // The ranking is the root, so it has no segment of its own.
+            onChange={(id) =>
+              navigate({
+                tab: id === HOME_SECTION ? null : id,
+                player: null,
+                view: null,
+              })
+            }
             label="Secciones de la página"
           />
         </div>
@@ -295,15 +327,16 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             token={token}
             players={ranking}
             onBalanceChange={() => void loadSession()}
+            revision={revision}
           />
         </TabPanel>
 
         <TabPanel id="tierlist" active={section === 'tierlist'}>
-          <TierList players={ranking} user={user} token={token} />
+          <TierList players={ranking} user={user} token={token} revision={revision} />
         </TabPanel>
 
         <TabPanel id="clips" active={section === 'clips'}>
-          <Clips user={user} token={token} players={ranking} />
+          <Clips user={user} token={token} players={ranking} revision={revision} />
         </TabPanel>
       </div>
 

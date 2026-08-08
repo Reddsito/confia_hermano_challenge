@@ -42,6 +42,8 @@ interface BlueShellsProps {
   token: string | null;
   players: RankedPlayer[];
   onBalanceChange: () => void;
+  /** Bumped by the dashboard's refresh cycle; a change refetches the board. */
+  revision: number;
 }
 
 const SPIN_MS = 3200;
@@ -52,6 +54,7 @@ export function BlueShells({
   token,
   players,
   onBalanceChange,
+  revision,
 }: BlueShellsProps) {
   const [state, setState] = useState<ShellsState | null>(null);
   const [odds, setOdds] = useState<ChallengeOdds[]>([]);
@@ -98,13 +101,15 @@ export function BlueShells({
     setReceived(await fetchReceived(token));
   }, [token]);
 
+  // `revision` is a dependency on purpose: the dashboard's heartbeat bumps it,
+  // and this board goes stale the moment somebody else throws a shell.
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, revision]);
 
   useEffect(() => {
     void reloadReceived();
-  }, [reloadReceived]);
+  }, [reloadReceived, revision]);
 
   useEffect(() => {
     void (async () => {
