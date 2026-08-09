@@ -13,7 +13,8 @@
     "reset": "tsx src/cli/reset.ts",
     "backfill": "tsx src/cli/backfill.ts",
     "discord:test": "tsx src/cli/discord-test.ts",
-    "repair": "tsx src/cli/repair.ts"
+    "repair": "tsx src/cli/repair.ts",
+    "trim:presignup": "tsx src/cli/trim-presignup.ts"
   },
   "dependencies": {
     "@challenge/core": "workspace:*",

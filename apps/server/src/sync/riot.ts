@@ -61,6 +61,26 @@ export interface CycleReport {
 }
 
 /**
+ * The instant a player's games start counting, in seconds — what Riot's match
+ * list wants.
+ *
+ * Whichever came later: the tournament opening, or the player signing up. The
+ * tournament date alone would credit somebody who registers halfway through with
+ * everything they had already played since the start, which is a different
+ * challenge from the one everyone else is running.
+ */
+export function countFrom(
+  tournamentStart: number,
+  player: { createdAt: string },
+): number {
+  const joined = Date.parse(player.createdAt);
+  // A roster row with an unreadable date falls back to the tournament window
+  // rather than to 1970, which would ingest a player's whole career.
+  const from = Number.isNaN(joined) ? tournamentStart : Math.max(tournamentStart, joined);
+  return Math.floor(from / 1000);
+}
+
+/**
  * One refresh cycle. Runs players sequentially: the rate limiter already paces
  * requests, and serial work means a single unreachable player degrades one row
  * instead of aborting the whole batch.
@@ -74,9 +94,7 @@ export async function runRiotCycle(
   const started = Date.now();
   const players = listPlayers(db, 'approved');
   const queues = config.ingestQueues;
-  const startTimeSeconds = Math.floor(
-    Date.parse(config.tournament.startsAt) / 1000,
-  );
+  const tournamentStart = Date.parse(config.tournament.startsAt);
 
   let updated = 0;
   let failed = 0;
@@ -89,7 +107,7 @@ export async function runRiotCycle(
         client,
         player,
         queues,
-        startTimeSeconds,
+        countFrom(tournamentStart, player),
         config,
         notifier,
       );
