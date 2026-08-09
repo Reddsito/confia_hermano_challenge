@@ -14,18 +14,96 @@ import {
   tierColor,
 } from './ui';
 import { ShellMark } from './BlueShells';
+import { SORT_OPTIONS, type SortKey } from './Filters';
 import { RoleIcon, TierCrest } from './icons';
+
+/**
+ * A column header you can sort by.
+ *
+ * Clicking a new column sorts it best-first; clicking the one already active
+ * flips it, which is the only way to ask "who is worst at this". The arrow is
+ * drawn for the active column only — an arrow on every header reads as six
+ * competing controls rather than one current state.
+ */
+function SortHeader({
+  column,
+  sort,
+  reverse,
+  onSort,
+  align = 'left',
+  className,
+  children,
+}: {
+  column: SortKey;
+  sort: SortKey;
+  reverse: boolean;
+  onSort: (key: SortKey) => void;
+  align?: 'left' | 'right' | 'center';
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const active = sort === column;
+  const bestFirst =
+    SORT_OPTIONS.find((option) => option.key === column)?.bestFirst ?? 'desc';
+  // Which way the values actually run right now, which is what aria-sort means —
+  // not whether the best row is on top.
+  const direction =
+    bestFirst === 'asc'
+      ? reverse
+        ? 'descending'
+        : 'ascending'
+      : reverse
+        ? 'ascending'
+        : 'descending';
+
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? direction : 'none'}
+      className={classNames(
+        'pb-1 font-semibold',
+        align === 'right' && 'text-right',
+        align === 'center' && 'text-center',
+        className,
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={classNames(
+          'eyebrow inline-flex items-center gap-1 transition-colors hover:text-ink',
+          align === 'right' && 'flex-row-reverse',
+          active ? 'text-ink' : 'text-ink-3',
+        )}
+        style={active ? { color: 'var(--color-accent)' } : undefined}
+      >
+        {children}
+        {active && (
+          <span aria-hidden="true" className="text-[0.6rem]">
+            {direction === 'ascending' ? '▲' : '▼'}
+          </span>
+        )}
+      </button>
+    </th>
+  );
+}
 
 export function RankingTable({
   players,
   rosterSize,
   loading,
   onSelect,
+  sort,
+  reverse,
+  onSort,
 }: {
   players: RankedPlayer[];
   rosterSize: number;
   loading: boolean;
   onSelect: (player: RankedPlayer) => void;
+  sort: SortKey;
+  reverse: boolean;
+  onSort: (key: SortKey) => void;
 }) {
   if (players.length === 0) {
     // Saying "no match" when the roster itself is empty sends people hunting
@@ -55,15 +133,21 @@ export function RankingTable({
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[980px] border-separate border-spacing-y-1.5 text-fluid-sm">
+        <table className="w-full min-w-[1060px] border-separate border-spacing-y-1.5 text-fluid-sm">
           <caption className="sr-only">
-            Tabla completa, ordenada con los controles de arriba
+            Tabla completa. Los encabezados con flecha ordenan al hacer clic.
           </caption>
           <thead>
             <tr className="eyebrow text-left text-ink-3">
-              <th scope="col" className="w-20 px-4 pb-1 font-semibold">
+              <SortHeader
+                column="ladder"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                className="w-20 px-4"
+              >
                 #
-              </th>
+              </SortHeader>
               <th scope="col" className="px-2 pb-1 font-semibold">
                 Jugador
               </th>
@@ -73,21 +157,64 @@ export function RankingTable({
               <th scope="col" className="px-2 pb-1 font-semibold">
                 Elo
               </th>
-              <th scope="col" className="px-2 pb-1 font-semibold">
+              <SortHeader
+                column="winrate"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                className="px-2"
+              >
                 Victorias / Derrotas
-              </th>
-              <th scope="col" className="px-2 pb-1 font-semibold">
+              </SortHeader>
+              <SortHeader
+                column="games"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                align="right"
+                className="px-2"
+              >
+                Partidas
+              </SortHeader>
+              <SortHeader
+                column="streak"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                className="px-2"
+              >
                 Forma
-              </th>
-              <th scope="col" className="px-2 pb-1 text-center font-semibold">
+              </SortHeader>
+              <SortHeader
+                column="shells"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                align="center"
+                className="px-2"
+              >
                 Conchas
-              </th>
-              <th scope="col" className="px-2 pb-1 text-right font-semibold">
+              </SortHeader>
+              <SortHeader
+                column="gained"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                align="right"
+                className="px-2"
+              >
                 LP
-              </th>
-              <th scope="col" className="px-2 pb-1 text-right font-semibold">
+              </SortHeader>
+              <SortHeader
+                column="kda"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                align="right"
+                className="px-2"
+              >
                 KDA
-              </th>
+              </SortHeader>
               <th scope="col" className="px-2 pb-1 font-semibold">
                 Campeones
               </th>
@@ -203,6 +330,10 @@ export function RankingTable({
                     />
                   </td>
 
+                  <td className="tabular px-2 py-3 text-right">
+                    {player.totals.games}
+                  </td>
+
                   <td className="px-2 py-3">
                     <div className="flex items-center gap-2">
                       <FormSparkline results={player.recentResults} />
@@ -305,6 +436,10 @@ export function RankingTable({
 
               <div className="mt-2 flex items-center justify-between gap-2">
                 <FormSparkline results={player.recentResults} width={90} />
+                <span className="tabular text-fluid-xs text-ink-2">
+                  {player.totals.games}{' '}
+                  <span className="text-ink-3">partidas</span>
+                </span>
                 <span className="tabular text-fluid-xs text-ink-2">
                   KDA {player.kda.toFixed(2)}
                 </span>

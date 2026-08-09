@@ -2,20 +2,41 @@ import { ROLES, type Role } from '@challenge/core/domain';
 import { ROLE_LABEL, classNames } from './ui';
 import { RoleIcon } from './icons';
 
-export type SortKey = 'ladder' | 'gained' | 'winrate' | 'kda' | 'games';
+export type SortKey =
+  | 'ladder'
+  | 'gained'
+  | 'winrate'
+  | 'kda'
+  | 'games'
+  | 'shells'
+  | 'streak';
 
-export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: 'ladder', label: 'Rango' },
-  { key: 'gained', label: 'LP gained' },
-  { key: 'winrate', label: 'Winrate' },
-  { key: 'kda', label: 'KDA' },
-  { key: 'games', label: 'Partidas jugadas' },
+/**
+ * `bestFirst` is which direction puts the best player on top, which is not the
+ * same for every column: the ladder is best at position 1, everything else is
+ * best at its highest value. Comparators always sort best-first, and this is
+ * only here so the header can report the right `aria-sort` to a screen reader.
+ */
+export const SORT_OPTIONS: Array<{
+  key: SortKey;
+  label: string;
+  bestFirst: 'asc' | 'desc';
+}> = [
+  { key: 'ladder', label: 'Rango', bestFirst: 'asc' },
+  { key: 'gained', label: 'LP ganados', bestFirst: 'desc' },
+  { key: 'winrate', label: 'Winrate', bestFirst: 'desc' },
+  { key: 'kda', label: 'KDA', bestFirst: 'desc' },
+  { key: 'games', label: 'Partidas jugadas', bestFirst: 'desc' },
+  { key: 'shells', label: 'Conchas', bestFirst: 'desc' },
+  { key: 'streak', label: 'Racha', bestFirst: 'desc' },
 ];
 
 export interface FilterState {
   role: Role | 'ALL';
   query: string;
   sort: SortKey;
+  /** Flips the chosen column, so the worst of it can be read too. */
+  reverse: boolean;
   liveOnly: boolean;
 }
 
@@ -141,8 +162,14 @@ export function Filters({
           <span className="sr-only">Sort by</span>
           <select
             value={value.sort}
+            // Picking a column here starts it best-first, whatever the previous
+            // column had been flipped to.
             onChange={(event) =>
-              onChange({ ...value, sort: event.target.value as SortKey })
+              onChange({
+                ...value,
+                sort: event.target.value as SortKey,
+                reverse: false,
+              })
             }
             className="min-h-10 rounded-full border border-line bg-carbon px-4 text-fluid-sm text-ink"
           >

@@ -57,8 +57,18 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
     role: 'ALL',
     query: '',
     sort: 'ladder',
+    reverse: false,
     liveOnly: false,
   });
+
+  /** A new column starts best-first; the active one flips. */
+  const sortBy = useCallback((key: SortKey) => {
+    setFilters((current) =>
+      current.sort === key
+        ? { ...current, reverse: !current.reverse }
+        : { ...current, sort: key, reverse: false },
+    );
+  }, []);
 
   // Bumped once per refresh cycle. The tabs that own their own data watch it and
   // refetch, so one heartbeat keeps the whole page current instead of each panel
@@ -175,7 +185,12 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
       );
     });
 
-    return [...filtered].sort(comparatorFor(filters.sort));
+    // Comparators always order best-first; `reverse` is applied here so every
+    // column gets the flip for free instead of each one knowing about it.
+    const compare = comparatorFor(filters.sort);
+    return [...filtered].sort(
+      filters.reverse ? (a, b) => compare(b, a) : compare,
+    );
   }, [ranking, filters]);
 
   // Derived rather than stored: an unknown section in the URL lands on the
@@ -296,6 +311,9 @@ export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
             rosterSize={ranking.length}
             loading={isRefreshing}
             onSelect={(p) => openPlayer(p.id)}
+            sort={filters.sort}
+            reverse={filters.reverse}
+            onSort={sortBy}
           />
         </TabPanel>
 
@@ -457,6 +475,12 @@ function comparatorFor(sort: SortKey) {
         return b.kda - a.kda;
       case 'games':
         return b.totals.games - a.totals.games;
+      case 'shells':
+        return b.shells - a.shells;
+      case 'streak':
+        // Signed: a positive run is a win streak, a negative one a losing run,
+        // so this reads best form to worst across the whole table.
+        return b.streak - a.streak;
       case 'ladder':
       default:
         return a.position - b.position;
