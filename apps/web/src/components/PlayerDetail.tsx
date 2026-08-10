@@ -352,8 +352,16 @@ export function PlayerDetail({
                       value={String(extras.largestSpree)}
                     />
                     <Stat
-                      label="Multikills"
-                      value={`${extras.pentaKills}P · ${extras.quadraKills}Q · ${extras.tripleKills}T`}
+                      label="Pentakills"
+                      value={String(extras.pentaKills)}
+                    />
+                    <Stat
+                      label="Cuádruples"
+                      value={String(extras.quadraKills)}
+                    />
+                    <Stat
+                      label="Triples"
+                      value={String(extras.tripleKills)}
                     />
                     <Stat
                       label="Rendiciones"
