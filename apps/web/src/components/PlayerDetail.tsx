@@ -569,6 +569,11 @@ function HistoryTab({
             <div className="min-w-0 flex-1">
               <p className="text-fluid-sm font-semibold" style={{ color }}>
                 {match.win ? 'Victoria' : 'Derrota'}
+                {match.lpDelta !== null && (
+                  <span className="tabular ml-2">
+                    {formatSigned(match.lpDelta)} LP
+                  </span>
+                )}
                 <span className="tabular ml-2 font-normal text-ink-3">
                   {formatClock(match.durationMinutes)} · {formatAgo(match.playedAt)}
                 </span>

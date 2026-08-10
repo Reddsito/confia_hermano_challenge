@@ -548,6 +548,18 @@ const MIGRATIONS: string[] = [
   FROM discord_users
   WHERE discord_id = '398877892270096384';
   `,
+
+  // LP won or lost on a single game.
+  //
+  // Riot never reports this: it is the difference between two LEAGUE-V4 samples,
+  // which the sync already computes for the Discord embed and then threw away.
+  // Nullable and left null on purpose — a sync cycle that ingests several new
+  // matches at once cannot say which of them earned the movement, and every row
+  // written before this migration has no second sample to be differenced
+  // against. A null means "we do not know", never "zero".
+  `
+  ALTER TABLE player_matches ADD COLUMN lp_delta INTEGER;
+  `,
 ];
 
 export function openDatabase(path: string): Db {

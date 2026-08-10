@@ -79,6 +79,25 @@ export function insertPlayerMatch(
 }
 
 /**
+ * Attaches the LP a game moved, once the caller knows it.
+ *
+ * Separate from the insert because a match row is built from match data alone —
+ * the backfill and repair commands replay old games with no rank context, and
+ * folding LP into PlayerMatchRow would force them to invent a value. Only the
+ * live sync has two rank samples to difference, so only it calls this.
+ */
+export function setMatchLpDelta(
+  db: Db,
+  playerId: string,
+  matchId: string,
+  delta: number,
+): void {
+  db.prepare(
+    'UPDATE player_matches SET lp_delta = ? WHERE player_id = ? AND match_id = ?',
+  ).run(delta, playerId, matchId);
+}
+
+/**
  * Records a rank sample, but only when it actually moved. Writing every cycle
  * would add 720 identical rows a day per player and make the chart unreadable.
  */
@@ -186,6 +205,8 @@ export interface MatchRow {
   firstBlood: boolean;
   surrendered: boolean;
   killParticipation: number | null;
+  /** LP the game moved, or null when it could not be attributed. */
+  lpDelta: number | null;
 }
 
 /**
@@ -211,7 +232,8 @@ export function recentMatches(
               damage_to_champions AS damageToChampions,
               penta_kills AS pentaKills, quadra_kills AS quadraKills,
               triple_kills AS tripleKills, first_blood AS firstBlood,
-              surrendered, kill_participation AS killParticipation
+              surrendered, kill_participation AS killParticipation,
+              lp_delta AS lpDelta
        FROM player_matches
        WHERE player_id = ?
        ORDER BY played_at DESC

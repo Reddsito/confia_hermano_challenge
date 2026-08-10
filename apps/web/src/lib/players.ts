@@ -20,6 +20,12 @@ export interface MatchRecord {
   firstBlood: boolean;
   surrendered: boolean;
   killParticipation: number | null;
+  /**
+   * LP the game moved. Null when it could not be attributed to this game —
+   * several games ingested in one sync cycle share a single rank sample, and
+   * games recorded before this was tracked have none at all.
+   */
+  lpDelta: number | null;
 }
 
 export interface EarnedShellRecord {

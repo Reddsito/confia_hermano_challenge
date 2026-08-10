@@ -21,6 +21,7 @@ import {
   cacheRank,
   insertPlayerMatch,
   recordRankSample,
+  setMatchLpDelta,
   setActiveGame,
   staleRankPuuids,
   type PlayerMatchRow,
@@ -288,6 +289,13 @@ async function syncPlayer(
       recentResults = [row.win, ...recentResults].slice(0, MAX_RECENT_RESULTS);
       winStreak = row.win ? winStreak + 1 : 0;
       insertPlayerMatch(db, row);
+
+      // Only when this cycle brought exactly one game, for the reason above.
+      // Anything else stays null so the history says nothing rather than
+      // spreading one movement across games that did not earn it.
+      if (lpDelta !== null) {
+        setMatchLpDelta(db, player.id, matchId, lpDelta);
+      }
 
       // The coin for winning lands before any wager is paid, so it is the
       // player's own result that gets first call on the wallet's headroom
