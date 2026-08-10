@@ -34,8 +34,7 @@ interface LiveParticipant {
   displayName: string | null;
   /**
    * Only ever set for a tracked player — the spectator API reports no position.
-   * Both teams arrive already seated in lane order, so this is here to label a
-   * row, never to sort one.
+   * Teams arrive in Riot's pick order, so this labels a row, never sorts one.
    */
   role: Role | null;
   spellIcons: string[];

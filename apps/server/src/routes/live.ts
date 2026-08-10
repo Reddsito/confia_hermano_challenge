@@ -1,12 +1,7 @@
 import { Hono } from 'hono';
 
-import { opggUrl, orderByLane } from '@challenge/core/domain';
-import {
-  HEAL_SPELL_ID,
-  SMITE_SPELL_ID,
-  TELEPORT_SPELL_ID,
-  type PlatformId,
-} from '@challenge/core/riot';
+import { opggUrl } from '@challenge/core/domain';
+import { type PlatformId } from '@challenge/core/riot';
 
 import type { Db } from '../db/index';
 import { activeGames, cachedRanks } from '../db/matches';
@@ -98,12 +93,8 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
             playerId: tracked?.id ?? null,
             displayName: tracked?.displayName ?? null,
             // Only a tracked player has a role we can state. Everyone else is
-            // null, and the lane ordering below is what copes with that.
+            // null: SPECTATOR-V5 reports no position.
             role: tracked?.role ?? null,
-            // Spell evidence for the lane ordering below, and nothing else.
-            hasSmite: (participant.spellIds ?? []).includes(SMITE_SPELL_ID),
-            hasHeal: (participant.spellIds ?? []).includes(HEAL_SPELL_ID),
-            hasTeleport: (participant.spellIds ?? []).includes(TELEPORT_SPELL_ID),
             spellIcons: (participant.spellIds ?? [])
               .map((id) => assets.spells.get(id) ?? null)
               .filter((icon): icon is string => icon !== null),
@@ -123,26 +114,16 @@ export function liveRoutes(db: Db, challengeQueueId: number, platform: PlatformI
 
         const ours = anchor?.teamId ?? 100;
 
-        // Riot hands back pick order, not lane order. Both sides are reseated
-        // so the two columns read top-jungle-mid-adc-support against each
-        // other instead of drifting apart. The spell flags were only ever
-        // evidence for that seating, so they do not travel to the client — it
-        // already has the spell icons it renders.
+        // Riot's own order, untouched. Seating the two columns by lane meant
+        // guessing from summoner spells, and a guess that is wrong now and then
+        // reads as a bug — the viewer has no way to tell a heuristic apart from
+        // a mistake. Pick order is at least the order Riot vouches for.
         const lineup = (teamId: number, mine: boolean) =>
-          orderByLane(
-            game.participants
-              .filter((participant) =>
-                mine ? participant.teamId === teamId : participant.teamId !== teamId,
-              )
-              .map(describe),
-          ).map(
-            ({
-              hasSmite: _hasSmite,
-              hasHeal: _hasHeal,
-              hasTeleport: _hasTeleport,
-              ...participant
-            }) => participant,
-          );
+          game.participants
+            .filter((participant) =>
+              mine ? participant.teamId === teamId : participant.teamId !== teamId,
+            )
+            .map(describe);
 
         return {
           gameId: game.gameId,
