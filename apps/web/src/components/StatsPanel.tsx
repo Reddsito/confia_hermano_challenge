@@ -107,6 +107,25 @@ export function StatsPanel({
       .sort((a, b) => b.value - a.value)
       .slice(0, TOP_N);
 
+  /**
+   * Multikills. Filtered to those who actually landed one, for the same reason
+   * the streak boards are: a pentakill column is mostly zeros, and ranking ten
+   * players on "0" would bury the one person who earned the row.
+   */
+  const multikillLeaders = (
+    key: 'pentaKills' | 'quadraKills' | 'tripleKills',
+    noun: string,
+  ): LeaderRow[] =>
+    players
+      .map((player) => ({
+        player,
+        value: player.extras?.[key] ?? 0,
+        display: `${player.extras?.[key] ?? 0} ${noun}`,
+      }))
+      .filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, TOP_N);
+
   const kdaLeaders = players
     .filter((player) => player.totals.games >= 5)
     .map((player) => ({
@@ -152,11 +171,16 @@ export function StatsPanel({
         are different achievements, and merging them would rank a 9-game losing
         streak against a 9-game winning one as if they were comparable.
       */}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <LeaderColumn
           title="Mejor racha"
           caption="Victorias seguidas"
           rows={streakLeaders('longestWinStreak')}
+        />
+        <LeaderColumn
+          title="Mejor KDA"
+          caption="Kills + asistencias ÷ muertes · mínimo 5 partidas"
+          rows={kdaLeaders}
         />
         <LeaderColumn
           title="Peor racha"
@@ -165,33 +189,33 @@ export function StatsPanel({
         />
       </div>
 
+      {/*
+        The three multikills as their own row. Kept apart from CATEGORIES
+        because those boards rank everybody on a number everybody has, while
+        these rank the few who landed one at all.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <LeaderColumn
+          title="Pentakills"
+          caption="Más pentakills"
+          rows={multikillLeaders('pentaKills', 'pentas')}
+          empty="Nadie hizo un pentakill todavía."
+        />
+        <LeaderColumn
+          title="Cuádruples"
+          caption="Más cuádruples"
+          rows={multikillLeaders('quadraKills', 'cuádruples')}
+          empty="Nadie hizo un cuádruple todavía."
+        />
+        <LeaderColumn
+          title="Triples"
+          caption="Más triples"
+          rows={multikillLeaders('tripleKills', 'triples')}
+          empty="Nadie hizo un triple todavía."
+        />
+      </div>
+
       <DuoBoard duos={duos} players={players} />
-
-      <section className="rounded-2xl border border-line bg-carbon p-4">
-        <header className="text-center">
-          <h3 className="display text-fluid-lg">KDA</h3>
-          <p className="eyebrow mt-1 text-ink-3">
-            Kills + assists ÷ deaths · 5 games minimum
-          </p>
-        </header>
-
-        {kdaLeaders.length === 0 ? (
-          <p className="mt-4 text-center text-fluid-sm text-ink-3">
-            Ningún jugador llegó a 5 partidas todavía.
-          </p>
-        ) : (
-          <>
-            <Winner row={kdaLeaders[0]!} />
-            {kdaLeaders.length > 1 && (
-              <ol className="mt-4 grid gap-1.5 sm:grid-cols-2">
-                {kdaLeaders.slice(1).map((row, index) => (
-                  <ChaserRow key={row.player.id} row={row} position={index + 2} />
-                ))}
-              </ol>
-            )}
-          </>
-        )}
-      </section>
     </div>
   );
 }
@@ -339,10 +363,13 @@ function LeaderColumn({
   title,
   caption,
   rows,
+  empty = 'Todavía no hay suficientes partidas.',
 }: {
   title: string;
   caption: string;
   rows: LeaderRow[];
+  /** Why the board is empty, when "not enough games" is not the reason. */
+  empty?: string;
 }) {
   const [winner, ...rest] = rows;
 
@@ -354,9 +381,7 @@ function LeaderColumn({
       </header>
 
       {!winner ? (
-        <p className="mt-6 text-center text-fluid-sm text-ink-3">
-          Todavía no hay suficientes partidas.
-        </p>
+        <p className="mt-6 text-center text-fluid-sm text-ink-3">{empty}</p>
       ) : (
         <>
           <Winner row={winner} />
