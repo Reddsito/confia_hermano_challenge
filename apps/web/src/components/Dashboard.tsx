@@ -30,8 +30,16 @@ import { Tabs, TabPanel } from './Tabs';
 import { navigate, oneOf, useRoute } from '../lib/route';
 import { TournamentClock, TournamentProgress } from './TournamentClock';
 
-/** How often we check whether the backend has published a newer snapshot. */
-const POLL_CHECK_MS = 15_000;
+/**
+ * How often we check whether the backend has published a newer snapshot.
+ *
+ * The check is free until the countdown runs out — it compares two numbers and
+ * returns — so this is really the resolution of the moment that matters. At
+ * fifteen seconds the page could sit on a finished refresh for fifteen seconds
+ * before noticing, which the reader experiences as the wait the backend had
+ * already finished.
+ */
+const POLL_CHECK_MS = 3_000;
 
 export const SECTIONS = [
   'ranking',

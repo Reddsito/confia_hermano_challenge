@@ -39,6 +39,12 @@ export class Scheduler {
   }
 
   /**
+   * How long the last cycle took, used to promise a moment when the data will
+   * be ready rather than the moment work starts on it.
+   */
+  private lastCycleMs = 0;
+
+  /**
    * The next tick that has not happened yet.
    *
    * The schedule is stamped when a tick fires, but a cycle that overruns its
@@ -48,14 +54,28 @@ export class Scheduler {
    * every later cycle publishes a time that is just as stale. Advancing in
    * whole intervals keeps the published moment on the tick grid while
    * guaranteeing it is still ahead.
+   *
+   * The next cycle's own duration is added on top, because a tick is when the
+   * work starts and not when the answer exists. Counting down to the start
+   * leaves the site sitting on zero for the length of a cycle, showing
+   * "Refreshing…" while it waits for a snapshot that is still being built.
+   * Counting down to the finish means the moment the ring empties is the
+   * moment there is something new to show.
    */
   private publishableNextRun(): number {
     const now = Date.now();
     const scheduled = this.nextRunAt || now;
-    if (scheduled > now) return scheduled;
 
-    const missed = Math.ceil((now - scheduled + 1) / this.intervalMs);
-    return scheduled + missed * this.intervalMs;
+    const start =
+      scheduled > now
+        ? scheduled
+        : scheduled +
+          Math.ceil((now - scheduled + 1) / this.intervalMs) * this.intervalMs;
+
+    // The last cycle is the best estimate of the next one; the margin covers
+    // the write and the trip back out to the browser. Capped so a single
+    // pathological cycle cannot push the countdown past the following tick.
+    return start + Math.min(this.lastCycleMs + 2_000, this.intervalMs);
   }
 
   start(): void {
@@ -163,6 +183,7 @@ export class Scheduler {
         this.accrueCoins();
       }
 
+      this.lastCycleMs = report.durationMs;
       markCycleComplete(this.db, this.publishableNextRun());
       recordPositions(this.db, this.config, this.notifier);
 
