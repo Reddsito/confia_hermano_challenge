@@ -81,6 +81,17 @@ interface RankBudget {
  */
 const SUMMONER_CACHE_MS = 6 * 60 * 60 * 1000;
 
+/**
+ * How long a roster player's rank is trusted when they have not played.
+ *
+ * Half an hour rather than the six the strangers get: this is the number the
+ * standings are built from, and the exceptions the match list cannot see — LP
+ * decay, a Riot correction, a game the ingest missed — should not be allowed to
+ * sit on the board all evening. Spread across a roster it costs about one
+ * request per player per half hour instead of one per cycle.
+ */
+const ROSTER_RANK_MAX_AGE_MS = 30 * 60 * 1000;
+
 interface SummonerFacts {
   profileIconId: number | null;
   summonerLevel: number | null;
@@ -227,52 +238,81 @@ async function syncPlayer(
 
   let puuid = player.puuid ?? (await resolvePuuid(db, client, player));
 
-  /**
-   * Rank always, icon and level only when the cache has gone cold. The league
-   * request stays unconditional because it is the one carrying the answer the
-   * standings are built from — and because it is what surfaces a PUUID the key
-   * no longer recognises.
-   */
-  const readIdentity = async (id: string) => {
-    const cached = cachedSummoner(db, id, SUMMONER_CACHE_MS);
-    const [summoner, leagueEntries] = await Promise.all([
-      cached ?? client.getSummonerByPuuid(id),
-      client.getLeagueEntriesByPuuid(id),
-    ]);
+  // With a single queue, Riot filters for us. With several, the filter has to
+  // be dropped and applied locally — the endpoint takes only one queue id.
+  const askForMatches = (id: string) =>
+    client.getMatchIds(id, {
+      ...(queues.length === 1 ? { queue: queueId } : {}),
+      startTime: startTimeSeconds,
+      count: MATCH_PAGE_SIZE,
+    });
 
-    const facts: SummonerFacts = {
-      profileIconId: summoner.profileIconId,
-      summonerLevel: summoner.summonerLevel,
-    };
-    if (!cached) cacheSummoner(db, id, facts);
-
-    return [facts, leagueEntries] as const;
-  };
-
-  let summoner: SummonerFacts;
-  let entries;
+  // The first Riot call for this player doubles as the check that the key still
+  // recognises the cached PUUID. Riot encrypts PUUIDs per API key, and a
+  // development key is replaced every 24 hours — after which every cached PUUID
+  // is rejected with a 400. Rather than failing daily, drop the stale value and
+  // resolve it again.
+  let matchIds: string[];
   try {
-    [summoner, entries] = await readIdentity(puuid);
+    matchIds = await askForMatches(puuid);
   } catch (error) {
-    // Riot encrypts PUUIDs per API key, and a development key is replaced every
-    // 24 hours — after which every cached PUUID is rejected with a 400. Rather
-    // than failing daily, drop the stale value and resolve it again.
     if (!(error instanceof RiotApiError) || error.status !== 400) throw error;
 
     console.warn(
       `[sync] cached PUUID rejected for ${player.displayName}, re-resolving`,
     );
-    // The cache is keyed by PUUID, so the rejected one would never be read
-    // again — but on disk it would sit there indefinitely.
     forgetSummoner(db, puuid);
     puuid = await resolvePuuid(db, client, player);
-    [summoner, entries] = await readIdentity(puuid);
+    matchIds = await askForMatches(puuid);
   }
 
-  const solo = entries.find((entry) => entry.queueType === queueType);
-  const currentRank = solo ? toRank(solo) : null;
+  // Riot returns newest first; walk oldest first so recentResults stays ordered.
+  const fresh = matchIds
+    .filter((id) => !isMatchProcessed(db, player.id, id))
+    .reverse();
 
   const existing = getPlayerState(db, player.id);
+
+  const cachedFacts = cachedSummoner(db, puuid, SUMMONER_CACHE_MS);
+  const summoner: SummonerFacts =
+    cachedFacts ??
+    (await client.getSummonerByPuuid(puuid).then((dto) => {
+      const facts = {
+        profileIconId: dto.profileIconId,
+        summonerLevel: dto.summonerLevel,
+      };
+      cacheSummoner(db, puuid, facts);
+      return facts;
+    }));
+
+  /**
+   * Rank only when it can have moved.
+   *
+   * A player's tier and LP change when they finish a ranked game and at no
+   * other time, so asking on every cycle for somebody who has not played is
+   * spending a request to be told what we already know — and it was a third of
+   * what the roster costs. The periodic refresh is the safety net for the
+   * exceptions the match list cannot see: LP decay, a Riot correction, or a
+   * game the ingest missed.
+   */
+  const rankIsStale =
+    staleRankPuuids(db, [puuid], ROSTER_RANK_MAX_AGE_MS).length > 0;
+
+  let currentRank = existing?.currentRank ?? null;
+  if (fresh.length > 0 || rankIsStale) {
+    const entries = await client.getLeagueEntriesByPuuid(puuid);
+    const solo = entries.find((entry) => entry.queueType === queueType);
+    currentRank = solo ? toRank(solo) : null;
+
+    // Written even when unranked, because the timestamp is what the staleness
+    // check reads — an unranked player with no row would be asked every cycle.
+    cacheRank(db, puuid, {
+      tier: solo?.tier ?? null,
+      division: solo?.rank ?? null,
+      lp: solo?.leaguePoints ?? null,
+    });
+  }
+
   const previousRank = existing?.currentRank ?? null;
   const wasInGame = existing?.inGame ?? false;
   const totals: MatchTotals = existing
@@ -305,19 +345,6 @@ async function syncPlayer(
     lastError: null,
     updatedAt: new Date().toISOString(),
   });
-
-  // With a single queue, Riot filters for us. With several, the filter has to
-  // be dropped and applied locally — the endpoint takes only one queue id.
-  const matchIds = await client.getMatchIds(puuid, {
-    ...(queues.length === 1 ? { queue: queueId } : {}),
-    startTime: startTimeSeconds,
-    count: MATCH_PAGE_SIZE,
-  });
-
-  // Riot returns newest first; walk oldest first so recentResults stays ordered.
-  const fresh = matchIds
-    .filter((id) => !isMatchProcessed(db, player.id, id))
-    .reverse();
 
   // LP movement can only be attributed to a single game. With several new
   // matches in one cycle we cannot tell which one earned what, so we say
