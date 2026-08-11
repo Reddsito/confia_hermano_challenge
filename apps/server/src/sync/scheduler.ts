@@ -34,8 +34,32 @@ export class Scheduler {
   /** When the next tick fires. The countdown on the site reads this. */
   private nextRunAt = 0;
 
+  private get intervalMs(): number {
+    return Math.max(this.config.tournament.refreshIntervalMinutes * 60_000, 1);
+  }
+
+  /**
+   * The next tick that has not happened yet.
+   *
+   * The schedule is stamped when a tick fires, but a cycle that overruns its
+   * interval finishes after that moment has already gone by. Publishing it
+   * would promise the site a refresh that is already behind it: the countdown
+   * lands on zero, shows "Refreshing…", and stays there for good, because
+   * every later cycle publishes a time that is just as stale. Advancing in
+   * whole intervals keeps the published moment on the tick grid while
+   * guaranteeing it is still ahead.
+   */
+  private publishableNextRun(): number {
+    const now = Date.now();
+    const scheduled = this.nextRunAt || now;
+    if (scheduled > now) return scheduled;
+
+    const missed = Math.ceil((now - scheduled + 1) / this.intervalMs);
+    return scheduled + missed * this.intervalMs;
+  }
+
   start(): void {
-    const intervalMs = this.config.tournament.refreshIntervalMinutes * 60_000;
+    const intervalMs = this.intervalMs;
     console.log(
       `[scheduler] every ${this.config.tournament.refreshIntervalMinutes} min ` +
         `(${this.config.useMockData ? 'mock' : 'riot'})` +
@@ -139,11 +163,7 @@ export class Scheduler {
         this.accrueCoins();
       }
 
-      markCycleComplete(
-        this.db,
-        this.nextRunAt ||
-          Date.now() + this.config.tournament.refreshIntervalMinutes * 60_000,
-      );
+      markCycleComplete(this.db, this.publishableNextRun());
       recordPositions(this.db, this.config, this.notifier);
 
       // Sent after the data is committed, so a Discord outage can never delay
