@@ -73,9 +73,17 @@ export class Scheduler {
           Math.ceil((now - scheduled + 1) / this.intervalMs) * this.intervalMs;
 
     // The last cycle is the best estimate of the next one; the margin covers
-    // the write and the trip back out to the browser. Capped so a single
-    // pathological cycle cannot push the countdown past the following tick.
-    return start + Math.min(this.lastCycleMs + 2_000, this.intervalMs);
+    // the write and the trip back out to the browser.
+    //
+    // Capped at a quarter of the interval, because the estimate is only ever
+    // an estimate and an outlier must not be allowed to inflate the countdown:
+    // the first cycle after a restart runs with a cold cache and takes as long
+    // as the interval itself, which uncapped would tell the reader to wait
+    // twice as long as anything the site will actually do. A cycle that slow
+    // is better shown as a couple of late seconds than as a doubled promise,
+    // and the estimate corrects itself on the very next cycle.
+    const margin = Math.min(this.lastCycleMs + 2_000, this.intervalMs / 4);
+    return start + margin;
   }
 
   start(): void {

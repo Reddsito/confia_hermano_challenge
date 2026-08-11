@@ -22,9 +22,18 @@ export function RefreshMeter({
   source,
 }: RefreshMeterProps) {
   const countdown = useCountdown(nextUpdateAt);
-  const intervalMs = Math.max(intervalMinutes * 60_000, 1);
+
+  // The span the ring drains over is the one the backend actually promised —
+  // from this snapshot to the next — not the configured interval. The two are
+  // not the same: the published moment includes the cycle's own duration, so
+  // measuring against the bare interval leaves the ring pinned at full while
+  // that margin runs down, which reads as a stuck meter.
+  const promisedMs = Date.parse(nextUpdateAt) - Date.parse(generatedAt);
+  const spanMs = Number.isFinite(promisedMs) && promisedMs > 0
+    ? promisedMs
+    : Math.max(intervalMinutes * 60_000, 1);
   const remaining = countdown.ready
-    ? Math.min(countdown.totalMs / intervalMs, 1)
+    ? Math.min(countdown.totalMs / spanMs, 1)
     : 0;
 
   const mounted = useMounted();
