@@ -224,7 +224,7 @@ export function RankingTable({
             </tr>
           </thead>
           <tbody>
-            {players.map((player) => {
+            {players.map((player, index) => {
               const accent = tierColor(player.rank);
               return (
                 <tr
@@ -342,7 +342,9 @@ export function RankingTable({
                   </td>
 
                   <td className="px-2 py-3 text-center">
-                    <ShellCount player={player} />
+                    {/* Only the leader: every row below has the rows above it
+                        for headroom inside the scroll box. */}
+                    <ShellCount player={player} below={index === 0} />
                   </td>
 
                   <td className="px-2 py-3 text-right">
@@ -374,18 +376,23 @@ export function RankingTable({
       <ul className="space-y-2 md:hidden">
         {players.map((player) => {
           const accent = tierColor(player.rank);
+
+          // The tier bar is an inset shadow rather than a positioned strip,
+          // which is how the match history already draws its own. The strip
+          // needed `overflow-hidden` to keep it inside the rounded corner, and
+          // that clipped the shell tooltip on every card.
           return (
             <li
               key={player.id}
-              className="relative cursor-pointer overflow-hidden rounded-xl border border-line bg-carbon p-3 pl-4"
-              style={{ '--tier': accent } as React.CSSProperties}
+              className="relative cursor-pointer rounded-xl border border-line bg-carbon p-3 pl-4"
+              style={
+                {
+                  '--tier': accent,
+                  boxShadow: `inset 3px 0 0 0 ${accent}`,
+                } as React.CSSProperties
+              }
               onClick={() => onSelect(player)}
             >
-              <span
-                aria-hidden="true"
-                className="absolute inset-y-0 left-0 w-[3px]"
-                style={{ background: accent }}
-              />
               <div className="flex items-center gap-2.5">
                 <span className="tabular w-9 shrink-0">
                   <span className="text-fluid-base font-semibold">
@@ -514,7 +521,21 @@ function SplitBar({ wins, losses }: { wins: number; losses: number }) {
  * on hover. The count alone says they are dangerous; the hover says what they
  * are currently paying for.
  */
-function ShellCount({ player }: { player: RankedPlayer }) {
+function ShellCount({
+  player,
+  below = false,
+}: {
+  player: RankedPlayer;
+  /**
+   * Opens the tooltip downward instead of up.
+   *
+   * The table scrolls sideways, and a box that is not `visible` on one axis is
+   * never `visible` on the other — asking for horizontal scroll silently buys
+   * vertical clipping. The leader has no room above them inside that box, so
+   * their tooltip was being cut in half by the header.
+   */
+  below?: boolean;
+}) {
   const hit = player.lastHit;
 
   const owed = player.owes.length;
@@ -556,7 +577,8 @@ function ShellCount({ player }: { player: RankedPlayer }) {
         <span
           role="tooltip"
           className={classNames(
-            'pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-56 -translate-x-1/2',
+            'pointer-events-none absolute left-1/2 z-30 w-56 -translate-x-1/2',
+            below ? 'top-full mt-2' : 'bottom-full mb-2',
             'rounded-lg border border-line bg-carbon-2 p-2.5 text-left shadow-lg',
             'opacity-0 transition-opacity group-hover/shell:opacity-100 group-focus/shell:opacity-100',
           )}
