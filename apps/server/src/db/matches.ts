@@ -518,6 +518,59 @@ export function cacheRank(db: Db, puuid: string, rank: CachedRank): void {
   ).run(puuid, rank.tier, rank.division, rank.lp, Date.now());
 }
 
+export interface CachedSummoner {
+  profileIconId: number | null;
+  summonerLevel: number | null;
+}
+
+/**
+ * The icon and level for a puuid, or null when nothing fresh is on record.
+ *
+ * Unlike {@link cachedRanks} this refuses a stale row rather than returning it,
+ * because the caller's only alternative is to ask Riot — there is no separate
+ * "should I refresh this" decision to make.
+ */
+export function cachedSummoner(
+  db: Db,
+  puuid: string,
+  maxAgeMs: number,
+): CachedSummoner | null {
+  const row = db
+    .prepare(
+      `SELECT profile_icon_id, summoner_level FROM summoner_cache
+       WHERE puuid = ? AND fetched_at > ?`,
+    )
+    .get(puuid, Date.now() - maxAgeMs) as
+    | { profile_icon_id: number | null; summoner_level: number | null }
+    | undefined;
+
+  if (!row) return null;
+  return {
+    profileIconId: row.profile_icon_id,
+    summonerLevel: row.summoner_level,
+  };
+}
+
+export function cacheSummoner(
+  db: Db,
+  puuid: string,
+  summoner: CachedSummoner,
+): void {
+  db.prepare(
+    `INSERT INTO summoner_cache (puuid, profile_icon_id, summoner_level, fetched_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (puuid) DO UPDATE SET
+       profile_icon_id = excluded.profile_icon_id,
+       summoner_level = excluded.summoner_level,
+       fetched_at = excluded.fetched_at`,
+  ).run(puuid, summoner.profileIconId, summoner.summonerLevel, Date.now());
+}
+
+/** Drops a cached entry whose puuid the API key no longer recognises. */
+export function forgetSummoner(db: Db, puuid: string): void {
+  db.prepare('DELETE FROM summoner_cache WHERE puuid = ?').run(puuid);
+}
+
 export function setActiveGame(
   db: Db,
   playerId: string,

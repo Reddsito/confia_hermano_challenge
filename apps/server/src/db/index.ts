@@ -560,6 +560,24 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE player_matches ADD COLUMN lp_delta INTEGER;
   `,
+
+  // The icon and level behind a roster player's avatar.
+  //
+  // Neither moves during a session, yet SUMMONER-V4 has to be asked per player
+  // and that one request is a quarter of what a cycle spends on each of them.
+  // Held in memory this cache was already paying for itself, but it started
+  // empty on every restart — and a cycle that reruns the whole roster cold on a
+  // night with a dozen live games crosses the rate limit's hundred-request
+  // window and takes two minutes instead of eight seconds. On disk it survives
+  // the restart, so a deploy costs nothing.
+  `
+  CREATE TABLE summoner_cache (
+    puuid           TEXT PRIMARY KEY,
+    profile_icon_id INTEGER,
+    summoner_level  INTEGER,
+    fetched_at      INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function openDatabase(path: string): Db {

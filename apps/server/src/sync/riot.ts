@@ -19,6 +19,9 @@ import { QUEUE_IDS, type ServerConfig } from '../config';
 import type { Db } from '../db/index';
 import {
   cacheRank,
+  cacheSummoner,
+  cachedSummoner,
+  forgetSummoner,
   insertPlayerMatch,
   recordRankSample,
   setMatchLpDelta,
@@ -74,23 +77,13 @@ interface RankBudget {
  *
  * Neither moves during a game, and both are decoration next to the ladder —
  * yet asking every cycle costs one request per player, a quarter of what the
- * roster spends. Held in memory rather than in the database: losing it on
- * restart costs one extra request per player, which is cheaper than a
- * migration for a number nobody sorts by.
+ * roster spends.
  */
 const SUMMONER_CACHE_MS = 6 * 60 * 60 * 1000;
 
 interface SummonerFacts {
-  profileIconId: number;
-  summonerLevel: number;
-}
-
-const summonerCache = new Map<string, { at: number; facts: SummonerFacts }>();
-
-function cachedSummoner(puuid: string): SummonerFacts | null {
-  const hit = summonerCache.get(puuid);
-  if (!hit || Date.now() - hit.at >= SUMMONER_CACHE_MS) return null;
-  return hit.facts;
+  profileIconId: number | null;
+  summonerLevel: number | null;
 }
 
 export interface CycleReport {
@@ -241,7 +234,7 @@ async function syncPlayer(
    * no longer recognises.
    */
   const readIdentity = async (id: string) => {
-    const cached = cachedSummoner(id);
+    const cached = cachedSummoner(db, id, SUMMONER_CACHE_MS);
     const [summoner, leagueEntries] = await Promise.all([
       cached ?? client.getSummonerByPuuid(id),
       client.getLeagueEntriesByPuuid(id),
@@ -251,7 +244,7 @@ async function syncPlayer(
       profileIconId: summoner.profileIconId,
       summonerLevel: summoner.summonerLevel,
     };
-    if (!cached) summonerCache.set(id, { at: Date.now(), facts });
+    if (!cached) cacheSummoner(db, id, facts);
 
     return [facts, leagueEntries] as const;
   };
@@ -270,8 +263,8 @@ async function syncPlayer(
       `[sync] cached PUUID rejected for ${player.displayName}, re-resolving`,
     );
     // The cache is keyed by PUUID, so the rejected one would never be read
-    // again — but it would sit there until the process restarts.
-    summonerCache.delete(puuid);
+    // again — but on disk it would sit there indefinitely.
+    forgetSummoner(db, puuid);
     puuid = await resolvePuuid(db, client, player);
     [summoner, entries] = await readIdentity(puuid);
   }
