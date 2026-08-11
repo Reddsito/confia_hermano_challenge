@@ -53,6 +53,46 @@ import { MAX_RECENT_RESULTS, computeStreak, toRank } from './helpers';
 
 const MATCH_PAGE_SIZE = 20;
 
+/**
+ * Ceiling on rank lookups for people who are not in the challenge, per cycle.
+ *
+ * Ten live games at once would otherwise ask for a hundred ranks in a single
+ * pass and spend the whole rate-limit budget on decoration for the live board,
+ * starving the roster sync the standings actually depend on. Whatever is left
+ * over is picked up next cycle — a tier that shows up two minutes late is
+ * still the right tier.
+ */
+const PARTICIPANT_RANK_BUDGET = 20;
+
+/** Spend tracker for the above, shared by every player in one cycle. */
+interface RankBudget {
+  left: number;
+}
+
+/**
+ * How long a summoner's icon and level are trusted.
+ *
+ * Neither moves during a game, and both are decoration next to the ladder —
+ * yet asking every cycle costs one request per player, a quarter of what the
+ * roster spends. Held in memory rather than in the database: losing it on
+ * restart costs one extra request per player, which is cheaper than a
+ * migration for a number nobody sorts by.
+ */
+const SUMMONER_CACHE_MS = 6 * 60 * 60 * 1000;
+
+interface SummonerFacts {
+  profileIconId: number;
+  summonerLevel: number;
+}
+
+const summonerCache = new Map<string, { at: number; facts: SummonerFacts }>();
+
+function cachedSummoner(puuid: string): SummonerFacts | null {
+  const hit = summonerCache.get(puuid);
+  if (!hit || Date.now() - hit.at >= SUMMONER_CACHE_MS) return null;
+  return hit.facts;
+}
+
 export interface CycleReport {
   players: number;
   updated: number;
@@ -101,6 +141,8 @@ export async function runRiotCycle(
   let failed = 0;
   let newMatches = 0;
 
+  const rankBudget: RankBudget = { left: PARTICIPANT_RANK_BUDGET };
+
   for (const player of players) {
     try {
       newMatches += await syncPlayer(
@@ -111,6 +153,7 @@ export async function runRiotCycle(
         countFrom(tournamentStart, player),
         config,
         notifier,
+        rankBudget,
       );
       updated += 1;
     } catch (error) {
@@ -146,6 +189,7 @@ async function cacheParticipantRanks(
   client: RiotClient,
   game: ActiveGameDto,
   queueType: string,
+  budget: RankBudget,
 ): Promise<void> {
   const missing = staleRankPuuids(
     db,
@@ -154,6 +198,11 @@ async function cacheParticipantRanks(
   );
 
   for (const puuid of missing) {
+    // Out of budget for this cycle; the rest keep their stale entry and get
+    // another chance on the next pass.
+    if (budget.left <= 0) return;
+    budget.left -= 1;
+
     try {
       const entries = await client.getLeagueEntriesByPuuid(puuid);
       const solo = entries.find((entry) => entry.queueType === queueType);
@@ -178,19 +227,39 @@ async function syncPlayer(
   startTimeSeconds: number,
   config: ServerConfig,
   notifier: DiscordNotifier,
+  rankBudget: RankBudget,
 ): Promise<number> {
   const queueId = queues[0]!;
   const queueType = config.tournament.queue;
 
   let puuid = player.puuid ?? (await resolvePuuid(db, client, player));
 
-  let summoner;
+  /**
+   * Rank always, icon and level only when the cache has gone cold. The league
+   * request stays unconditional because it is the one carrying the answer the
+   * standings are built from — and because it is what surfaces a PUUID the key
+   * no longer recognises.
+   */
+  const readIdentity = async (id: string) => {
+    const cached = cachedSummoner(id);
+    const [summoner, leagueEntries] = await Promise.all([
+      cached ?? client.getSummonerByPuuid(id),
+      client.getLeagueEntriesByPuuid(id),
+    ]);
+
+    const facts: SummonerFacts = {
+      profileIconId: summoner.profileIconId,
+      summonerLevel: summoner.summonerLevel,
+    };
+    if (!cached) summonerCache.set(id, { at: Date.now(), facts });
+
+    return [facts, leagueEntries] as const;
+  };
+
+  let summoner: SummonerFacts;
   let entries;
   try {
-    [summoner, entries] = await Promise.all([
-      client.getSummonerByPuuid(puuid),
-      client.getLeagueEntriesByPuuid(puuid),
-    ]);
+    [summoner, entries] = await readIdentity(puuid);
   } catch (error) {
     // Riot encrypts PUUIDs per API key, and a development key is replaced every
     // 24 hours — after which every cached PUUID is rejected with a 400. Rather
@@ -200,11 +269,11 @@ async function syncPlayer(
     console.warn(
       `[sync] cached PUUID rejected for ${player.displayName}, re-resolving`,
     );
+    // The cache is keyed by PUUID, so the rejected one would never be read
+    // again — but it would sit there until the process restarts.
+    summonerCache.delete(puuid);
     puuid = await resolvePuuid(db, client, player);
-    [summoner, entries] = await Promise.all([
-      client.getSummonerByPuuid(puuid),
-      client.getLeagueEntriesByPuuid(puuid),
-    ]);
+    [summoner, entries] = await readIdentity(puuid);
   }
 
   const solo = entries.find((entry) => entry.queueType === queueType);
@@ -435,7 +504,7 @@ async function syncPlayer(
   );
 
   if (activeGame && queues.includes(activeGame.gameQueueConfigId)) {
-    await cacheParticipantRanks(db, client, activeGame, queueType);
+    await cacheParticipantRanks(db, client, activeGame, queueType, rankBudget);
   }
 
   // Only the transition is interesting; re-announcing every cycle while someone
