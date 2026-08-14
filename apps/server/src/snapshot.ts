@@ -10,6 +10,7 @@ import { getMeta, setMeta, type Db } from './db/index';
 import {
   bestDuos,
   dailyDeltas,
+  duoGameCounts,
   extraTotalsFor,
   headToHead,
   lpSeries,
@@ -40,6 +41,8 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
   const players = listPlayers(db, 'approved');
   const states = listPlayerStates(db);
   const hits = lastHits(db);
+  // One grouped query for the whole roster, not one per player inside the map.
+  const duoGames = duoGameCounts(db);
 
   const entries: PlayerEntry[] = players.map((player) => {
     const state = states.get(player.id);
@@ -63,6 +66,7 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
       inGame: state?.inGame ?? false,
       error: state?.lastError ?? null,
       extras: extraTotalsFor(db, player.id),
+      duoGames: duoGames.get(player.id) ?? 0,
       shells: balanceFor(db, player.id).available,
       lastHit: hits.get(player.id) ?? null,
       owes: pendingThrows(db, player.id).map((row) => row.challengeName),

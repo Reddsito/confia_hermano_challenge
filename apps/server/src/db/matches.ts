@@ -382,6 +382,31 @@ export function bestDuos(db: Db, minimumGames = 2): Duo[] {
     .all(minimumGames) as Duo[];
 }
 
+/**
+ * How many games each player queued alongside at least one other tracked
+ * player, by player id.
+ *
+ * Counted with DISTINCT match ids rather than by summing pairs: a trio shows up
+ * as three pairs for the same game, and summing them would report three duo
+ * games where only one was played.
+ */
+export function duoGameCounts(db: Db): Map<string, number> {
+  const rows = db
+    .prepare(
+      `SELECT a.player_id AS playerId,
+              COUNT(DISTINCT a.match_id) AS games
+       FROM player_matches a
+       JOIN player_matches b
+         ON a.match_id = b.match_id
+        AND a.team_id = b.team_id
+        AND a.player_id <> b.player_id
+       GROUP BY a.player_id`,
+    )
+    .all() as Array<{ playerId: string; games: number }>;
+
+  return new Map(rows.map((row) => [row.playerId, row.games]));
+}
+
 export interface DayDelta {
   playerId: string;
   day: string;

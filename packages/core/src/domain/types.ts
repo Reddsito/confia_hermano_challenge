@@ -71,6 +71,8 @@ export interface PlayerEntry {
   error: string | null;
   /** Derived from the per-match table; absent until a cycle has stored games. */
   extras: PlayerExtras | null;
+  /** Games played on the same team as at least one other tracked player. */
+  duoGames: number;
   /** Unspent blue shells this player is holding. */
   shells: number;
   /** The most recent challenge fired at them, for the hover card. */

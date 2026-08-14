@@ -133,7 +133,7 @@ export function RankingTable({
   return (
     <>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[1060px] border-separate border-spacing-y-1.5 text-fluid-sm">
+        <table className="w-full min-w-[1120px] border-separate border-spacing-y-1.5 text-fluid-sm">
           <caption className="sr-only">
             Tabla completa. Los encabezados con flecha ordenan al hacer clic.
           </caption>
@@ -175,6 +175,16 @@ export function RankingTable({
                 className="px-2"
               >
                 Partidas
+              </SortHeader>
+              <SortHeader
+                column="duo"
+                sort={sort}
+                reverse={reverse}
+                onSort={onSort}
+                align="right"
+                className="px-2"
+              >
+                Duo
               </SortHeader>
               <SortHeader
                 column="streak"
@@ -334,6 +344,13 @@ export function RankingTable({
                     {player.totals.games}
                   </td>
 
+                  <td className="px-2 py-3 text-right">
+                    <DuoCount
+                      duoGames={player.duoGames}
+                      games={player.totals.games}
+                    />
+                  </td>
+
                   <td className="px-2 py-3">
                     <div className="flex items-center gap-2">
                       <FormSparkline results={player.recentResults} />
@@ -446,6 +463,13 @@ export function RankingTable({
                 <span className="tabular text-fluid-xs text-ink-2">
                   {player.totals.games}{' '}
                   <span className="text-ink-3">partidas</span>
+                </span>
+                <span className="tabular text-fluid-xs text-ink-2">
+                  <DuoCount
+                    duoGames={player.duoGames}
+                    games={player.totals.games}
+                  />{' '}
+                  <span className="text-ink-3">duo</span>
                 </span>
                 <span className="tabular text-fluid-xs text-ink-2">
                   KDA {player.kda.toFixed(2)}
@@ -620,6 +644,28 @@ function ShellCount({
           )}
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * Games queued with another tracked player. Shown against the player's own
+ * total on hover: eight duo games means one thing on a roster of ten games and
+ * another on a roster of two hundred.
+ */
+function DuoCount({ duoGames, games }: { duoGames: number; games: number }) {
+  if (duoGames === 0) {
+    return <span className="text-ink-3">—</span>;
+  }
+
+  return (
+    <span
+      className="tabular font-semibold"
+      title={`${duoGames} de ${games} partidas jugadas con alguien del torneo${
+        games > 0 ? ` · ${formatPercent(duoGames / games)}` : ''
+      }`}
+    >
+      {duoGames}
     </span>
   );
 }

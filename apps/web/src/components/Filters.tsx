@@ -8,6 +8,7 @@ export type SortKey =
   | 'winrate'
   | 'kda'
   | 'games'
+  | 'duo'
   | 'shells'
   | 'streak';
 
@@ -27,6 +28,7 @@ export const SORT_OPTIONS: Array<{
   { key: 'winrate', label: 'Winrate', bestFirst: 'desc' },
   { key: 'kda', label: 'KDA', bestFirst: 'desc' },
   { key: 'games', label: 'Partidas jugadas', bestFirst: 'desc' },
+  { key: 'duo', label: 'Partidas en duo', bestFirst: 'desc' },
   { key: 'shells', label: 'Conchas', bestFirst: 'desc' },
   { key: 'streak', label: 'Racha', bestFirst: 'desc' },
 ];

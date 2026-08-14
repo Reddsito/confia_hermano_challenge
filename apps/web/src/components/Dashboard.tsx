@@ -483,6 +483,8 @@ function comparatorFor(sort: SortKey) {
         return b.kda - a.kda;
       case 'games':
         return b.totals.games - a.totals.games;
+      case 'duo':
+        return b.duoGames - a.duoGames;
       case 'shells':
         return b.shells - a.shells;
       case 'streak':
