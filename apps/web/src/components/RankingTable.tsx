@@ -534,15 +534,13 @@ function LowEloBand() {
       className="flex items-baseline justify-center gap-3 rounded-lg px-4 py-2"
       style={{
         background:
-          'linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-mark-amber) 16%, transparent) 50%, transparent)',
-        boxShadow:
-          'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 28%, transparent)',
+          'linear-gradient(90deg, transparent, var(--color-carbon-3) 50%, transparent)',
+        boxShadow: 'inset 0 0 0 1px var(--color-line-strong)',
       }}
     >
       <span
-        className="display shrink-0 leading-none uppercase"
+        className="display shrink-0 leading-none uppercase text-ink-2"
         style={{
-          color: 'var(--color-mark-amber)',
           fontSize: 'clamp(1rem, 2.2vw, 1.5rem)',
           letterSpacing: '0.1em',
         }}
