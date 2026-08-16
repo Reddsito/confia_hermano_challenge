@@ -525,34 +525,51 @@ function lowEloBoundary(players: RankedPlayer[], sort: SortKey): number {
   );
 }
 
-const LOW_ELO_LABEL = 'Low elo';
-const LOW_ELO_CAPTION = 'De platino para abajo';
+const LOW_ELO_CAPTION = 'De platino para abajo · abandonad toda esperanza';
 
-/** The band itself, shared by the table row and the mobile card. */
+/**
+ * The band itself, shared by the table row and the mobile card.
+ *
+ * The hazard stripes are the whole joke, so they run edge to edge behind the
+ * word instead of sitting in a corner as decoration.
+ */
 function LowEloBand() {
   return (
     <div
-      className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+      className="relative overflow-hidden rounded-xl px-4 py-6 text-center sm:py-8"
       style={{
         background:
-          'linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 22%, transparent), transparent 70%)',
-        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 35%, transparent)',
+          'linear-gradient(180deg, color-mix(in oklab, var(--color-mark-amber) 14%, transparent), transparent)',
+        boxShadow:
+          'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 40%, transparent)',
       }}
     >
-      <span
-        className="display shrink-0 text-fluid-sm tracking-wide"
-        style={{ color: 'var(--color-mark-amber)' }}
-      >
-        {LOW_ELO_LABEL}
-      </span>
-      <span
-        className="h-px flex-1"
+      {/* Caution tape, top and bottom. */}
+      {(['top-0', 'bottom-0'] as const).map((edge) => (
+        <span
+          key={edge}
+          aria-hidden="true"
+          className={classNames('absolute inset-x-0 h-2', edge)}
+          style={{
+            background:
+              'repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-mark-amber) 70%, transparent) 0 10px, transparent 10px 20px)',
+          }}
+        />
+      ))}
+
+      <p
+        className="display leading-none uppercase"
         style={{
-          background:
-            'repeating-linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 45%, transparent) 0 6px, transparent 6px 12px)',
+          color: 'var(--color-mark-amber)',
+          fontSize: 'clamp(1.75rem, 6vw, 3.25rem)',
+          letterSpacing: '0.12em',
+          textShadow:
+            '0 0 28px color-mix(in oklab, var(--color-mark-amber) 45%, transparent)',
         }}
-      />
-      <span className="eyebrow shrink-0 text-ink-3">{LOW_ELO_CAPTION}</span>
+      >
+        Low elo
+      </p>
+      <p className="mt-2 text-fluid-sm text-ink-2">{LOW_ELO_CAPTION}</p>
     </div>
   );
 }
@@ -564,8 +581,8 @@ function LowEloBand() {
  */
 function LowEloDividerRow() {
   return (
-    <tr aria-hidden="true">
-      <td colSpan={13} className="px-0 pt-2 pb-1">
+    <tr>
+      <td colSpan={13} className="px-0 pt-5 pb-3">
         <LowEloBand />
       </td>
     </tr>
@@ -574,7 +591,7 @@ function LowEloDividerRow() {
 
 function LowEloDividerCard() {
   return (
-    <li aria-hidden="true" className="pt-1">
+    <li className="pt-3 pb-1">
       <LowEloBand />
     </li>
   );
