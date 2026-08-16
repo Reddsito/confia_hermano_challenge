@@ -525,7 +525,7 @@ function lowEloBoundary(players: RankedPlayer[], sort: SortKey): number {
   );
 }
 
-const LOW_ELO_CAPTION = 'abandonad toda esperanza';
+const LOW_ELO_CAPTION = 'be better';
 
 /**
  * The dashes either side of the label. They fade towards the outer edge so the
