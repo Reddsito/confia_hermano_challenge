@@ -507,7 +507,7 @@ export function RankingTable({
 }
 
 /**
- * Where the table crosses from Emerald and up into everything below it, or -1
+ * Where the table crosses from Diamond and up into Emerald and below, or -1
  * when no divider belongs.
  *
  * Only the ladder sort earns one. Every other column scatters the tiers, so the
