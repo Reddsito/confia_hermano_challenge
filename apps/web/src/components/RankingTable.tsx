@@ -1,5 +1,6 @@
+import { Fragment } from 'react';
 import type { RankedPlayer } from '@challenge/core/domain';
-import { titleCase } from '@challenge/core/domain';
+import { isLowElo, titleCase } from '@challenge/core/domain';
 import {
   Avatar,
   FormSparkline,
@@ -105,6 +106,8 @@ export function RankingTable({
   reverse: boolean;
   onSort: (key: SortKey) => void;
 }) {
+  const lowEloAt = lowEloBoundary(players, sort);
+
   if (players.length === 0) {
     // Saying "no match" when the roster itself is empty sends people hunting
     // for a filter they never set.
@@ -236,7 +239,7 @@ export function RankingTable({
           <tbody>
             {players.map((player, index) => {
               const accent = tierColor(player.rank);
-              return (
+              const row = (
                 <tr
                   key={player.id}
                   className="group cursor-pointer bg-carbon transition-colors hover:bg-carbon-2"
@@ -384,6 +387,14 @@ export function RankingTable({
                   </td>
                 </tr>
               );
+
+              if (index !== lowEloAt) return row;
+              return (
+                <Fragment key={`low-elo-${player.id}`}>
+                  <LowEloDividerRow />
+                  {row}
+                </Fragment>
+              );
             })}
           </tbody>
         </table>
@@ -391,14 +402,14 @@ export function RankingTable({
 
       {/* Narrow screens: cards, so nothing hides behind a horizontal scrollbar. */}
       <ul className="space-y-2 md:hidden">
-        {players.map((player) => {
+        {players.map((player, index) => {
           const accent = tierColor(player.rank);
 
           // The tier bar is an inset shadow rather than a positioned strip,
           // which is how the match history already draws its own. The strip
           // needed `overflow-hidden` to keep it inside the rounded corner, and
           // that clipped the shell tooltip on every card.
-          return (
+          const card = (
             <li
               key={player.id}
               className="relative cursor-pointer rounded-xl border border-line bg-carbon p-3 pl-4"
@@ -481,9 +492,91 @@ export function RankingTable({
               </div>
             </li>
           );
+
+          if (index !== lowEloAt) return card;
+          return (
+            <Fragment key={`low-elo-${player.id}`}>
+              <LowEloDividerCard />
+              {card}
+            </Fragment>
+          );
         })}
       </ul>
     </>
+  );
+}
+
+/**
+ * Where the table crosses from Emerald and up into everything below it, or -1
+ * when no divider belongs.
+ *
+ * Only the ladder sort earns one. Every other column scatters the tiers, so the
+ * band would flip several times down the table and stop meaning "here is the
+ * cut-off" — it would just be noise between two arbitrary rows.
+ */
+function lowEloBoundary(players: RankedPlayer[], sort: SortKey): number {
+  if (sort !== 'ladder') return -1;
+
+  // Read as a change of side rather than "first low player" so the reversed
+  // ladder, which puts low elo on top, still gets its divider in one place.
+  return players.findIndex(
+    (player, index) =>
+      index > 0 && isLowElo(player.rank) !== isLowElo(players[index - 1].rank),
+  );
+}
+
+const LOW_ELO_LABEL = 'Low elo';
+const LOW_ELO_CAPTION = 'De platino para abajo';
+
+/** The band itself, shared by the table row and the mobile card. */
+function LowEloBand() {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+      style={{
+        background:
+          'linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 22%, transparent), transparent 70%)',
+        boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 35%, transparent)',
+      }}
+    >
+      <span
+        className="display shrink-0 text-fluid-sm tracking-wide"
+        style={{ color: 'var(--color-mark-amber)' }}
+      >
+        {LOW_ELO_LABEL}
+      </span>
+      <span
+        className="h-px flex-1"
+        style={{
+          background:
+            'repeating-linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 45%, transparent) 0 6px, transparent 6px 12px)',
+        }}
+      />
+      <span className="eyebrow shrink-0 text-ink-3">{LOW_ELO_CAPTION}</span>
+    </div>
+  );
+}
+
+/**
+ * Rendered as a single full-width cell rather than a styled `<tr>`: the table
+ * uses `border-spacing`, so a row of empty cells would inherit the per-cell gaps
+ * and break the band into segments.
+ */
+function LowEloDividerRow() {
+  return (
+    <tr aria-hidden="true">
+      <td colSpan={13} className="px-0 pt-2 pb-1">
+        <LowEloBand />
+      </td>
+    </tr>
+  );
+}
+
+function LowEloDividerCard() {
+  return (
+    <li aria-hidden="true" className="pt-1">
+      <LowEloBand />
+    </li>
   );
 }
 

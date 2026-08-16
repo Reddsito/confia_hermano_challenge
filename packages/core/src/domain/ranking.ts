@@ -20,6 +20,19 @@ export function isApex(tier: Tier): boolean {
   return APEX_TIERS.includes(tier);
 }
 
+/** Everything under Emerald, which is where the ranking draws its shame line. */
+const LOW_ELO_CEILING = TIERS.indexOf('EMERALD');
+
+/**
+ * Whether a rank sits below Emerald. Unranked counts as low elo: a player with
+ * no rank has not climbed out of it, and leaving them above the divider would
+ * read as an endorsement nobody earned.
+ */
+export function isLowElo(rank: Rank | null): boolean {
+  if (!rank) return true;
+  return TIERS.indexOf(rank.tier) < LOW_ELO_CEILING;
+}
+
 /**
  * Ladder points at the bottom of a tier, so a chart can draw the tier bands on
  * the same scale the ranking sorts by rather than re-deriving the arithmetic.
