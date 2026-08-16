@@ -531,10 +531,10 @@ const LOW_ELO_CAPTION = 'abandonad toda esperanza';
 function LowEloBand() {
   return (
     <div
-      className="flex items-baseline gap-3 rounded-lg px-4 py-2"
+      className="flex items-baseline justify-center gap-3 rounded-lg px-4 py-2"
       style={{
         background:
-          'linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 16%, transparent), transparent 65%)',
+          'linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-mark-amber) 16%, transparent) 50%, transparent)',
         boxShadow:
           'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 28%, transparent)',
       }}
