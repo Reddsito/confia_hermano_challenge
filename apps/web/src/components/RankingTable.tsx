@@ -525,51 +525,33 @@ function lowEloBoundary(players: RankedPlayer[], sort: SortKey): number {
   );
 }
 
-const LOW_ELO_CAPTION = 'De platino para abajo · abandonad toda esperanza';
+const LOW_ELO_CAPTION = 'abandonad toda esperanza';
 
-/**
- * The band itself, shared by the table row and the mobile card.
- *
- * The hazard stripes are the whole joke, so they run edge to edge behind the
- * word instead of sitting in a corner as decoration.
- */
+/** The band itself, shared by the table row and the mobile card. */
 function LowEloBand() {
   return (
     <div
-      className="relative overflow-hidden rounded-xl px-4 py-6 text-center sm:py-8"
+      className="flex items-baseline gap-3 rounded-lg px-4 py-2"
       style={{
         background:
-          'linear-gradient(180deg, color-mix(in oklab, var(--color-mark-amber) 14%, transparent), transparent)',
+          'linear-gradient(90deg, color-mix(in oklab, var(--color-mark-amber) 16%, transparent), transparent 65%)',
         boxShadow:
-          'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 40%, transparent)',
+          'inset 0 0 0 1px color-mix(in oklab, var(--color-mark-amber) 28%, transparent)',
       }}
     >
-      {/* Caution tape, top and bottom. */}
-      {(['top-0', 'bottom-0'] as const).map((edge) => (
-        <span
-          key={edge}
-          aria-hidden="true"
-          className={classNames('absolute inset-x-0 h-2', edge)}
-          style={{
-            background:
-              'repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-mark-amber) 70%, transparent) 0 10px, transparent 10px 20px)',
-          }}
-        />
-      ))}
-
-      <p
-        className="display leading-none uppercase"
+      <span
+        className="display shrink-0 leading-none uppercase"
         style={{
           color: 'var(--color-mark-amber)',
-          fontSize: 'clamp(1.75rem, 6vw, 3.25rem)',
-          letterSpacing: '0.12em',
-          textShadow:
-            '0 0 28px color-mix(in oklab, var(--color-mark-amber) 45%, transparent)',
+          fontSize: 'clamp(1rem, 2.2vw, 1.5rem)',
+          letterSpacing: '0.1em',
         }}
       >
         Low elo
-      </p>
-      <p className="mt-2 text-fluid-sm text-ink-2">{LOW_ELO_CAPTION}</p>
+      </span>
+      <span className="truncate text-fluid-sm text-ink-3">
+        — {LOW_ELO_CAPTION}
+      </span>
     </div>
   );
 }
@@ -582,7 +564,7 @@ function LowEloBand() {
 function LowEloDividerRow() {
   return (
     <tr>
-      <td colSpan={13} className="px-0 pt-5 pb-3">
+      <td colSpan={13} className="px-0 pt-3 pb-1.5">
         <LowEloBand />
       </td>
     </tr>
@@ -591,7 +573,7 @@ function LowEloDividerRow() {
 
 function LowEloDividerCard() {
   return (
-    <li className="pt-3 pb-1">
+    <li className="pt-2">
       <LowEloBand />
     </li>
   );
