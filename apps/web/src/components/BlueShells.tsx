@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   MAX_HELD_SHELLS,
@@ -237,94 +238,57 @@ export function BlueShells({
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
-        <div className="space-y-4">
-          <Inventory
-            available={available}
-            shells={mine?.shells ?? []}
-            ceiling={ceiling}
-            isSpectator={isSpectator}
-          />
-
-          <CoinShop
-            wallet={user.coins}
-            heldShells={available}
-            token={token}
-            onBought={async () => {
-              await reload();
-              onBalanceChange();
-            }}
-          />
-        </div>
-
-        <Wheel
-          odds={odds}
-          spinning={spinning}
-          landed={landed}
-          targetName={targetPlayer?.displayName ?? null}
+      {/*
+        Side by side rather than stacked in a narrow column: the wheel used to
+        take the rest of this row, and with it gone the two cards have the width
+        to themselves.
+      */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Inventory
+          available={available}
+          shells={mine?.shells ?? []}
+          ceiling={ceiling}
+          isSpectator={isSpectator}
         />
 
+        <CoinShop
+          wallet={user.coins}
+          heldShells={available}
+          token={token}
+          onBought={async () => {
+            await reload();
+            onBalanceChange();
+          }}
+        />
       </div>
 
       {/*
         The two boards read as a pair — who keeps catching them against who
-        keeps firing them — so they get their own full-width row instead of
-        being squeezed into a column beside the wheel.
+        keeps firing them — so they share a row.
       */}
       <div className="grid gap-4 lg:grid-cols-2">
         <HitRanking standings={state?.standings ?? null} players={players} />
         <ThrowRanking standings={state?.standings ?? null} players={players} />
       </div>
 
-      {rolled && (
-        <section className="rounded-2xl border border-line bg-carbon p-5">
-          <header className="flex flex-wrap items-baseline justify-between gap-3">
-            <h3 className="display text-fluid-lg">
-              {rolled.payload.kind === 'RANDOM_CHAMPION'
-                ? 'Le tocó'
-                : 'Con estas runas'}
-            </h3>
-
-            {rolled.payload.kind === 'RANDOM_CHAMPION' && (
-              <div className="flex items-center gap-3">
-                <p className="text-fluid-xs text-ink-3">
-                  {rolled.rerollsLeft > 0
-                    ? `Te quedan ${rolled.rerollsLeft} giros si no lo tiene`
-                    : 'Sin giros: este es el definitivo'}
-                </p>
-                <button
-                  type="button"
-                  disabled={rolled.rerollsLeft <= 0 || rerolling}
-                  onClick={() => void reroll()}
-                  className={classNames(
-                    'eyebrow min-h-11 rounded-xl border border-line px-4 transition-all',
-                    'disabled:cursor-not-allowed disabled:opacity-35',
-                  )}
-                >
-                  {rerolling ? 'Girando…' : 'No lo tiene, girar'}
-                </button>
-              </div>
-            )}
-          </header>
-
-          <div className="mt-4">
-            <PayloadView
-              // Keyed by the result so a reroll remounts the reel and replays
-              // the spin, instead of silently swapping the icon underneath.
-              key={
-                rolled.payload.kind === 'RANDOM_CHAMPION'
-                  ? rolled.payload.championId
-                  : 'runes'
-              }
-              payload={rolled.payload}
-              champions={champions}
-              runes={runes}
-              items={items}
-              pool={pool}
-              animate
-            />
-          </div>
-        </section>
+      {(spinning || landed) && (
+        <SpinOverlay
+          odds={odds}
+          spinning={spinning}
+          landed={landed}
+          targetName={targetPlayer?.displayName ?? null}
+          rolled={rolled}
+          rerolling={rerolling}
+          onReroll={() => void reroll()}
+          champions={champions}
+          runes={runes}
+          items={items}
+          pool={pool}
+          onClose={() => {
+            setLanded(null);
+            setRolled(null);
+          }}
+        />
       )}
 
       <section className="rounded-2xl border border-line bg-carbon p-5">
@@ -740,6 +704,149 @@ function Received({
  * alternates purely so neighbours are distinguishable — the meaning is in the
  * label under the pointer, never in the shade.
  */
+/**
+ * The wheel and whatever it rolled, over the page rather than in it.
+ *
+ * The wheel used to hold a 260px column open on every visit for the seconds a
+ * year it is actually turning. Firing a shell is a moment, not a panel, so it
+ * gets the screen while it lasts and gives it all back afterwards.
+ */
+function SpinOverlay({
+  odds,
+  spinning,
+  landed,
+  targetName,
+  rolled,
+  rerolling,
+  onReroll,
+  champions,
+  runes,
+  items,
+  pool,
+  onClose,
+}: {
+  odds: ChallengeOdds[];
+  spinning: boolean;
+  landed: { id: string; name: string; detail: string } | null;
+  targetName: string | null;
+  rolled: { throwId: string; payload: ShellPayload; rerollsLeft: number } | null;
+  rerolling: boolean;
+  onReroll: () => void;
+  champions: Map<number, ChampionInfo>;
+  runes: Map<number, RuneOption>;
+  items: Map<number, ItemInfo>;
+  pool: number[];
+  onClose: () => void;
+}) {
+  // Closing mid-draw would strand the throw with its result unseen, so the exit
+  // only opens once the server has answered and the wheel has stopped.
+  const dismissable = !spinning && !rerolling;
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && dismissable) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [dismissable, onClose]);
+
+  // Portalled for the same reason the rules modal is: the nav's backdrop-filter
+  // makes it the containing block for any fixed descendant, which would pin the
+  // overlay to the nav instead of the viewport.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-void/85 p-4 backdrop-blur-sm"
+      onClick={() => dismissable && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ruleta de conchas"
+        onClick={(event) => event.stopPropagation()}
+        className="my-auto flex w-full max-w-2xl flex-col items-center gap-4"
+      >
+        <Wheel
+          odds={odds}
+          spinning={spinning}
+          landed={landed}
+          targetName={targetName}
+        />
+
+        {rolled && (
+          <section className="w-full rounded-2xl border border-line bg-carbon p-5">
+            <header className="flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="display text-fluid-lg">
+                {rolled.payload.kind === 'RANDOM_CHAMPION'
+                  ? 'Le tocó'
+                  : 'Con estas runas'}
+              </h3>
+
+              {rolled.payload.kind === 'RANDOM_CHAMPION' && (
+                <div className="flex items-center gap-3">
+                  <p className="text-fluid-xs text-ink-3">
+                    {rolled.rerollsLeft > 0
+                      ? `Te quedan ${rolled.rerollsLeft} giros si no lo tiene`
+                      : 'Sin giros: este es el definitivo'}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={rolled.rerollsLeft <= 0 || rerolling}
+                    onClick={onReroll}
+                    className={classNames(
+                      'eyebrow min-h-11 rounded-xl border border-line px-4 transition-all',
+                      'disabled:cursor-not-allowed disabled:opacity-35',
+                    )}
+                  >
+                    {rerolling ? 'Girando…' : 'No lo tiene, girar'}
+                  </button>
+                </div>
+              )}
+            </header>
+
+            <div className="mt-4">
+              <PayloadView
+                // Keyed by the result so a reroll remounts the reel and replays
+                // the spin, instead of silently swapping the icon underneath.
+                key={
+                  rolled.payload.kind === 'RANDOM_CHAMPION'
+                    ? rolled.payload.championId
+                    : 'runes'
+                }
+                payload={rolled.payload}
+                champions={champions}
+                runes={runes}
+                items={items}
+                pool={pool}
+                animate
+              />
+            </div>
+          </section>
+        )}
+
+        <button
+          type="button"
+          disabled={!dismissable}
+          onClick={onClose}
+          className={classNames(
+            'eyebrow min-h-11 rounded-xl border border-line bg-carbon px-6 transition-all',
+            'disabled:cursor-not-allowed disabled:opacity-35',
+          )}
+        >
+          {spinning ? 'Girando…' : 'Cerrar'}
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function Wheel({
   odds,
   spinning,
