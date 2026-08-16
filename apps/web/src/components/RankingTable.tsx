@@ -527,29 +527,46 @@ function lowEloBoundary(players: RankedPlayer[], sort: SortKey): number {
 
 const LOW_ELO_CAPTION = 'abandonad toda esperanza';
 
+/**
+ * The dashes either side of the label. They fade towards the outer edge so the
+ * rule dissolves into the table instead of stopping at a hard end.
+ */
+function DashedRule() {
+  return (
+    <span
+      aria-hidden="true"
+      className="h-px min-w-4 flex-1"
+      style={{
+        background:
+          'repeating-linear-gradient(90deg, var(--color-line-strong) 0 6px, transparent 6px 12px)',
+        maskImage: 'linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent)',
+      }}
+    />
+  );
+}
+
 /** The band itself, shared by the table row and the mobile card. */
 function LowEloBand() {
   return (
     <div
-      className="flex items-baseline justify-center gap-3 rounded-lg px-4 py-2"
-      style={{
-        background:
-          'linear-gradient(90deg, transparent, var(--color-carbon-3) 50%, transparent)',
-        boxShadow: 'inset 0 0 0 1px var(--color-line-strong)',
-      }}
+      className="flex items-center gap-3 px-4 py-2"
     >
-      <span
-        className="display shrink-0 leading-none uppercase text-ink-2"
-        style={{
-          fontSize: 'clamp(1rem, 2.2vw, 1.5rem)',
-          letterSpacing: '0.1em',
-        }}
-      >
-        Low elo
+      <DashedRule />
+
+      <span className="flex shrink-0 items-baseline gap-2">
+        <span
+          className="display leading-none uppercase text-ink-2"
+          style={{
+            fontSize: 'clamp(1rem, 2.2vw, 1.5rem)',
+            letterSpacing: '0.1em',
+          }}
+        >
+          Low elo
+        </span>
+        <span className="text-fluid-sm text-ink-3">— {LOW_ELO_CAPTION}</span>
       </span>
-      <span className="truncate text-fluid-sm text-ink-3">
-        — {LOW_ELO_CAPTION}
-      </span>
+
+      <DashedRule />
     </div>
   );
 }
