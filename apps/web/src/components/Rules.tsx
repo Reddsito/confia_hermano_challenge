@@ -46,6 +46,7 @@ const PLAY_RULES = [
   'Dodgear para esquivar un reto de concha no vale. El reto sigue pendiente para la próxima.',
   'Un remake no cuenta para nada: ni suma, ni resta, ni cumple un reto.',
   'El reto de una concha se cumple en la siguiente partida que juegues, no cuando te venga bien.',
+  'Si te salteás el reto de una concha, después lo tenés que cumplir dos veces.',
   'Podés jugar en duo con quien quieras, pero el ranking es individual.',
 ];
 
