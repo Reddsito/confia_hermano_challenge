@@ -49,6 +49,12 @@ interface BlueShellsProps {
 
 const SPIN_MS = 3200;
 
+/**
+ * Throwing is closed: the shop, the rankings and the received-throws board stay
+ * live, but nobody can fire a new shell until this flips back to true.
+ */
+const THROWS_ENABLED = false;
+
 
 export function BlueShells({
   user,
@@ -310,7 +316,7 @@ export function BlueShells({
                 key={player.id}
                 player={player}
                 selected={target === player.id}
-                disabled={spinning}
+                disabled={!THROWS_ENABLED || spinning}
                 onSelect={() => setTarget(player.id)}
               />
             ))}
@@ -339,7 +345,7 @@ export function BlueShells({
 
         <button
           type="button"
-          disabled={!target || available <= 0 || spinning}
+          disabled={!THROWS_ENABLED || !target || available <= 0 || spinning}
           onClick={() => void fire()}
           className={classNames(
             'eyebrow mt-4 min-h-14 w-full rounded-2xl px-6 text-void transition-all',
@@ -348,12 +354,14 @@ export function BlueShells({
           style={{
             background: 'var(--color-accent)',
             boxShadow:
-              target && available > 0 && !spinning
+              THROWS_ENABLED && target && available > 0 && !spinning
                 ? '0 0 40px -12px var(--color-accent)'
                 : undefined,
           }}
         >
-          {spinning
+          {!THROWS_ENABLED
+            ? 'Las tiradas están cerradas'
+            : spinning
             ? 'Ahí va…'
             : available <= 0
               ? 'No tenés conchas para tirar'

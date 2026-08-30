@@ -34,6 +34,13 @@ import { DiscordNotifier } from '../discord/notifier';
 import { mentionFor } from '../db/users';
 import { currentUser } from './auth';
 
+/**
+ * Throwing is closed: everything else about shells stays live, but no new
+ * shell can be fired until this flips back to true. Enforced here as well as
+ * in the UI, since a disabled button is not a rule.
+ */
+const THROWS_ENABLED = false;
+
 export function shellRoutes(db: Db, config: ServerConfig) {
   const app = new Hono();
 
@@ -105,6 +112,9 @@ export function shellRoutes(db: Db, config: ServerConfig) {
   });
 
   app.post('/throw', async (context) => {
+    if (!THROWS_ENABLED) {
+      return context.json({ error: 'Las tiradas están cerradas.' }, 403);
+    }
     const user = currentUser(db, context.req.header('authorization'), config);
     if (!user) {
       return context.json({ error: 'Sign in with Discord first.' }, 401);
