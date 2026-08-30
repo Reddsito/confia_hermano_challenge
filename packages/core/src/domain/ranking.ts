@@ -20,11 +20,11 @@ export function isApex(tier: Tier): boolean {
   return APEX_TIERS.includes(tier);
 }
 
-/** Emerald and under, which is where the ranking draws its shame line. */
-const LOW_ELO_CEILING = TIERS.indexOf('DIAMOND');
+/** Diamond and under, which is where the ranking draws its shame line. */
+const LOW_ELO_CEILING = TIERS.indexOf('MASTER');
 
 /**
- * Whether a rank sits at Emerald or below. Unranked counts as low elo: a player
+ * Whether a rank sits at Diamond or below. Unranked counts as low elo: a player
  * with no rank has not climbed out of it, and leaving them above the divider
  * would read as an endorsement nobody earned.
  */
