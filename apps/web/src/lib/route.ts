@@ -29,6 +29,28 @@ const KEYS = {
 const listeners = new Set<() => void>();
 
 /**
+ * Prefix every section path sits under. Empty for the production dashboard,
+ * which owns the root; `/demo` for the alternate design, which mounts the same
+ * island one level down. Set once before the island renders, so `useRoute` and
+ * `navigate` agree on which segment is the section and which is the mount
+ * point.
+ */
+let basePath = '';
+
+/** Normalises `demo`, `/demo` and `/demo/` to the same `/demo`. */
+export function setBasePath(value: string): void {
+  const trimmed = value.replace(/^\/+|\/+$/g, '');
+  basePath = trimmed ? `/${trimmed}` : '';
+}
+
+/** Strips the mount point, leaving the path the router reasons about. */
+function relative(path: string): string {
+  if (!basePath) return path;
+  if (path === basePath) return '/';
+  return path.startsWith(`${basePath}/`) ? path.slice(basePath.length) : path;
+}
+
+/**
  * The snapshot has to be referentially stable between reads, so we hand out the
  * raw location and let callers parse it in a memo.
  */
@@ -48,7 +70,8 @@ function subscribe(onChange: () => void): () => void {
 }
 
 function parse(location: string): Route {
-  const [path = '', search = ''] = location.split('?');
+  const [rawPath = '', search = ''] = location.split('?');
+  const path = relative(rawPath);
   const params = new URLSearchParams(search);
 
   return {
@@ -90,7 +113,11 @@ export function navigate(
   }
 
   const path =
-    'tab' in patch ? (patch.tab ? `/${patch.tab}` : '/') : window.location.pathname;
+    'tab' in patch
+      ? patch.tab
+        ? `${basePath}/${patch.tab}`
+        : basePath || '/'
+      : window.location.pathname;
 
   const query = params.toString();
   const url = `${path}${query ? `?${query}` : ''}`;

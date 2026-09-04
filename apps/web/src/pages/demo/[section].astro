@@ -1,0 +1,17 @@
+---
+/**
+ * Mirrors `/[section].astro` one level down: every dashboard section is a real
+ * prerendered document under `/demo` too, so a refresh or a shared link lands
+ * on HTML instead of on the root. The ranking is `/demo` itself.
+ */
+import DemoPage from '../../components/DemoPage.astro';
+import { HOME_SECTION, SECTIONS } from '../../components/Dashboard';
+
+export function getStaticPaths() {
+  return SECTIONS.filter((section) => section !== HOME_SECTION).map(
+    (section) => ({ params: { section } }),
+  );
+}
+---
+
+<DemoPage />

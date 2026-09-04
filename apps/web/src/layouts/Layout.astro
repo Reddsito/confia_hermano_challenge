@@ -4,9 +4,27 @@ import '../styles/global.css';
 interface Props {
   title: string;
   description: string;
+  /**
+   * Theme scope for the document. The dashboard leaves it empty and inherits
+   * the tokens defined on `:root`; `/demo` passes `theme-press`, which
+   * redefines every one of them for the duration of the page.
+   */
+  bodyClass?: string;
+  /** Google Fonts stylesheet for the active theme's typefaces. */
+  fontHref?: string;
+  /** Browser chrome tint — it should match the page's actual ground. */
+  themeColor?: string;
+  colorScheme?: 'dark' | 'light';
 }
 
-const { title, description } = Astro.props;
+const {
+  title,
+  description,
+  bodyClass = '',
+  fontHref = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap',
+  themeColor = '#0b0509',
+  colorScheme = 'dark',
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -16,22 +34,19 @@ const { title, description } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0509" />
+    <meta name="color-scheme" content={colorScheme} />
+    <meta name="theme-color" content={themeColor} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap"
-    />
+    <link rel="stylesheet" href={fontHref} />
     <link rel="preconnect" href="https://ddragon.leagueoflegends.com" />
 
     <!-- A private leaderboard has no reason to be indexed. -->
     <meta name="robots" content="noindex, nofollow" />
   </head>
-  <body class="text-fluid-base antialiased">
+  <body class:list={['text-fluid-base', 'antialiased', bodyClass]}>
     <slot />
   </body>
 </html>

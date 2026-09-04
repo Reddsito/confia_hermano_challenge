@@ -1204,7 +1204,7 @@ function ThrowRanking({
   );
 }
 
-export const COIN_GOLD = '#f2c94c';
+export const COIN_GOLD = 'var(--color-gold)';
 
 /**
  * One moneda. A struck coin rather than a flat dot, so it reads as currency

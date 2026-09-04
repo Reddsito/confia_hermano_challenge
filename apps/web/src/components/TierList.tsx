@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   TIER_BRACKETS,
   bracketRange,
-  tierColorHex,
   type RankedPlayer,
 } from '@challenge/core/domain';
 
@@ -15,7 +14,7 @@ import {
   type TierMove,
 } from '../lib/session';
 import { TierCrest } from './icons';
-import { Avatar, classNames } from './ui';
+import { Avatar, classNames, tierColor } from './ui';
 import { useDragDrop } from './useDragDrop';
 
 /**
@@ -173,7 +172,7 @@ export function TierList({ players, user, token, revision }: TierListProps) {
               division: null,
               leaguePoints: bracket.minLp,
             };
-            const accent = tierColorHex(rank);
+            const accent = tierColor(rank);
 
             return (
               <section

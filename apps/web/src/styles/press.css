@@ -1,0 +1,212 @@
+/*
+ * `theme-press` — the alternate design, mounted at /demo.
+ *
+ * The dashboard theme is a broadcast overlay: black ground, cyan liveness,
+ * soft corners, light that bleeds. This one is its opposite in every axis — the
+ * classification page of a sports daily, printed on the rose newsprint those
+ * papers actually use. Pink stock, black ink, one press blue, corners at zero,
+ * and edges that are drawn rather than lit.
+ *
+ * The reference is deliberate: this page has always been a `clasificación` —
+ * positions, movement arrows, a table read top to bottom — and that is a layout
+ * printed sport solved a century ago.
+ *
+ * It is a token swap, not a fork. Tailwind v4 compiles `bg-carbon`,
+ * `border-line` and `rounded-xl` down to `var(--color-carbon)`,
+ * `var(--color-line)` and `var(--radius-xl)`, so redefining those variables
+ * under one class re-skins every component the dashboard already has — with a
+ * single source of truth for both designs instead of two component trees
+ * drifting apart.
+ *
+ * The rules below sit outside `@layer` on purpose: unlayered declarations beat
+ * every layered one, which is how `.rounded-full` (a literal, not a variable)
+ * gets flattened without a single `!important`.
+ */
+
+.theme-press {
+  /* Surfaces, lightest stock on top — the inverse of the dark theme's ramp.
+     The page ground is the deeper rose of an untrimmed edge; cards are the
+     sheet itself. */
+  --color-void: #f0cbc1;
+  --color-carbon: #fce7e1;
+  --color-carbon-2: #f8dcd4;
+  --color-carbon-3: #efc9bd;
+
+  /* Rules are drawn in ink, so the strong one is nearly black. */
+  --color-line: #d7a396;
+  --color-line-strong: #1a1210;
+
+  --color-ink: #1a1210;
+  --color-ink-2: #5c463e;
+  --color-ink-3: #9a7367;
+
+  /* One press blue. Same job the cyan has in the dark theme: interaction and
+     liveness, never data — which is also why it may sit near `mark-blue`
+     without confusion. The two never appear as peers in the same chart. */
+  --color-accent: #0b3d91;
+  --color-accent-deep: #06255c;
+
+  /* The five data marks, re-darkened for a light ground. Same five meanings,
+     same separation for colour-vision deficiency — a light surface simply
+     needs the ink side of each hue instead of the glow side. */
+  --color-mark-red: #b3122c;
+  --color-mark-magenta: #6f2f9e;
+  --color-mark-amber: #8a5605;
+  --color-mark-teal: #0a6353;
+  --color-mark-blue: #2f63c4;
+
+  /* Pale yellow vanishes on cream stock; coins need the ochre side of gold. */
+  --color-gold: #8a5d04;
+
+  /*
+   * The ladder, on the ink side. Core's hexes are lit for a black ground —
+   * Platinum and Challenger read as highlighter on cream stock. These are the
+   * same ten tiers at the same relative hues, darkened until each one clears
+   * 4.5:1 against the card surface and stays separable from its neighbours.
+   */
+  --tier-iron: #5c5560;
+  --tier-bronze: #7c3f1d;
+  --tier-silver: #5b6b7a;
+  --tier-gold: #85660c;
+  --tier-platinum: #0c7367;
+  --tier-emerald: #12703a;
+  --tier-diamond: #2a58ad;
+  --tier-master: #7526ab;
+  --tier-grandmaster: #ad1030;
+  --tier-challenger: #816500;
+
+  /* Anton is the condensed grotesque of a back-page headline; Bitter is a slab
+     cut for text at small sizes, which is what a results page is mostly made
+     of. */
+  --font-display: 'Anton', 'Chakra Petch', ui-sans-serif, sans-serif;
+  --font-sans: 'Bitter', Georgia, ui-serif, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Print has no rounded corners. Zeroing the scale squares off every card,
+     input, badge and avatar in one line. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* The ground is painted on `html`, above the body element the theme class sits
+   on, so it has to be reached from the outside. */
+:root:has(.theme-press) {
+  color-scheme: light;
+  /* Literal, not `var(--color-void)`: the theme class lives on `body`, so the
+     redefinition has not reached `html` yet. */
+  background-color: #f0cbc1;
+}
+
+/*
+ * `rounded-full` compiles to a literal radius rather than a variable, so the
+ * pills are the one thing the token swap cannot reach. Flatten them here.
+ */
+.theme-press .rounded-full,
+.theme-press .rounded-t-full,
+.theme-press .rounded-b-full {
+  border-radius: 0;
+}
+
+/* Except the genuinely circular things: a live dot and an avatar photo read as
+   dots and photos, not as squares. */
+.theme-press .live-dot,
+.theme-press img.rounded-full {
+  border-radius: 9999px;
+}
+
+/*
+ * Ambient layer. The dark theme floats a measurement grid and a cold wash; this
+ * one is paper — faint ruled lines, a warm vignette at the edges, and the
+ * slight unevenness of stock that went through a press.
+ */
+.theme-press::before {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(26 18 16 / 4%) 0px,
+    rgb(26 18 16 / 4%) 1px,
+    transparent 1px,
+    transparent 5px
+  );
+  background-size: auto;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+}
+
+.theme-press::after {
+  background-image:
+    radial-gradient(ellipse 70% 45% at 50% -5%, rgb(11 61 145 / 8%), transparent 70%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, rgb(26 18 16 / 9%), transparent 70%);
+}
+
+/*
+ * Type. Anton is a single-weight condensed grotesque — asking for 700 would
+ * make the browser synthesise a bold and smear the stems, so the display face
+ * declares its real weight and earns emphasis from size instead.
+ */
+.theme-press .display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+
+/* Column headers and labels: the small caps line of a results table. */
+.theme-press .eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.64rem;
+  letter-spacing: 0.22em;
+}
+
+.theme-press .tabular {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+/*
+ * The signature treatment. The dark theme blooms; print cannot. The same
+ * emphasis comes from a solid ink edge, a hard offset shadow — the block
+ * lifted off the page — and a thick bar of the element's tier colour down the
+ * side.
+ */
+.theme-press .neon {
+  border-color: var(--color-line-strong);
+  border-width: 1.5px;
+  box-shadow:
+    5px 5px 0 0 var(--tier),
+    0 0 0 1.5px var(--color-line-strong);
+}
+
+.theme-press .neon-text {
+  color: var(--tier);
+  text-shadow: none;
+  font-weight: 700;
+}
+
+/*
+ * Images get a light press pass: knocked-back saturation and a touch of warmth,
+ * so champion art and profile icons sit on the paper instead of glowing off it.
+ */
+.theme-press img {
+  filter: saturate(0.85) contrast(1.05) sepia(0.1);
+}
+
+/* Nothing on paper is frosted. */
+.theme-press .backdrop-blur,
+.theme-press .backdrop-blur-md,
+.theme-press .backdrop-blur-sm {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.theme-press ::selection {
+  background: color-mix(in oklab, var(--color-accent) 30%, transparent);
+  color: var(--color-ink);
+}

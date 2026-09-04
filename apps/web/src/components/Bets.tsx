@@ -26,7 +26,7 @@ import type { CoinWallet } from '../lib/coins';
 import type { SessionUser } from '../lib/session';
 import { classNames } from './ui';
 
-const GOLD = '#f2c94c';
+const GOLD = 'var(--color-gold)';
 const RED = 'var(--color-mark-red)';
 const TEAL = 'var(--color-mark-teal)';
 

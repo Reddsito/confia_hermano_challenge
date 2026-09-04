@@ -64,7 +64,7 @@ interface LiveGame {
 }
 
 /** Matches the sync cadence: fetching faster would only show the same answer. */
-const BET_GOLD = '#f2c94c';
+const BET_GOLD = 'var(--color-gold)';
 
 const POLL_MS = 30_000;
 

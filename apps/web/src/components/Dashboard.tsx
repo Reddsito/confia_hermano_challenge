@@ -27,7 +27,7 @@ import { DiscordLink, SignupButton } from './Signup';
 import { BestDays, EloEvolution } from './EloCharts';
 import { StatsPanel } from './StatsPanel';
 import { Tabs, TabPanel } from './Tabs';
-import { navigate, oneOf, useRoute } from '../lib/route';
+import { navigate, oneOf, setBasePath, useRoute } from '../lib/route';
 import { TournamentClock, TournamentProgress } from './TournamentClock';
 
 /**
@@ -55,7 +55,21 @@ type Section = (typeof SECTIONS)[number];
 /** Lives at `/` rather than at a segment of its own; every other section is `/<id>`. */
 export const HOME_SECTION: Section = 'ranking';
 
-export function Dashboard({ initialSnapshot }: { initialSnapshot: Snapshot }) {
+export function Dashboard({
+  initialSnapshot,
+  basePath = '',
+}: {
+  initialSnapshot: Snapshot;
+  /**
+   * Where this island is mounted. The production dashboard owns the root and
+   * leaves it empty; `/demo` mounts the same island, with the same sections,
+   * under its own prefix. Applied before the first `useRoute` read so the very
+   * first render already knows which segment is the section.
+   */
+  basePath?: string;
+}) {
+  setBasePath(basePath);
+
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);

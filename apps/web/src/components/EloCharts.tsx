@@ -22,11 +22,11 @@ import { Avatar, classNames } from './ui';
  * hover readout rather than by colour alone.
  */
 const SERIES_COLORS = [
-  '#ec3a5e',
-  '#b455e8',
-  '#c4830c',
-  '#0fa892',
-  '#3d7ce0',
+  'var(--color-mark-red)',
+  'var(--color-mark-magenta)',
+  'var(--color-mark-amber)',
+  'var(--color-mark-teal)',
+  'var(--color-mark-blue)',
 ] as const;
 
 interface Series {

@@ -6,7 +6,7 @@ import { ROLES, type Role } from '@challenge/core/domain';
 import { SIGNUP_ENDPOINT } from '../lib/api';
 import { ROLE_LABEL } from './ui';
 
-const GOLD = '#f2c94c';
+const GOLD = 'var(--color-gold)';
 
 /** The group's Discord. Shown wherever someone might want in. */
 export const DISCORD_INVITE = 'https://discord.gg/Hr9dpFbSa';

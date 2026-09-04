@@ -13,7 +13,7 @@ import {
 import type { SessionUser } from '../lib/session';
 import { Avatar, classNames } from './ui';
 
-const GOLD = '#f2c94c';
+const GOLD = 'var(--color-gold)';
 
 function formatDuration(seconds: number | null): string | null {
   if (seconds === null) return null;

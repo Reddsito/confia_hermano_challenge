@@ -1,7 +1,30 @@
 import type { Rank, Role, Tier } from '@challenge/core/domain';
-import { TIER_COLOR, formatRank, isApex, titleCase } from '@challenge/core/domain';
+import {
+  TIER_COLOR as TIER_COLOR_HEX,
+  TIERS,
+  formatRank,
+  isApex,
+  titleCase,
+} from '@challenge/core/domain';
 
-export { TIER_COLOR };
+/**
+ * The ladder colours, made themable.
+ *
+ * Core owns the real hexes because the Discord embeds need plain integers and
+ * cannot read a stylesheet. Those values are tuned for a dark ground, though —
+ * on the light `theme-press` page Platinum and Challenger all but disappear.
+ *
+ * So the browser gets one level of indirection: every tier resolves through
+ * `--tier-<tier>`, with core's hex as the fallback. Nothing changes for the
+ * default theme, and a theme that needs the ink side of the ladder redefines
+ * ten variables instead of forking every component that draws a tier.
+ */
+export const TIER_COLOR = Object.fromEntries(
+  TIERS.map((tier) => [
+    tier,
+    `var(--tier-${tier.toLowerCase()}, ${TIER_COLOR_HEX[tier]})`,
+  ]),
+) as Record<Tier, string>;
 
 /**
  * Pinned Data Dragon version. Bump it after a patch to pick up new champion

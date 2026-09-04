@@ -27,7 +27,7 @@ import {
  * fails contrast as text on the carbon background. The rules sheet leans on a
  * single gold accent, so it carries its own.
  */
-const GOLD = '#f2c94c';
+const GOLD = 'var(--color-gold)';
 
 interface RuleSection {
   title: string;

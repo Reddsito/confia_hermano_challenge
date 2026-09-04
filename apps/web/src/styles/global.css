@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './press.css';
 
 /*
  * Visual direction: a broadcast scoreboard. Monochrome by default, so the only
@@ -31,6 +32,10 @@
   /* Accent — interaction and liveness only, never used to encode data. */
   --color-accent: #22d3ee;
   --color-accent-deep: #0e7490;
+
+  /* Coins. A sixth mark in practice, so it is a token like the rest — a light
+     theme has to be able to darken it instead of losing it against the page. */
+  --color-gold: #f2c94c;
 
   /* Validated data marks. */
   --color-mark-red: #ec3a5e;

@@ -187,7 +187,7 @@ export function PanelLinks({ code, roster, onError }: PanelLinksProps) {
                       : 'border-line text-ink-3 hover:text-ink',
                   )}
                   style={
-                    user.isSpectator ? { background: '#f2c94c' } : undefined
+                    user.isSpectator ? { background: 'var(--color-gold)' } : undefined
                   }
                   aria-pressed={user.isSpectator}
                 >

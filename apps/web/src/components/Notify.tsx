@@ -13,7 +13,7 @@ import {
   type SoundId,
 } from '../lib/sound';
 
-const GOLD = '#f2c94c';
+const GOLD = 'var(--color-gold)';
 
 /** Reads the settings and re-renders whichever component is showing them. */
 export function useNotify(): { enabled: boolean; sound: SoundId } {
