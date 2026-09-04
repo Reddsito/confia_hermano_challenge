@@ -9,6 +9,7 @@
  * just a different site.
  */
 import Layout from '../layouts/Layout.astro';
+import { SessionCatcher } from '../components/SessionCatcher';
 import { loadSnapshotAtBuild } from '../lib/api';
 
 const snapshot = await loadSnapshotAtBuild();
@@ -88,6 +89,10 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
         Próximo circuito · <span style="color: var(--color-accent)">NA</span> ·
         SoloQ
       </p>
+
+      <!-- Discord returns here after a sign-in, so the token has to be read on
+           this page even though there is no dashboard on it. -->
+      <SessionCatcher client:load />
     </main>
 
     <footer

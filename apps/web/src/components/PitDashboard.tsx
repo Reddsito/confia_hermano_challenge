@@ -20,6 +20,7 @@ import { navigate, oneOf, setBasePath, useRoute } from '../lib/route';
 import { BlueShells, CoinMark, COIN_GOLD, ShellMark } from './BlueShells';
 import { Classification } from './Classification';
 import { Clips } from './Clips';
+import { CoinShop } from './CoinShop';
 import { Duels } from './Duels';
 import { BestDays, EloEvolution } from './EloCharts';
 import { LiveGames, useLiveFeed } from './LiveGames';
@@ -51,6 +52,7 @@ export const PIT_SECTIONS = [
   'duels',
   'traces',
   'shells',
+  'shop',
   'tierlist',
   'clips',
 ] as const;
@@ -75,6 +77,7 @@ export function PitDashboard({
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [revision, setRevision] = useState(0);
+  const [sessionReady, setSessionReady] = useState(false);
 
   const route = useRoute();
   const inFlight = useRef(false);
@@ -82,7 +85,11 @@ export function PitDashboard({
   const loadSession = useCallback(async () => {
     const stored = captureSessionFromUrl() ?? readToken();
     setToken(stored);
-    setUser(stored ? await fetchMe(stored) : null);
+    try {
+      setUser(stored ? await fetchMe(stored) : null);
+    } finally {
+      setSessionReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -148,9 +155,7 @@ export function PitDashboard({
     [ranking],
   );
 
-  const requested = oneOf(route.tab, PIT_SECTIONS, PIT_HOME);
-  const section: PitSection =
-    requested === 'shells' && !user ? PIT_HOME : requested;
+  const section = oneOf(route.tab, PIT_SECTIONS, PIT_HOME);
 
   const selected = route.player
     ? (ranking.find((player) => player.id === route.player) ?? null)
@@ -172,7 +177,11 @@ export function PitDashboard({
     { id: 'traces', label: 'Trazadas' },
     { id: 'tierlist', label: 'Tier list' },
     { id: 'clips', label: 'Clips' },
-    ...(user ? [{ id: 'shells' as const, label: 'Caparazones' }] : []),
+    // Always listed, signed in or not. A tab that vanishes when you are logged
+    // out does not read as locked, it reads as missing — which is exactly how
+    // it was reported.
+    { id: 'shells', label: 'Caparazones' },
+    { id: 'shop', label: 'Tienda' },
   ];
 
   return (
@@ -293,13 +302,41 @@ export function PitDashboard({
       </TabPanel>
 
       <TabPanel id="shells" active={section === 'shells'}>
-        <BlueShells
-          user={user}
-          token={token}
-          players={ranking}
-          onBalanceChange={() => void loadSession()}
-          revision={revision}
-        />
+        {user && token ? (
+          <BlueShells
+            user={user}
+            token={token}
+            players={ranking}
+            onBalanceChange={() => void loadSession()}
+            revision={revision}
+          />
+        ) : (
+          <SignInWall
+            ready={sessionReady}
+            title="Caparazones azules"
+            body="Entrá con Discord para ver tu inventario, tirar caparazones y seguir las deudas del resto."
+          />
+        )}
+      </TabPanel>
+
+      <TabPanel id="shop" active={section === 'shop'}>
+        {user?.coins && token ? (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_1fr]">
+            <CoinShop
+              wallet={user.coins}
+              heldShells={user.shells?.available ?? 0}
+              token={token}
+              onBought={() => void loadSession()}
+            />
+            <ShopNotes wallet={user.coins} />
+          </div>
+        ) : (
+          <SignInWall
+            ready={sessionReady}
+            title="Tienda"
+            body="Entrá con Discord para gastar tus monedas. Se ganan jugando, y también mirando."
+          />
+        )}
       </TabPanel>
 
       <TabPanel id="tierlist" active={section === 'tierlist'}>
@@ -321,6 +358,84 @@ export function PitDashboard({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * What a signed-out reader gets instead of a missing tab: the name of the
+ * thing, why it needs an account, and the way in.
+ */
+function SignInWall({
+  ready,
+  title,
+  body,
+}: {
+  ready: boolean;
+  title: string;
+  body: string;
+}) {
+  // Held blank until the session has actually resolved, so somebody who is
+  // signed in never sees "entrá" flash before their own inventory.
+  if (!ready) {
+    return (
+      <p className="px-4 py-16 text-center text-fluid-sm text-ink-3">
+        Comprobando sesión…
+      </p>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-line bg-carbon px-6 py-14 text-center">
+      <h3 className="display text-fluid-lg leading-none">{title}</h3>
+      <p className="mx-auto mt-3 max-w-md text-fluid-sm text-ink-2">{body}</p>
+      <a
+        href={loginUrl()}
+        className="eyebrow mt-6 inline-flex items-center gap-2 rounded-sm border px-4 py-2.5 transition-colors"
+        style={{
+          borderColor: 'var(--color-accent)',
+          color: 'var(--color-accent)',
+        }}
+      >
+        <ShellMark size={14} />
+        Entrar con Discord
+      </a>
+    </section>
+  );
+}
+
+/** The rules of the currency, next to the thing that spends it. */
+function ShopNotes({ wallet }: { wallet: NonNullable<SessionUser['coins']> }) {
+  const rows: [string, string][] = [
+    ['Hoy llevás', `${wallet.earnedToday} de ${wallet.dailyCap}`],
+    ['Tope de cartera', String(wallet.cap)],
+    [
+      'Cómo se ganan',
+      wallet.isSpectator
+        ? `${SPECTATOR_DAILY_GRANT} por día por mirar`
+        : 'Jugando, y con la entrega diaria',
+    ],
+  ];
+
+  return (
+    <section className="rounded-xl border border-line bg-carbon px-4 py-4">
+      <h3 className="display text-fluid-lg leading-none">Cómo funciona</h3>
+      <p className="mt-1 text-fluid-xs text-ink-3">
+        Las monedas se ganan despacio a propósito: un caparazón cuesta varios
+        días, y eso es lo que hace que tirarlo signifique algo.
+      </p>
+
+      <dl className="mt-4 divide-y divide-line border-t border-line">
+        {rows.map(([label, value]) => (
+          <div
+            key={label}
+            className="flex items-baseline justify-between gap-4 py-2.5"
+          >
+            <dt className="eyebrow text-ink-3">{label}</dt>
+            <dd className="tabular text-fluid-sm">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
