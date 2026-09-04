@@ -1,11 +1,12 @@
 ---
 /**
- * The public front door while the new design is being built.
+ * The public front door between challenges.
  *
  * The dashboard itself lives under `/demo` now, so the root is a held front
- * page: masthead, nameplate, and a stamp where the tables used to be. It wears
- * the same press theme as `/demo`, because a placeholder that looks nothing
- * like the product it precedes is just a different site.
+ * page: masthead, nameplate, and a stamp where the tables will go once the
+ * next challenge starts. It wears the same press theme as `/demo`, because a
+ * placeholder that looks nothing like the product it precedes is just a
+ * different site.
  */
 import Layout from '../layouts/Layout.astro';
 import { loadSnapshotAtBuild } from '../lib/api';
@@ -23,7 +24,7 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
 
 <Layout
   title={`${tournament.name} — Próximamente`}
-  description="Una nueva edición del challenge está en imprenta."
+  description="El próximo reto todavía no ha empezado."
   bodyClass="theme-press"
   fontHref="https://fonts.googleapis.com/css2?family=Anton&family=Bitter:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
   themeColor="#f0cbc1"
@@ -50,13 +51,7 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
         {tournament.name}
       </h1>
 
-      <div
-        class="mt-6 border-t-2 border-b border-[color:var(--color-line-strong)] py-2"
-      >
-        <p class="eyebrow" style="color: var(--color-accent)">
-          Cierre de edición · rediseño en imprenta
-        </p>
-      </div>
+      <div class="mt-6 border-t-2 border-[color:var(--color-line-strong)]"></div>
     </header>
 
     <main
@@ -77,8 +72,8 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
         class="max-w-xl text-fluid-lg leading-snug italic"
         style="color: var(--color-ink-2)"
       >
-        Estamos rehaciendo la tabla de arriba abajo. Vuelve pronto: la próxima
-        edición sale con todo cambiado.
+        El próximo reto todavía no ha empezado. Vuelve pronto: cuando arranque,
+        la tabla se publica aquí.
       </p>
 
       <div
