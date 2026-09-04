@@ -180,7 +180,7 @@ export function PitDashboard({
     // Always listed, signed in or not. A tab that vanishes when you are logged
     // out does not read as locked, it reads as missing — which is exactly how
     // it was reported.
-    { id: 'shells', label: 'Caparazones' },
+    { id: 'shells', label: 'Conchas' },
     { id: 'shop', label: 'Tienda' },
   ];
 
@@ -313,8 +313,8 @@ export function PitDashboard({
         ) : (
           <SignInWall
             ready={sessionReady}
-            title="Caparazones azules"
-            body="Entrá con Discord para ver tu inventario, tirar caparazones y seguir las deudas del resto."
+            title="Conchas azules"
+            body="Entrá con Discord para ver tu inventario, tirar conchas y seguir las deudas del resto."
           />
         )}
       </TabPanel>
@@ -420,7 +420,7 @@ function ShopNotes({ wallet }: { wallet: NonNullable<SessionUser['coins']> }) {
     <section className="rounded-xl border border-line bg-carbon px-4 py-4">
       <h3 className="display text-fluid-lg leading-none">Cómo funciona</h3>
       <p className="mt-1 text-fluid-xs text-ink-3">
-        Las monedas se ganan despacio a propósito: un caparazón cuesta varios
+        Las monedas se ganan despacio a propósito: una concha cuesta varios
         días, y eso es lo que hace que tirarlo signifique algo.
       </p>
 
@@ -540,7 +540,7 @@ function AccountChip({
             background:
               'color-mix(in oklab, var(--color-accent) 14%, transparent)',
           }}
-          title="Caparazones disponibles"
+          title="Conchas disponibles"
         >
           <ShellMark size={10} />
           {user.shells.available}

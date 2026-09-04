@@ -1015,3 +1015,20 @@ export function throwsEnabled(db: Db): boolean {
 export function setThrowsEnabled(db: Db, enabled: boolean): void {
   setMeta(db, THROWS_ENABLED_KEY, enabled ? 'true' : 'false');
 }
+
+/**
+ * When this player was last hit, or null if they never have been.
+ *
+ * Read off the throw log rather than kept as a column: the log is already the
+ * record of what happened, and a second copy of the same fact is a second
+ * thing that can be wrong.
+ */
+export function lastThrowAgainst(db: Db, playerId: string): number | null {
+  const row = db
+    .prepare(
+      `SELECT thrown_at AS thrownAt FROM shell_throws
+       WHERE to_player = ? ORDER BY thrown_at DESC LIMIT 1`,
+    )
+    .get(playerId) as { thrownAt: number } | undefined;
+  return row?.thrownAt ?? null;
+}

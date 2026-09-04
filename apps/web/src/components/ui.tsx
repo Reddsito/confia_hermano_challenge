@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import type { Rank, Role, Tier } from '@challenge/core/domain';
 import {
   TIER_COLOR as TIER_COLOR_HEX,
@@ -74,6 +76,29 @@ export function initials(name: string): string {
     .join('');
 }
 
+/**
+ * A stable colour for somebody with no profile icon.
+ *
+ * Derived from the name rather than picked at random, so the same person keeps
+ * the same badge across reloads and across the table — a colour that changes on
+ * every render is noise, and a shared dark square makes twenty people who have
+ * not synced yet look like one repeated hole in the page.
+ */
+function fallbackTint(name: string): { background: string; color: string } {
+  let hash = 0;
+  for (let index = 0; index < name.length; index += 1) {
+    hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+  }
+
+  // Spread around the wheel, kept dark enough for the warm ink to read on it
+  // and desaturated enough not to compete with the tier colours beside it.
+  const hue = hash % 360;
+  return {
+    background: `oklch(38% 0.09 ${hue})`,
+    color: `oklch(93% 0.04 ${hue})`,
+  };
+}
+
 interface AvatarProps {
   name: string;
   iconId: number | null;
@@ -83,16 +108,28 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, iconId, size = 40, inGame, ring }: AvatarProps) {
-  const url = profileIconUrl(iconId);
+  // An icon id that Data Dragon does not serve at the pinned version 404s, and
+  // a broken <img> renders as a black hole rather than as nothing. Falling back
+  // on the error means the badge is decided by what actually loaded, not by
+  // whether an id happened to be set.
+  const [broken, setBroken] = useState(false);
+  const url = broken ? null : profileIconUrl(iconId);
+  const tint = url ? null : fallbackTint(name);
+
+  // A fresh id deserves a fresh attempt: the roster can be corrected, and the
+  // avatar should recover without a reload.
+  useEffect(() => setBroken(false), [iconId]);
 
   return (
     <span className="relative inline-flex shrink-0">
       <span
-        className="display grid place-items-center overflow-hidden rounded-lg bg-carbon-3 text-ink-2"
+        className="display grid place-items-center overflow-hidden rounded-lg"
         style={{
           width: size,
           height: size,
           fontSize: size * 0.34,
+          background: tint?.background ?? 'var(--color-carbon-3)',
+          color: tint?.color ?? 'var(--color-ink-2)',
           boxShadow: ring
             ? `0 0 0 1.5px ${ring}, 0 0 16px -6px ${ring}`
             : '0 0 0 1px var(--color-line)',
@@ -109,6 +146,7 @@ export function Avatar({ name, iconId, size = 40, inGame, ring }: AvatarProps) {
             // it shows its ghost instead of ours and fires pointercancel,
             // which kills any pointer-event drag the avatar takes part in.
             draggable={false}
+            onError={() => setBroken(true)}
             className="h-full w-full object-cover"
           />
         ) : (

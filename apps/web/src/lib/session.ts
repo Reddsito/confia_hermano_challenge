@@ -107,6 +107,12 @@ export interface ShellsState {
     earned: number;
     thrown: number;
     available: number;
+    /**
+     * Epoch ms until which nothing can land on this player, or null when they
+     * are open. The window depends on their position: the leader never has
+     * one, the four chasing them get twelve hours, everybody else a day.
+     */
+    cooldownUntil: number | null;
     shells: Array<{
       id: string;
       rule: string;

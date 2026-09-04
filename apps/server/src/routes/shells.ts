@@ -22,9 +22,17 @@ import {
   spinChallenge,
   throwsAgainst,
   throwsEnabled,
+  lastThrowAgainst,
   type ChallengeKind,
 } from '../db/shells';
-import { MAX_CHAMPION_REROLLS, rollChampion } from '@challenge/core/domain';
+import {
+  MAX_CHAMPION_REROLLS,
+  rollChampion,
+  buildRanking,
+  shellCooldownRemaining,
+  shellCooldownUntil,
+} from '@challenge/core/domain';
+import { buildSnapshot } from '../snapshot';
 import { championPoolFor, rollFor } from '../shells/spin';
 import { describePayload } from '../shells/describe';
 import { runeTrees } from '../riot/runes';
@@ -89,6 +97,17 @@ export function shellRoutes(db: Db, config: ServerConfig) {
 
   app.get('/', (context) => {
     const players = listPlayers(db, 'approved');
+
+    // Built once per request rather than per player: the shelter the UI draws
+    // has to be the shelter the throw route enforces, so both read the same
+    // ranking.
+    const positionOf = new Map(
+      buildRanking(buildSnapshot(db, config)).map((entry) => [
+        entry.id,
+        entry.position,
+      ]),
+    );
+
     return context.json({
       max: MAX_HELD_SHELLS,
       ceiling: MAX_HELD_SHELLS,
@@ -97,6 +116,11 @@ export function shellRoutes(db: Db, config: ServerConfig) {
         playerId: player.id,
         ...balanceFor(db, player.id),
         shells: listShells(db, player.id),
+        /** Epoch ms until which this player cannot be hit; null when open. */
+        cooldownUntil: shellCooldownUntil(
+          lastThrowAgainst(db, player.id),
+          positionOf.get(player.id) ?? Number.MAX_SAFE_INTEGER,
+        ),
       })),
       // The feed stays capped — it is a "what just happened" list. The
       // standings beside it are counted over every row, which is why they are
@@ -144,6 +168,32 @@ export function shellRoutes(db: Db, config: ServerConfig) {
       (player) => player.id === targetId,
     );
     if (!target) return context.json({ error: 'No such player.' }, 404);
+
+    // Shelter. Checked before the shell is spent, so a blocked throw costs
+    // nothing: the rule is "you cannot hit them yet", not "you wasted one".
+    const position =
+      buildRanking(buildSnapshot(db, config)).find(
+        (entry) => entry.id === targetId,
+      )?.position ?? Number.MAX_SAFE_INTEGER;
+
+    const remaining = shellCooldownRemaining(
+      lastThrowAgainst(db, targetId),
+      position,
+      Date.now(),
+    );
+
+    if (remaining > 0) {
+      const hours = Math.floor(remaining / 3_600_000);
+      const minutes = Math.ceil((remaining % 3_600_000) / 60_000);
+      const wait = hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`;
+      return context.json(
+        {
+          error: `${target.displayName} ya recibió una concha hace poco. Podés volver a tirarle en ${wait}.`,
+          cooldownUntil: Date.now() + remaining,
+        },
+        429,
+      );
+    }
 
     // Counted against the account rather than the roster entry: it is the only
     // number a spectator has, and for a player it is the same figure with any

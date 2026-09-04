@@ -217,6 +217,13 @@ export function BlueShells({
     }
   };
 
+  /** Which panel the rail is showing. Throwing is what people come here for. */
+  const [view, setView] = useState<ShellView['id']>('throw');
+
+  const targetBlockedFor = target
+    ? Math.max(0, (balances.get(target)?.cooldownUntil ?? 0) - Date.now())
+    : 0;
+
   if (!user) return <Gate />;
   // Spectators have no roster entry by design — that is the whole role. Only
   // somebody who is meant to be playing can be missing a link.
@@ -224,55 +231,180 @@ export function BlueShells({
     return <Unlinked username={user.username} />;
   }
 
+  const owed = received.filter((entry) => !entry.completedAt).length;
+
+  const views: ShellView[] = [
+    { id: 'throw', label: 'Tirar' },
+    ...(isSpectator
+      ? []
+      : [
+          {
+            id: 'owed' as const,
+            label: 'Tus deudas',
+            badge: owed > 0 ? String(owed) : undefined,
+          },
+        ]),
+    { id: 'stock', label: 'Inventario' },
+    { id: 'boards', label: 'Rankings' },
+    { id: 'log', label: 'Historial' },
+    ...(user.isAdmin ? [{ id: 'bench' as const, label: 'Banco' }] : []),
+  ];
+
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,11rem)_1fr] lg:items-start">
       {/*
-        What you owe comes first. It is the one thing on this page that is
-        actionable, and it used to sit below the wheel where it was only found
-        by scrolling past everything you might do to somebody else.
+        A rail rather than another stack. Six panels down one column is a page
+        nobody reaches the bottom of, and the two that matter — what you owe and
+        who you can hit — were the ones buried furthest down.
       */}
-      {/* Nothing can ever land on a spectator, so they are not shown a card
-          that would permanently read "you are all caught up". */}
-      {!isSpectator && (
-        <Received
-          throws={received}
-          champions={champions}
-          runes={runes}
-          items={items}
-        />
-      )}
+      <ShellRail views={views} active={view} onChange={setView} />
 
-      {/*
-        Side by side rather than stacked in a narrow column: the wheel used to
-        take the rest of this row, and with it gone the two cards have the width
-        to themselves.
-      */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Inventory
-          available={available}
-          shells={mine?.shells ?? []}
-          ceiling={ceiling}
-          isSpectator={isSpectator}
-        />
+      <div className="min-w-0">
+        {view === 'throw' && (
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-line bg-carbon p-5">
+              <header className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="display text-fluid-lg">Elegí una víctima</h3>
+                <p className="text-fluid-xs text-ink-3">
+                  La ruleta decide qué te deben.
+                </p>
+              </header>
 
-        <CoinShop
-          wallet={user.coins}
-          heldShells={available}
-          token={token}
-          onBought={async () => {
-            await reload();
-            onBalanceChange();
-          }}
-        />
-      </div>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {players
+                  // Admins keep themselves on the list: firing at yourself is
+                  // the only way to walk the whole flow without making someone
+                  // else owe a game. It still costs a shell.
+                  .filter((player) => user.isAdmin || player.id !== user.playerId)
+                  .map((player) => (
+                    <TargetCard
+                      key={player.id}
+                      player={player}
+                      selected={target === player.id}
+                      disabled={!throwsEnabled || spinning}
+                      cooldownUntil={
+                        balances.get(player.id)?.cooldownUntil ?? null
+                      }
+                      onSelect={() => setTarget(player.id)}
+                    />
+                  ))}
+              </ul>
 
-      {/*
-        The two boards read as a pair — who keeps catching them against who
-        keeps firing them — so they share a row.
-      */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <HitRanking standings={state?.standings ?? null} players={players} />
-        <ThrowRanking standings={state?.standings ?? null} players={players} />
+              {user.isAdmin && (
+                <label className="mt-4 block">
+                  <span className="eyebrow text-ink-3">
+                    Forzar reto (solo admin) — vacío gira la ruleta
+                  </span>
+                  <select
+                    value={forced ?? ''}
+                    onChange={(event) => setForced(event.target.value || null)}
+                    disabled={spinning}
+                    className="mt-1 min-h-11 w-full rounded-xl border border-line bg-void px-3 text-fluid-sm"
+                  >
+                    <option value="">Que decida la ruleta</option>
+                    {odds.map((challenge) => (
+                      <option key={challenge.id} value={challenge.id}>
+                        {challenge.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <button
+                type="button"
+                disabled={
+                  !throwsEnabled ||
+                  !target ||
+                  available <= 0 ||
+                  spinning ||
+                  targetBlockedFor > 0
+                }
+                onClick={() => void fire()}
+                className={classNames(
+                  'eyebrow mt-4 min-h-14 w-full rounded-2xl px-6 text-void transition-all',
+                  'disabled:cursor-not-allowed disabled:opacity-35',
+                )}
+                style={{
+                  background: 'var(--color-accent)',
+                  boxShadow:
+                    throwsEnabled &&
+                    target &&
+                    available > 0 &&
+                    !spinning &&
+                    targetBlockedFor === 0
+                      ? '0 0 40px -12px var(--color-accent)'
+                      : undefined,
+                }}
+              >
+                {!throwsEnabled
+                  ? 'Las tiradas están cerradas'
+                  : spinning
+                    ? 'Ahí va…'
+                    : available <= 0
+                      ? 'No tenés conchas para tirar'
+                      : targetBlockedFor > 0 && targetPlayer
+                        ? `${targetPlayer.displayName} está a salvo ${formatWait(targetBlockedFor)}`
+                        : targetPlayer
+                          ? `Tirarle a ${targetPlayer.displayName}`
+                          : 'Elegí una víctima primero'}
+              </button>
+
+              {error && (
+                <p
+                  role="alert"
+                  className="mt-3 text-fluid-xs"
+                  style={{ color: 'var(--color-mark-red)' }}
+                >
+                  {error}
+                </p>
+              )}
+            </section>
+
+            <Odds odds={odds} />
+          </div>
+        )}
+
+        {view === 'owed' && !isSpectator && (
+          <Received
+            throws={received}
+            champions={champions}
+            runes={runes}
+            items={items}
+          />
+        )}
+
+        {view === 'stock' && (
+          <Inventory
+            available={available}
+            shells={mine?.shells ?? []}
+            ceiling={ceiling}
+            isSpectator={isSpectator}
+          />
+        )}
+
+        {view === 'boards' && (
+          <div className="grid gap-4 xl:grid-cols-2">
+            <HitRanking standings={state?.standings ?? null} players={players} />
+            <ThrowRanking
+              standings={state?.standings ?? null}
+              players={players}
+            />
+          </div>
+        )}
+
+        {view === 'log' && <History state={state} byId={byId} />}
+
+        {view === 'bench' && user.isAdmin && (
+          <TestBench
+            token={token}
+            targetId={target ?? user.playerId}
+            champions={champions}
+            runes={runes}
+            items={items}
+            pool={pool}
+          />
+        )}
       </div>
 
       {(spinning || landed) && (
@@ -294,108 +426,74 @@ export function BlueShells({
           }}
         />
       )}
-
-      <section className="rounded-2xl border border-line bg-carbon p-5">
-        <header className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="display text-fluid-lg">Elegí una víctima</h3>
-          <p className="text-fluid-xs text-ink-3">
-            La ruleta decide qué te deben.
-          </p>
-        </header>
-
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {players
-            // Admins keep themselves on the list: firing at yourself is the
-            // only way to walk the whole flow without making someone else owe
-            // a game. It still costs a shell.
-            .filter((player) => user.isAdmin || player.id !== user.playerId)
-            .map((player) => (
-              <TargetCard
-                key={player.id}
-                player={player}
-                selected={target === player.id}
-                disabled={!throwsEnabled || spinning}
-                onSelect={() => setTarget(player.id)}
-              />
-            ))}
-        </ul>
-
-        {user.isAdmin && (
-          <label className="mt-4 block">
-            <span className="eyebrow text-ink-3">
-              Forzar reto (solo admin) — vacío gira la ruleta
-            </span>
-            <select
-              value={forced ?? ''}
-              onChange={(event) => setForced(event.target.value || null)}
-              disabled={spinning}
-              className="mt-1 min-h-11 w-full rounded-xl border border-line bg-void px-3 text-fluid-sm"
-            >
-              <option value="">Que decida la ruleta</option>
-              {odds.map((challenge) => (
-                <option key={challenge.id} value={challenge.id}>
-                  {challenge.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <button
-          type="button"
-          disabled={!throwsEnabled || !target || available <= 0 || spinning}
-          onClick={() => void fire()}
-          className={classNames(
-            'eyebrow mt-4 min-h-14 w-full rounded-2xl px-6 text-void transition-all',
-            'disabled:cursor-not-allowed disabled:opacity-35',
-          )}
-          style={{
-            background: 'var(--color-accent)',
-            boxShadow:
-              throwsEnabled && target && available > 0 && !spinning
-                ? '0 0 40px -12px var(--color-accent)'
-                : undefined,
-          }}
-        >
-          {!throwsEnabled
-            ? 'Las tiradas están cerradas'
-            : spinning
-            ? 'Ahí va…'
-            : available <= 0
-              ? 'No tenés conchas para tirar'
-              : targetPlayer
-                ? `Tirarle a ${targetPlayer.displayName}`
-                : 'Elegí una víctima primero'}
-        </button>
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-3 text-fluid-xs"
-            style={{ color: 'var(--color-mark-red)' }}
-          >
-            {error}
-          </p>
-        )}
-      </section>
-
-      {user.isAdmin && (
-        <TestBench
-          token={token}
-          targetId={target ?? user.playerId}
-          champions={champions}
-          runes={runes}
-          items={items}
-          pool={pool}
-        />
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Odds odds={odds} />
-        <History state={state} byId={byId} />
-      </div>
     </div>
   );
+}
+
+interface ShellView {
+  id: 'throw' | 'owed' | 'stock' | 'boards' | 'log' | 'bench';
+  label: string;
+  badge?: string;
+}
+
+/**
+ * The rail. Vertical from the large breakpoint, a horizontal scroller below it
+ * — a column of six buttons across the top of a phone would cost more height
+ * than the panel it is meant to be saving.
+ */
+function ShellRail({
+  views,
+  active,
+  onChange,
+}: {
+  views: ShellView[];
+  active: ShellView['id'];
+  onChange: (id: ShellView['id']) => void;
+}) {
+  return (
+    <nav
+      aria-label="Secciones de conchas"
+      className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:-mx-0 sm:px-0 lg:sticky lg:top-20 lg:flex-col"
+    >
+      {views.map((entry) => {
+        const on = entry.id === active;
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            aria-current={on ? 'page' : undefined}
+            onClick={() => onChange(entry.id)}
+            className={classNames(
+              'eyebrow relative shrink-0 rounded-md border px-3 py-2.5 text-left whitespace-nowrap transition-colors',
+              on
+                ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
+                : 'border-line text-ink-3 hover:text-ink-2',
+            )}
+          >
+            {entry.label}
+            {entry.badge && (
+              <span
+                className="tabular ml-2 rounded-sm px-1.5 py-0.5 text-[0.6rem]"
+                style={{
+                  color: 'var(--color-void)',
+                  background: 'var(--color-mark-red)',
+                }}
+              >
+                {entry.badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** "12 h 04 min" while it matters, "8 min" once it does not. */
+function formatWait(ms: number): string {
+  const hours = Math.floor(ms / 3_600_000);
+  const minutes = Math.ceil((ms % 3_600_000) / 60_000);
+  return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`;
 }
 
 /**
@@ -1441,20 +1539,25 @@ function TargetCard({
   player,
   selected,
   disabled,
+  cooldownUntil,
   onSelect,
 }: {
   player: RankedPlayer;
   selected: boolean;
   disabled: boolean;
+  /** Epoch ms until this player can be hit again, or null when they are open. */
+  cooldownUntil: number | null;
   onSelect: () => void;
 }) {
   const accent = tierColor(player.rank);
+  const shelter = Math.max(0, (cooldownUntil ?? 0) - Date.now());
+  const blocked = shelter > 0;
 
   return (
     <li>
       <button
         type="button"
-        disabled={disabled}
+        disabled={disabled || blocked}
         onClick={onSelect}
         aria-pressed={selected}
         className={classNames(
@@ -1483,9 +1586,20 @@ function TargetCard({
           <span className="display block truncate text-fluid-sm">
             {player.displayName}
           </span>
-          <span className="block truncate text-[0.68rem] text-ink-3">
-            #{player.position} · {player.totals.wins}W {player.totals.losses}L
-          </span>
+          {blocked ? (
+            // The shelter replaces the record rather than sitting beside it: a
+            // card you cannot click has one thing to say, and it is why.
+            <span
+              className="block truncate text-[0.68rem]"
+              style={{ color: 'var(--color-mark-teal)' }}
+            >
+              A salvo {formatWait(shelter)}
+            </span>
+          ) : (
+            <span className="block truncate text-[0.68rem] text-ink-3">
+              #{player.position} · {player.totals.wins}W {player.totals.losses}L
+            </span>
+          )}
         </span>
 
         <TierCrest rank={player.rank} size={26} />
