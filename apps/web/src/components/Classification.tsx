@@ -21,6 +21,15 @@ import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 type SortKey = 'position' | 'gained' | 'winRate' | 'kda' | 'games';
 
+/** A player with their two timing figures, computed once against the true order. */
+interface Timed {
+  player: RankedPlayer;
+  /** LP behind the leader. */
+  gap: number;
+  /** LP behind whoever is directly ahead. */
+  interval: number;
+}
+
 const COLUMNS: { key: SortKey; label: string; title: string }[] = [
   { key: 'position', label: 'POS', title: 'Posición en la ladder' },
   { key: 'gained', label: 'LP', title: 'LP ganados desde el arranque' },
@@ -47,13 +56,11 @@ export function Classification({
   const [liveOnly, setLiveOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>('position');
 
-  const leader = players[0] ?? null;
-
   /**
    * Gaps are computed against the true ladder order, before any filter runs.
    * A gap that changes because you typed in a search box is not a gap.
    */
-  const timed = useMemo(() => {
+  const timed = useMemo<Timed[]>(() => {
     const leaderPoints = players[0]?.ladderPoints ?? 0;
     return players.map((player, index) => ({
       player,
@@ -88,7 +95,7 @@ export function Classification({
 
     if (sort === 'position') return filtered;
 
-    const value = (row: (typeof timed)[number]): number => {
+    const value = (row: Timed): number => {
       switch (sort) {
         case 'gained':
           return row.player.ladderPointsGained;
@@ -116,7 +123,7 @@ export function Classification({
 
   return (
     <section className="space-y-3">
-      {leader && <LeaderBoard leader={leader} chaser={players[1] ?? null} />}
+      {timed.length > 0 && <FrontRow leaders={timed.slice(0, 3)} />}
 
       <ControlBar
         role={role}
@@ -192,97 +199,133 @@ export function Classification({
 }
 
 /**
- * The lead, stated once at instrument size. Not a podium: a podium ranks three
- * people against each other, and the only comparison that matters at the front
- * of a race is the one between P1 and whoever is closest to taking it.
+ * The front row.
+ *
+ * Ordered 2-1-3 from the medium breakpoint up, the way a podium is actually
+ * built: the winner in the middle and raised, the other two flanking. Below
+ * that width the order is plain 1-2-3, because three stacked cards read as a
+ * list, and a list that starts at second place is simply wrong.
+ *
+ * Every card carries the same four numbers, so the three are comparable rather
+ * than merely displayed — which is the whole reason to show a top three
+ * instead of a winner.
  */
-function LeaderBoard({
-  leader,
-  chaser,
-}: {
-  leader: RankedPlayer;
-  chaser: RankedPlayer | null;
-}) {
-  const margin = chaser ? leader.ladderPoints - chaser.ladderPoints : 0;
+function FrontRow({ leaders }: { leaders: Timed[] }) {
+  /** Podium order at width, reading order without it. */
+  const PLACEMENT = ['md:order-2', 'md:order-1', 'md:order-3'];
 
   return (
-    <div
-      className="neon flex flex-wrap items-center gap-x-8 gap-y-4 rounded-xl border bg-carbon px-4 py-4 sm:px-6"
-      style={{ ['--tier' as string]: tierColor(leader.rank) }}
+    <ol className="grid gap-2 md:grid-cols-3 md:items-end">
+      {leaders.map((entry, index) => (
+        <li key={entry.player.id} className={PLACEMENT[index]}>
+          <PodiumCard entry={entry} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PodiumCard({ entry }: { entry: Timed }) {
+  const { player, gap } = entry;
+  const first = player.position === 1;
+  const accent = tierColor(player.rank);
+
+  return (
+    <article
+      className={classNames(
+        'neon flex h-full flex-col rounded-xl border bg-carbon px-4',
+        // The winner is taller, not louder. Height is the podium step.
+        first ? 'py-6 md:py-9' : 'py-4 md:py-5',
+      )}
+      style={{ ['--tier' as string]: accent }}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <span
+          className={classNames(
+            'display leading-none',
+            first ? 'text-fluid-xl' : 'text-fluid-lg text-ink-2',
+          )}
+          style={first ? { color: 'var(--color-accent)' } : undefined}
+        >
+          {player.position}
+        </span>
+
         <Avatar
-          name={leader.displayName}
-          iconId={leader.profileIconId}
-          size={54}
-          inGame={leader.inGame}
+          name={player.displayName}
+          iconId={player.profileIconId}
+          size={first ? 48 : 38}
+          inGame={player.inGame}
         />
-        <div className="min-w-0">
-          <p className="eyebrow text-ink-3">Líder de la carrera</p>
-          <p className="display truncate text-fluid-xl leading-none">
-            {leader.displayName}
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={classNames(
+              'display truncate leading-none',
+              first ? 'text-fluid-lg' : 'text-fluid-base',
+            )}
+          >
+            {player.displayName}
           </p>
-          <p className="tabular mt-1 text-fluid-xs neon-text">
-            {formatRankShort(leader.rank)}
+          <p className="tabular mt-1 text-fluid-xs" style={{ color: accent }}>
+            {formatRankShort(player.rank)}
           </p>
         </div>
       </div>
 
-      <dl className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <Readout
-          label="Ventaja"
-          value={margin > 0 ? `+${margin.toLocaleString()}` : '—'}
-          hint={chaser ? `sobre ${chaser.displayName}` : 'sin perseguidor'}
+      <dl className="mt-4 grid grid-cols-4 gap-2 border-t border-line pt-3">
+        <Cell
+          label={first ? 'Estado' : 'Gap'}
+          value={first ? 'Líder' : `+${gap.toLocaleString()}`}
+          tone={first ? 'lead' : undefined}
         />
-        <Readout
-          label="LP ganados"
+        <Cell
+          label="LP"
           value={
-            leader.ladderPointsGained >= 0
-              ? `+${leader.ladderPointsGained.toLocaleString()}`
-              : leader.ladderPointsGained.toLocaleString()
+            player.ladderPointsGained > 0
+              ? `+${player.ladderPointsGained.toLocaleString()}`
+              : player.ladderPointsGained.toLocaleString()
           }
-          tone={leader.ladderPointsGained >= 0 ? 'up' : 'down'}
+          tone={player.ladderPointsGained >= 0 ? 'up' : 'down'}
         />
-        <Readout label="Partidas" value={leader.totals.games.toLocaleString()} />
-        <Readout
-          label="Winrate"
+        <Cell
+          label="WR"
           value={
-            leader.totals.games > 0 ? formatPercent(leader.winRate, 1) : '—'
+            player.totals.games > 0 ? formatPercent(player.winRate, 0) : '—'
           }
         />
+        <Cell label="PJ" value={String(player.totals.games)} />
       </dl>
-    </div>
+    </article>
   );
 }
 
-function Readout({
+function Cell({
   label,
   value,
-  hint,
   tone,
 }: {
   label: string;
   value: string;
-  hint?: string;
-  tone?: 'up' | 'down';
+  tone?: 'up' | 'down' | 'lead';
 }) {
+  const color =
+    tone === 'up'
+      ? 'var(--color-mark-teal)'
+      : tone === 'down'
+        ? 'var(--color-mark-red)'
+        : tone === 'lead'
+          ? 'var(--color-accent)'
+          : undefined;
+
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="eyebrow text-ink-3">{label}</dt>
       <dd
-        className="tabular text-fluid-lg leading-tight"
-        style={{
-          color:
-            tone === 'up'
-              ? 'var(--color-mark-teal)'
-              : tone === 'down'
-                ? 'var(--color-mark-red)'
-                : undefined,
-        }}
+        className="tabular mt-0.5 truncate text-fluid-sm leading-none"
+        style={{ color }}
       >
         {value}
       </dd>
-      {hint && <p className="text-fluid-xs text-ink-3">{hint}</p>}
     </div>
   );
 }

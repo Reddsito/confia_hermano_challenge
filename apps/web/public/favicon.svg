@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#05070a" />
-  <rect x="6" y="18" width="4" height="8" rx="1.5" fill="#5f6a78" />
-  <rect x="14" y="8" width="4" height="18" rx="1.5" fill="#ffffff" />
-  <rect x="22" y="14" width="4" height="12" rx="1.5" fill="#22d3ee" />
+  <!-- Three podium steps, in the pit palette: graphite housing, warm white for
+       the winner, amber for the step the page keeps its eye on. -->
+  <rect width="32" height="32" rx="5" fill="#0c0a09" />
+  <rect x="6" y="18" width="4" height="8" rx="1" fill="#a89b88" />
+  <rect x="14" y="8" width="4" height="18" rx="1" fill="#f5efe4" />
+  <rect x="22" y="14" width="4" height="12" rx="1" fill="#ff9d1e" />
 </svg>
