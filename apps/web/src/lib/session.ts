@@ -100,6 +100,8 @@ export async function fetchChallenges(): Promise<ChallengeOdds[]> {
 
 export interface ShellsState {
   max: number;
+  /** Admin switch: false hides the wheel behind a closed notice. */
+  throwsEnabled: boolean;
   players: Array<{
     playerId: string;
     earned: number;

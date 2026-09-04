@@ -21,6 +21,7 @@ import {
   rollCount,
   spinChallenge,
   throwsAgainst,
+  throwsEnabled,
   type ChallengeKind,
 } from '../db/shells';
 import { MAX_CHAMPION_REROLLS, rollChampion } from '@challenge/core/domain';
@@ -33,13 +34,6 @@ import { shellThrowEmbed } from '../discord/embeds';
 import { DiscordNotifier } from '../discord/notifier';
 import { mentionFor } from '../db/users';
 import { currentUser } from './auth';
-
-/**
- * Throwing is closed: everything else about shells stays live, but no new
- * shell can be fired until this flips back to true. Enforced here as well as
- * in the UI, since a disabled button is not a rule.
- */
-const THROWS_ENABLED = false;
 
 export function shellRoutes(db: Db, config: ServerConfig) {
   const app = new Hono();
@@ -98,6 +92,7 @@ export function shellRoutes(db: Db, config: ServerConfig) {
     return context.json({
       max: MAX_HELD_SHELLS,
       ceiling: MAX_HELD_SHELLS,
+      throwsEnabled: throwsEnabled(db),
       players: players.map((player) => ({
         playerId: player.id,
         ...balanceFor(db, player.id),
@@ -112,7 +107,8 @@ export function shellRoutes(db: Db, config: ServerConfig) {
   });
 
   app.post('/throw', async (context) => {
-    if (!THROWS_ENABLED) {
+    // Enforced here as well as in the UI, since a disabled button is not a rule.
+    if (!throwsEnabled(db)) {
       return context.json({ error: 'Las tiradas están cerradas.' }, 403);
     }
     const user = currentUser(db, context.req.header('authorization'), config);

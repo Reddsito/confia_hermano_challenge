@@ -49,12 +49,6 @@ interface BlueShellsProps {
 
 const SPIN_MS = 3200;
 
-/**
- * Throwing is closed: the shop, the rankings and the received-throws board stay
- * live, but nobody can fire a new shell until this flips back to true.
- */
-const THROWS_ENABLED = false;
-
 
 export function BlueShells({
   user,
@@ -73,6 +67,10 @@ export function BlueShells({
     { id: string; name: string; detail: string } | null
   >(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Admin-controlled from the panel. Until the board loads we assume closed:
+  // showing a live button that the server then rejects is the worse guess.
+  const throwsEnabled = state?.throwsEnabled ?? false;
 
   // What the landed challenge rolled, if it rolls anything, plus the throw it
   // belongs to — the reroll needs the id, not just the result.
@@ -316,7 +314,7 @@ export function BlueShells({
                 key={player.id}
                 player={player}
                 selected={target === player.id}
-                disabled={!THROWS_ENABLED || spinning}
+                disabled={!throwsEnabled || spinning}
                 onSelect={() => setTarget(player.id)}
               />
             ))}
@@ -345,7 +343,7 @@ export function BlueShells({
 
         <button
           type="button"
-          disabled={!THROWS_ENABLED || !target || available <= 0 || spinning}
+          disabled={!throwsEnabled || !target || available <= 0 || spinning}
           onClick={() => void fire()}
           className={classNames(
             'eyebrow mt-4 min-h-14 w-full rounded-2xl px-6 text-void transition-all',
@@ -354,12 +352,12 @@ export function BlueShells({
           style={{
             background: 'var(--color-accent)',
             boxShadow:
-              THROWS_ENABLED && target && available > 0 && !spinning
+              throwsEnabled && target && available > 0 && !spinning
                 ? '0 0 40px -12px var(--color-accent)'
                 : undefined,
           }}
         >
-          {!THROWS_ENABLED
+          {!throwsEnabled
             ? 'Las tiradas están cerradas'
             : spinning
             ? 'Ahí va…'

@@ -10,9 +10,11 @@ import {
   fetchAdminThrows,
   fetchInfo,
   fetchRoster,
+  fetchThrowsEnabled,
   readCode,
   removePlayer,
   removeThrow,
+  setThrowsEnabled,
   setVisible,
   storeCode,
   type AdminThrow,
@@ -203,12 +205,69 @@ export function Panel() {
         </p>
       )}
 
+      <ShellSwitch code={code} busy={busy} onRun={run} />
+
       <ThrowsAdmin code={code} busy={busy} onRun={run} />
 
       <SoundLab />
 
       <PanelLinks code={code} roster={roster} onError={setError} />
     </div>
+  );
+}
+
+/**
+ * Opens and closes shell throwing for everyone.
+ *
+ * Only firing is affected: earned shells, standings and pending challenges stay
+ * live either way, so closing this mid-challenge freezes the wheel without
+ * rewriting anybody's balance.
+ */
+function ShellSwitch({
+  code,
+  busy,
+  onRun,
+}: {
+  code: string;
+  busy: boolean;
+  onRun: (action: () => Promise<unknown>, success?: string) => Promise<boolean>;
+}) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetchThrowsEnabled(code).then(setEnabled).catch(() => setEnabled(null));
+  }, [code]);
+
+  return (
+    <section className="rounded-2xl border border-line bg-carbon p-5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="display text-fluid-lg">Blue shells</h3>
+          <p className="text-fluid-xs text-ink-3">
+            {enabled === null
+              ? 'Consultando el estado…'
+              : enabled
+                ? 'Abiertas: cualquiera con conchas puede tirar.'
+                : 'Cerradas: nadie puede tirar. El resto del juego sigue igual.'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={busy || enabled === null}
+          onClick={() =>
+            void onRun(async () => {
+              const next = !enabled;
+              await setThrowsEnabled(code, next);
+              setEnabled(next);
+            }, enabled ? 'Tiradas cerradas.' : 'Tiradas abiertas.')
+          }
+          className="eyebrow min-h-11 shrink-0 rounded-full border border-line px-5 transition-colors hover:text-ink disabled:opacity-35"
+        >
+          {enabled ? 'Cerrar tiradas' : 'Abrir tiradas'}
+        </button>
+      </header>
+    </section>
   );
 }
 

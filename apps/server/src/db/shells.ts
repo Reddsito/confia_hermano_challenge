@@ -10,7 +10,7 @@ import {
   type ShellProgress,
 } from '@challenge/core/domain';
 
-import { getMeta, type Db } from './index';
+import { getMeta, setMeta, type Db } from './index';
 
 export interface ShellRow {
   id: string;
@@ -999,4 +999,19 @@ export function resolveSteals(db: Db): Steal[] {
   }
 
   return settled;
+}
+
+/**
+ * Whether new shells can be thrown. Kept in `meta` rather than a constant so
+ * the panel can close and reopen throwing without a deploy. Absent means
+ * closed: a fresh database should not start firing on its own.
+ */
+const THROWS_ENABLED_KEY = 'shells.throwsEnabled';
+
+export function throwsEnabled(db: Db): boolean {
+  return getMeta(db, THROWS_ENABLED_KEY) === 'true';
+}
+
+export function setThrowsEnabled(db: Db, enabled: boolean): void {
+  setMeta(db, THROWS_ENABLED_KEY, enabled ? 'true' : 'false');
 }

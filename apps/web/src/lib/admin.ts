@@ -280,3 +280,23 @@ export function adjustShells(
     body: JSON.stringify({ amount, reason }),
   });
 }
+
+/**
+ * The throwing switch. Everything else about shells stays live when it is off:
+ * only firing a new one is blocked, server-side as well as in the UI.
+ */
+export function fetchThrowsEnabled(code: string): Promise<boolean> {
+  return request<{ enabled: boolean }>(code, '/api/admin/shells/throws-enabled').then(
+    (body) => body.enabled,
+  );
+}
+
+export function setThrowsEnabled(
+  code: string,
+  enabled: boolean,
+): Promise<{ enabled: boolean }> {
+  return request(code, '/api/admin/shells/throws-enabled', {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+}

@@ -22,6 +22,8 @@ import {
   insertChallenge,
   listChallenges,
   pageThrows,
+  setThrowsEnabled,
+  throwsEnabled,
   updateChallenge,
   type ChallengeKind,
 } from '../db/shells';
@@ -313,6 +315,25 @@ export function adminRoutes(
   app.delete('/challenges/:id', (context) => {
     const ok = deleteChallenge(db, context.req.param('id'));
     return ok ? context.json({ ok: true }) : context.json({ error: 'Not found' }, 404);
+  });
+
+  /**
+   * The throwing switch. Closing it leaves every other part of the shell game
+   * live — balances, standings and pending challenges all keep working.
+   */
+  app.get('/shells/throws-enabled', (context) =>
+    context.json({ enabled: throwsEnabled(db) }),
+  );
+
+  app.post('/shells/throws-enabled', async (context) => {
+    const body = (await context.req.json().catch(() => ({}))) as {
+      enabled?: unknown;
+    };
+    if (typeof body.enabled !== 'boolean') {
+      return context.json({ error: 'enabled must be a boolean.' }, 400);
+    }
+    setThrowsEnabled(db, body.enabled);
+    return context.json({ enabled: body.enabled });
   });
 
   /** Forces a cycle now instead of waiting for the next tick. */
