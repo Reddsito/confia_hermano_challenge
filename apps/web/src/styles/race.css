@@ -1,0 +1,164 @@
+/*
+ * `theme-pit` — the alternate design, scoped to `/demo`.
+ *
+ * Direction: a pit wall timing screen. The production dashboard is a broadcast
+ * scoreboard — cold black, cyan, a title card. This one is the monitor the
+ * engineers actually read: warm graphite, amber pit light, and numbers that
+ * mean gap and interval rather than decoration.
+ *
+ * Three signal colours, and each one is a verb:
+ *   green  — gaining. Positions taken, LP won, a run of victories.
+ *   red    — losing. Positions dropped, LP given back.
+ *   purple — the best of the session. One holder at a time, like a fastest lap.
+ *
+ * Amber is never data. It is the page talking: the active tab, the focus ring,
+ * the live marker, the rail that fills while the next sync lands.
+ *
+ * Written outside `@layer` on purpose. Tailwind emits everything into layers,
+ * and an unlayered declaration outranks every layered one — so redefining the
+ * tokens here re-skins every `bg-carbon`, `border-line` and `rounded-xl` in the
+ * app without a single `!important`.
+ */
+.theme-pit {
+  --color-void: #0c0a09;
+  --color-carbon: #16130f;
+  --color-carbon-2: #1e1a15;
+  --color-carbon-3: #2a241d;
+  --color-line: #2e2721;
+  --color-line-strong: #4a4034;
+
+  /* Warm white: paper under a work light, not a screen at full blast. */
+  --color-ink: #f5efe4;
+  --color-ink-2: #a89b88;
+  --color-ink-3: #6e6355;
+
+  --color-accent: #ff9d1e;
+  --color-accent-deep: #b8660a;
+  --color-gold: #ffc74d;
+
+  --color-mark-red: #f2554d;
+  --color-mark-magenta: #c07bff;
+  --color-mark-amber: #ffb020;
+  --color-mark-teal: #2ed3a7;
+  --color-mark-blue: #5aa9ff;
+
+  /*
+   * The ten tiers are left to the core palette. Those hexes were validated
+   * against a dark surface already, and this ground is dark — re-tinting them
+   * warm would buy nothing and risk collapsing Platinum into Emerald.
+   */
+
+  /* Condensed for the board, because a timing screen is a column problem
+     before it is a typography one. Azeret is the numeral face: every digit
+     the same width, so a column of gaps stays a straight edge. */
+  --font-display: 'Barlow Condensed', 'Chakra Petch', ui-sans-serif, sans-serif;
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Azeret Mono', ui-monospace, monospace;
+
+  /* Instrument housing, not print and not a phone app: a 2px chamfer. */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 6px;
+
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* The ground is painted on `html`, above the body the theme class sits on, so
+   it has to be reached from outside. Literal, not `var(--color-void)`: the
+   redefinition has not reached `html` yet. */
+:root:has(.theme-pit) {
+  color-scheme: dark;
+  background-color: #0c0a09;
+}
+
+/*
+ * `rounded-full` compiles to a literal radius rather than a variable, so pills
+ * are the one thing the token swap cannot reach. Square them to the housing.
+ */
+.theme-pit .rounded-full,
+.theme-pit .rounded-t-full,
+.theme-pit .rounded-b-full {
+  border-radius: 2px;
+}
+
+/* Except what is genuinely round: a status light and a photograph. */
+.theme-pit .live-dot,
+.theme-pit img.rounded-full {
+  border-radius: 9999px;
+}
+
+/*
+ * Ambient layer. The dark theme floats a measurement grid; this one is the
+ * horizontal ruling of a timing monitor — rows, not a grid — under a single
+ * warm wash from the pit lane side.
+ */
+.theme-pit::before {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(245 239 228 / 3.5%) 0px,
+    rgb(245 239 228 / 3.5%) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  background-size: auto;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
+}
+
+.theme-pit::after {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 8% -6%, rgb(255 157 30 / 13%), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 95% 8%, rgb(46 211 167 / 6%), transparent 70%);
+}
+
+/*
+ * Type. Barlow Condensed carries real weight, so the display face takes 700
+ * and earns its authority from width rather than from size alone.
+ */
+.theme-pit .display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* Column headers: the stencilled labels above a timing column. */
+.theme-pit .eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+}
+
+.theme-pit .tabular {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * The signature treatment. The broadcast theme blooms outward; an instrument
+ * marks its channel with a hard bar down the leading edge and the faintest
+ * halo — enough to say lit, not enough to say neon.
+ */
+.theme-pit .neon {
+  border-color: color-mix(in oklab, var(--tier) 40%, var(--color-line));
+  box-shadow:
+    inset 3px 0 0 0 var(--tier),
+    0 0 18px -8px var(--tier);
+}
+
+.theme-pit .neon-text {
+  color: var(--tier);
+  text-shadow: none;
+  font-weight: 600;
+}
+
+.theme-pit ::selection {
+  background: color-mix(in oklab, var(--color-accent) 35%, transparent);
+  color: var(--color-ink);
+}

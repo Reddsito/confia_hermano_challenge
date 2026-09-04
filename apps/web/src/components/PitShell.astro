@@ -1,0 +1,116 @@
+---
+/**
+ * The shell for the alternate design at `/demo`.
+ *
+ * Where the production page opens with a broadcast title card — the name at
+ * display size, a subtitle, a rule — this one opens with the strip along the
+ * top of a timing monitor. The name is small and the readouts are large,
+ * because on a pit wall the session is a given and the numbers are the news.
+ */
+import Layout from '../layouts/Layout.astro';
+import { PitDashboard } from './PitDashboard';
+import { TournamentProgress } from './TournamentClock';
+import { loadSnapshotAtBuild } from '../lib/api';
+import { buildRanking } from '@challenge/core/domain';
+
+const snapshot = await loadSnapshotAtBuild();
+const { tournament } = snapshot;
+
+const ranking = buildRanking(snapshot);
+const leader = ranking[0] ?? null;
+const onTrack = ranking.filter((player) => player.inGame).length;
+---
+
+<Layout
+  title={`${tournament.name}${tournament.edition ? ` · ${tournament.edition}` : ''} — Muro de boxes`}
+  description={tournament.subtitle ||
+    'Clasificación en vivo del challenge privado de SoloQ.'}
+  bodyClass="theme-pit"
+  fontHref="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;600&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap"
+  themeColor="#0c0a09"
+  colorScheme="dark"
+>
+  <div class="mx-auto w-full max-w-[1600px] px-4 pb-16 sm:px-6">
+    <header class="pt-5 sm:pt-7">
+      <!-- The pit light: the one piece of amber that is always on. -->
+      <div class="h-0.5 w-full" style="background: var(--color-accent)"></div>
+
+      <div
+        class="flex flex-wrap items-end justify-between gap-x-10 gap-y-4 border-b border-line py-4"
+      >
+        <div class="min-w-0">
+          <p class="eyebrow" style="color: var(--color-accent)">
+            {tournament.edition || 'Sesión abierta'}
+          </p>
+          <h1 class="display mt-1 text-fluid-xl leading-none">
+            {tournament.name}
+          </h1>
+          {
+            tournament.subtitle && (
+              <p class="mt-1 max-w-xl text-fluid-xs text-ink-3">
+                {tournament.subtitle}
+              </p>
+            )
+          }
+        </div>
+
+        <dl class="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div>
+            <dt class="eyebrow text-ink-3">Pilotos</dt>
+            <dd class="tabular text-fluid-lg leading-none">
+              {ranking.length}
+            </dd>
+          </div>
+          <div>
+            <dt class="eyebrow text-ink-3">En pista</dt>
+            <dd
+              class="tabular text-fluid-lg leading-none"
+              style={onTrack > 0
+                ? 'color: var(--color-accent)'
+                : 'color: var(--color-ink-3)'}
+            >
+              {onTrack}
+            </dd>
+          </div>
+          {
+            leader && (
+              <div class="min-w-0">
+                <dt class="eyebrow text-ink-3">Líder</dt>
+                <dd class="truncate text-fluid-lg leading-none">
+                  {leader.displayName}
+                </dd>
+              </div>
+            )
+          }
+          <div>
+            <dt class="eyebrow text-ink-3">Circuito</dt>
+            <dd class="tabular text-fluid-lg leading-none uppercase">
+              {tournament.platform || 'euw1'}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <TournamentProgress tournament={tournament} client:idle />
+    </header>
+
+    <PitDashboard initialSnapshot={snapshot} basePath="demo" client:load />
+
+    <footer class="mt-20 border-t border-line pt-6 text-fluid-xs text-ink-3">
+      <p class="mb-4">
+        <a
+          href="/panel"
+          class="eyebrow transition-colors hover:text-[color:var(--color-accent)]"
+        >
+          Editar roster →
+        </a>
+      </p>
+      <p class="max-w-3xl">
+        {tournament.name} no está avalado por Riot Games y no refleja las opiniones
+        ni los puntos de vista de Riot Games ni de nadie oficialmente involucrado
+        en la producción o gestión de las propiedades de Riot Games. Riot Games y
+        todas sus propiedades asociadas son marcas registradas de Riot Games, Inc.
+      </p>
+    </footer>
+  </div>
+</Layout>

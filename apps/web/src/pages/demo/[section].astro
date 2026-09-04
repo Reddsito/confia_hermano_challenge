@@ -1,17 +1,16 @@
 ---
 /**
- * Mirrors `/[section].astro` one level down: every dashboard section is a real
- * prerendered document under `/demo` too, so a refresh or a shared link lands
- * on HTML instead of on the root. The ranking is `/demo` itself.
+ * One prerendered document per channel, so `/demo/duels` survives a refresh and
+ * a paste. The parrilla is `/demo` itself, so it is not in this list.
  */
-import DemoPage from '../../components/DemoPage.astro';
-import { HOME_SECTION, SECTIONS } from '../../components/Dashboard';
+import PitShell from '../../components/PitShell.astro';
+import { PIT_HOME, PIT_SECTIONS } from '../../components/PitDashboard';
 
 export function getStaticPaths() {
-  return SECTIONS.filter((section) => section !== HOME_SECTION).map(
+  return PIT_SECTIONS.filter((section) => section !== PIT_HOME).map(
     (section) => ({ params: { section } }),
   );
 }
 ---
 
-<DemoPage />
+<PitShell />

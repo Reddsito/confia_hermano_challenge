@@ -3,10 +3,10 @@
  * The public front door between challenges.
  *
  * The dashboard itself lives under `/demo` now, so the root is a held front
- * page: masthead, nameplate, and a stamp where the tables will go once the
- * next challenge starts. It wears the same press theme as `/demo`, because a
- * placeholder that looks nothing like the product it precedes is just a
- * different site.
+ * page: the timing strip, the name, and a lit decal where the board will go
+ * once the next challenge starts. It wears the same pit theme as `/demo`,
+ * because a placeholder that looks nothing like the product it precedes is
+ * just a different site.
  */
 import Layout from '../layouts/Layout.astro';
 import { loadSnapshotAtBuild } from '../lib/api';
@@ -25,19 +25,19 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
 <Layout
   title={`${tournament.name} — Próximamente`}
   description="El próximo reto todavía no ha empezado."
-  bodyClass="theme-press"
-  fontHref="https://fonts.googleapis.com/css2?family=Anton&family=Bitter:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
-  themeColor="#f0cbc1"
-  colorScheme="light"
+  bodyClass="theme-pit"
+  fontHref="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;600&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap"
+  themeColor="#0c0a09"
+  colorScheme="dark"
 >
   <div
     class="mx-auto flex min-h-screen w-full max-w-[1100px] flex-col px-4 sm:px-6"
   >
     <header class="pt-6 sm:pt-10">
-      <div class="h-1.5 w-full" style="background: var(--color-accent)"></div>
+      <div class="h-0.5 w-full" style="background: var(--color-accent)"></div>
 
       <div
-        class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-[color:var(--color-line-strong)] py-2"
+        class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-line py-2"
       >
         <p class="eyebrow" style="color: var(--color-ink-2)">
           {tournament.edition || 'Edición especial'}
@@ -51,7 +51,7 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
         {tournament.name}
       </h1>
 
-      <div class="mt-6 border-t-2 border-[color:var(--color-line-strong)]"></div>
+      <div class="mt-6 border-t border-line"></div>
     </header>
 
     <main
@@ -60,8 +60,8 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
       <!-- The stamp: the only rotated element on the page, so it reads as
            something pressed onto the paper rather than typeset with it. -->
       <div
-        class="border-4 px-8 py-6 sm:px-14 sm:py-8"
-        style="border-color: var(--color-mark-red); color: var(--color-mark-red); transform: rotate(-3.5deg)"
+        class="rounded-sm border-2 px-8 py-6 sm:px-14 sm:py-8"
+        style="border-color: var(--color-accent); color: var(--color-accent); transform: rotate(-2.5deg); box-shadow: 0 0 40px -14px var(--color-accent)"
       >
         <p class="display text-fluid-xl leading-none tracking-tight">
           Próximamente
@@ -88,7 +88,7 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
     </main>
 
     <footer
-      class="border-t-2 border-[color:var(--color-line-strong)] py-6 text-fluid-xs"
+      class="border-t border-line py-6 text-fluid-xs"
       style="color: var(--color-ink-3)"
     >
       <p class="max-w-3xl">
