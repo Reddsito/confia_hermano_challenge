@@ -186,68 +186,20 @@ export function PitDashboard({
 
   return (
     <div>
-      <nav
-        className="relative z-20 -mx-4 mb-5 border-y border-line bg-void/90 backdrop-blur-md sm:-mx-6 md:sticky md:top-0"
-        aria-label="Canales"
-      >
-        <div className="flex items-stretch overflow-x-auto px-4 sm:px-6">
-          {channels.map((channel) => {
-            const active = section === channel.id;
-            return (
-              <button
-                key={channel.id}
-                type="button"
-                aria-current={active ? 'page' : undefined}
-                onClick={() =>
-                  navigate({
-                    tab: channel.id === PIT_HOME ? null : channel.id,
-                    player: null,
-                    view: null,
-                  })
-                }
-                className={classNames(
-                  // A channel selector, not a row of pills: the active one is
-                  // marked by a lit edge along the top, the way a selected
-                  // input is marked on a mixing desk.
-                  'eyebrow relative shrink-0 border-r border-line px-4 py-3 whitespace-nowrap transition-colors first:border-l',
-                  active
-                    ? 'text-[color:var(--color-accent)]'
-                    : 'text-ink-3 hover:text-ink-2',
-                )}
-              >
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 top-0 h-[2px] transition-colors"
-                  style={{
-                    background: active ? 'var(--color-accent)' : 'transparent',
-                  }}
-                />
-                {channel.label}
-                {channel.badge && (
-                  <span
-                    className="tabular ml-2 rounded-sm px-1.5 py-0.5 text-[0.6rem]"
-                    style={{
-                      color: 'var(--color-void)',
-                      background: 'var(--color-accent)',
-                    }}
-                  >
-                    {channel.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 py-2 pl-4">
+      <div className="grid gap-5 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start">
+        {/*
+          A rail, not a strip. Nine channels and six controls across the top ran
+          out of width and turned the header into a wall of labels; down the
+          side each one gets its own line, and the board below gets the whole
+          page back.
+        */}
+        <aside className="lg:sticky lg:top-4">
+          <div className="mb-3 flex items-center gap-2">
             <SyncLight
               isRefreshing={isRefreshing}
               generatedAt={snapshot.generatedAt}
               nextUpdateAt={snapshot.nextUpdateAt}
             />
-            <NotifyButton />
-            <RulesButton tournament={snapshot.tournament} />
-            <SignupButton />
-            <DiscordLink />
             <AccountChip
               user={user}
               onSignOut={() => {
@@ -258,8 +210,67 @@ export function PitDashboard({
               }}
             />
           </div>
-        </div>
-      </nav>
+
+          <nav
+            className="-mx-4 flex gap-1 overflow-x-auto px-4 lg:mx-0 lg:flex-col lg:px-0"
+            aria-label="Canales"
+          >
+            {channels.map((channel) => {
+              const active = section === channel.id;
+              return (
+                <button
+                  key={channel.id}
+                  type="button"
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() =>
+                    navigate({
+                      tab: channel.id === PIT_HOME ? null : channel.id,
+                      player: null,
+                      view: null,
+                    })
+                  }
+                  className={classNames(
+                    // Marked by a lit leading edge, the way a selected input is
+                    // marked on a mixing desk.
+                    'eyebrow relative flex shrink-0 items-center gap-2 border border-line px-3 py-2.5 whitespace-nowrap transition-colors lg:w-full lg:border-x-0 lg:border-t-0',
+                    active
+                      ? 'text-[color:var(--color-accent)]'
+                      : 'text-ink-3 hover:text-ink-2',
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 w-[2px] transition-colors"
+                    style={{
+                      background: active ? 'var(--color-accent)' : 'transparent',
+                    }}
+                  />
+                  {channel.label}
+                  {channel.badge && (
+                    <span
+                      className="tabular ml-auto rounded-sm px-1.5 py-0.5 text-[0.6rem]"
+                      style={{
+                        color: 'var(--color-void)',
+                        background: 'var(--color-accent)',
+                      }}
+                    >
+                      {channel.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4 lg:flex-col lg:items-stretch">
+            <RulesButton tournament={snapshot.tournament} />
+            <SignupButton />
+            <NotifyButton />
+            <DiscordLink />
+          </div>
+        </aside>
+
+        <div className="min-w-0">
 
       {error && (
         <p
@@ -346,6 +357,9 @@ export function PitDashboard({
       <TabPanel id="clips" active={section === 'clips'}>
         <Clips user={user} token={token} players={ranking} revision={revision} />
       </TabPanel>
+
+        </div>
+      </div>
 
       {selected && (
         <PlayerDetail
