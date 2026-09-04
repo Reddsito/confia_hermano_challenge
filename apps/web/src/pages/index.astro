@@ -1,5 +1,107 @@
 ---
-import DashboardPage from '../components/DashboardPage.astro';
+/**
+ * The public front door while the new design is being built.
+ *
+ * The dashboard itself lives under `/demo` now, so the root is a held front
+ * page: masthead, nameplate, and a stamp where the tables used to be. It wears
+ * the same press theme as `/demo`, because a placeholder that looks nothing
+ * like the product it precedes is just a different site.
+ */
+import Layout from '../layouts/Layout.astro';
+import { loadSnapshotAtBuild } from '../lib/api';
+
+const snapshot = await loadSnapshotAtBuild();
+const { tournament } = snapshot;
+
+const printedOn = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(new Date(snapshot.generatedAt));
 ---
 
-<DashboardPage />
+<Layout
+  title={`${tournament.name} — Próximamente`}
+  description="Una nueva edición del challenge está en imprenta."
+  bodyClass="theme-press"
+  fontHref="https://fonts.googleapis.com/css2?family=Anton&family=Bitter:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
+  themeColor="#f0cbc1"
+  colorScheme="light"
+>
+  <div
+    class="mx-auto flex min-h-screen w-full max-w-[1100px] flex-col px-4 sm:px-6"
+  >
+    <header class="pt-6 sm:pt-10">
+      <div class="h-1.5 w-full" style="background: var(--color-accent)"></div>
+
+      <div
+        class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-[color:var(--color-line-strong)] py-2"
+      >
+        <p class="eyebrow" style="color: var(--color-ink-2)">
+          {tournament.edition || 'Edición especial'}
+        </p>
+        <p class="eyebrow" style="color: var(--color-ink-3)">{printedOn}</p>
+      </div>
+
+      <h1
+        class="display mt-6 text-fluid-2xl leading-[0.84] tracking-tight sm:mt-9"
+      >
+        {tournament.name}
+      </h1>
+
+      <div
+        class="mt-6 border-t-2 border-b border-[color:var(--color-line-strong)] py-2"
+      >
+        <p class="eyebrow" style="color: var(--color-accent)">
+          Cierre de edición · rediseño en imprenta
+        </p>
+      </div>
+    </header>
+
+    <main
+      class="flex flex-1 flex-col items-center justify-center gap-10 py-20 text-center"
+    >
+      <!-- The stamp: the only rotated element on the page, so it reads as
+           something pressed onto the paper rather than typeset with it. -->
+      <div
+        class="border-4 px-8 py-6 sm:px-14 sm:py-8"
+        style="border-color: var(--color-mark-red); color: var(--color-mark-red); transform: rotate(-3.5deg)"
+      >
+        <p class="display text-fluid-xl leading-none tracking-tight">
+          Próximamente
+        </p>
+      </div>
+
+      <p
+        class="max-w-xl text-fluid-lg leading-snug italic"
+        style="color: var(--color-ink-2)"
+      >
+        Estamos rehaciendo la tabla de arriba abajo. Vuelve pronto: la próxima
+        edición sale con todo cambiado.
+      </p>
+
+      <div
+        class="h-px w-24"
+        style="background: var(--color-line-strong)"
+      >
+      </div>
+
+      <p class="eyebrow" style="color: var(--color-ink-3)">
+        {tournament.platform?.toUpperCase() || 'EUW1'} · SoloQ
+      </p>
+    </main>
+
+    <footer
+      class="border-t-2 border-[color:var(--color-line-strong)] py-6 text-fluid-xs"
+      style="color: var(--color-ink-3)"
+    >
+      <p class="max-w-3xl">
+        {tournament.name} no está avalado por Riot Games y no refleja las opiniones
+        ni los puntos de vista de Riot Games ni de nadie oficialmente involucrado
+        en la producción o gestión de las propiedades de Riot Games. Riot Games y
+        todas sus propiedades asociadas son marcas registradas de Riot Games, Inc.
+      </p>
+    </footer>
+  </div>
+</Layout>
