@@ -28,7 +28,7 @@ import { PlayerDetail } from './PlayerDetail';
 import { RulesButton } from './Rules';
 import { DiscordLink, SignupButton } from './Signup';
 import { TabPanel } from './Tabs';
-import { Telemetry } from './Telemetry';
+import { Stats } from './Stats';
 import { TierList } from './TierList';
 import { classNames } from './ui';
 
@@ -41,13 +41,13 @@ const POLL_CHECK_MS = 3_000;
  * The production dashboard opens on a podium and a stats tab built from the
  * four numbers every scoreboard already shows. This one opens on a timing
  * board, and it splits what used to be one "Estadísticas" tab into two: the
- * telemetry nobody could compare before, and the head-to-head records the
+ * measures nobody could compare before, and the head-to-head records the
  * backend has always computed and never displayed.
  */
 export const PIT_SECTIONS = [
   'grid',
   'track',
-  'telemetry',
+  'stats',
   'duels',
   'traces',
   'shells',
@@ -167,7 +167,7 @@ export function PitDashboard({
       label: 'En pista',
       badge: liveCount > 0 ? String(liveCount) : undefined,
     },
-    { id: 'telemetry', label: 'Telemetría' },
+    { id: 'stats', label: 'Estadísticas' },
     { id: 'duels', label: 'Duelos' },
     { id: 'traces', label: 'Trazadas' },
     { id: 'tierlist', label: 'Tier list' },
@@ -277,8 +277,8 @@ export function PitDashboard({
         />
       </TabPanel>
 
-      <TabPanel id="telemetry" active={section === 'telemetry'}>
-        <Telemetry players={ranking} duos={snapshot.duos} />
+      <TabPanel id="stats" active={section === 'stats'}>
+        <Stats players={ranking} duos={snapshot.duos} />
       </TabPanel>
 
       <TabPanel id="duels" active={section === 'duels'}>

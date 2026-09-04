@@ -5,7 +5,7 @@ import type { RankedPlayer, Snapshot } from '@challenge/core/domain';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 /**
- * Telemetry.
+ * Statistics.
  *
  * The production stats tab ranks the group on the four numbers every scoreboard
  * already shows: kills, deaths, assists, CS. Everything richer — time spent
@@ -146,7 +146,7 @@ const CHANNELS: Channel[] = [
   },
 ];
 
-export function Telemetry({
+export function Stats({
   players,
   duos,
 }: {

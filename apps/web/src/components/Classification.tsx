@@ -30,12 +30,12 @@ interface Timed {
   interval: number;
 }
 
+/** The measures a reader can reorder the board by, in column order. */
 const COLUMNS: { key: SortKey; label: string; title: string }[] = [
-  { key: 'position', label: 'POS', title: 'Posición en la ladder' },
-  { key: 'gained', label: 'LP', title: 'LP ganados desde el arranque' },
-  { key: 'winRate', label: 'WR', title: 'Winrate' },
-  { key: 'kda', label: 'KDA', title: 'KDA' },
-  { key: 'games', label: 'PJ', title: 'Partidas jugadas' },
+  { key: 'winRate', label: 'WR', title: 'Ordenar por winrate' },
+  { key: 'games', label: 'PJ', title: 'Ordenar por partidas jugadas' },
+  { key: 'kda', label: 'KDA', title: 'Ordenar por KDA' },
+  { key: 'gained', label: 'LP', title: 'Ordenar por LP ganados desde el arranque' },
 ];
 
 /** Signed LP, in the language of a timing screen. */
@@ -55,6 +55,17 @@ export function Classification({
   const [query, setQuery] = useState('');
   const [liveOnly, setLiveOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>('position');
+  const [reverse, setReverse] = useState(false);
+
+  /** A new column opens best-first; clicking the active one flips it. */
+  const sortBy = (key: SortKey) => {
+    if (key === sort) {
+      setReverse((current) => !current);
+      return;
+    }
+    setSort(key);
+    setReverse(false);
+  };
 
   /**
    * Gaps are computed against the true ladder order, before any filter runs.
@@ -93,8 +104,8 @@ export function Classification({
       );
     });
 
-    if (sort === 'position') return filtered;
-
+    // Every comparator orders best-first, so `reverse` is applied once here
+    // instead of each column having to know which way its own good end points.
     const value = (row: Timed): number => {
       switch (sort) {
         case 'gained':
@@ -105,13 +116,17 @@ export function Classification({
           return row.player.kda;
         case 'games':
           return row.player.totals.games;
+        case 'position':
         default:
+          // Rank order. Position 1 is the best, so it is negated to keep the
+          // "bigger is better" contract the others follow.
           return -row.player.position;
       }
     };
 
-    return [...filtered].sort((a, b) => value(b) - value(a));
-  }, [timed, role, query, liveOnly, sort]);
+    const sorted = [...filtered].sort((a, b) => value(b) - value(a));
+    return reverse ? sorted.reverse() : sorted;
+  }, [timed, role, query, liveOnly, sort, reverse]);
 
   if (players.length === 0) {
     return (
@@ -142,36 +157,58 @@ export function Classification({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-line-strong">
-              <Th className="w-14 text-center">POS</Th>
+              <Th
+                className="w-14 text-center"
+                title="Posición en la ladder"
+                sortKey="position"
+                sort={sort}
+                reverse={reverse}
+                onSort={sortBy}
+              >
+                POS
+              </Th>
               <Th className="w-10" />
               <Th>Piloto</Th>
-              <Th className="hidden w-28 sm:table-cell">Rango</Th>
-              <Th className="w-20 text-right" title="Diferencia con el líder">
-                GAP
+              {/* Rank and position are the same ordering, so the column reads
+                  as sortable and sorts by the ladder rather than alphabetically
+                  by tier name, which would put Bronce above Master. */}
+              <Th
+                className="hidden w-28 sm:table-cell"
+                title="Ordenar por rango"
+                sortKey="position"
+                sort={sort}
+                reverse={reverse}
+                onSort={sortBy}
+              >
+                Rango
               </Th>
               <Th
-                className="w-20 text-right"
-                title="Diferencia con quien va justo delante"
+                className="w-24 text-right"
+                title="Cuántos LP le faltan para alcanzar al primero"
               >
-                INT
+                Al líder
               </Th>
-              {COLUMNS.slice(1).map((column) => (
+              <Th
+                className="w-24 text-right"
+                title="Cuántos LP le faltan para alcanzar a quien tiene justo delante"
+              >
+                Al de arriba
+              </Th>
+              {COLUMNS.map((column) => (
                 <Th
                   key={column.key}
                   className="hidden w-20 text-right md:table-cell"
                   title={column.title}
-                  onClick={() =>
-                    setSort((current) =>
-                      current === column.key ? 'position' : column.key,
-                    )
-                  }
-                  active={sort === column.key}
+                  sortKey={column.key}
+                  sort={sort}
+                  reverse={reverse}
+                  onSort={sortBy}
                 >
                   {column.label}
                 </Th>
               ))}
               <Th className="hidden w-28 lg:table-cell">Forma</Th>
-              <Th className="w-24 text-right">Estado</Th>
+              <Th className="w-32 text-right whitespace-nowrap">Estado</Th>
             </tr>
           </thead>
 
@@ -206,9 +243,11 @@ export function Classification({
  * that width the order is plain 1-2-3, because three stacked cards read as a
  * list, and a list that starts at second place is simply wrong.
  *
- * Every card carries the same four numbers, so the three are comparable rather
- * than merely displayed — which is the whole reason to show a top three
- * instead of a winner.
+ * Three cards of equal weight are a row, not a podium, so the place is carried
+ * three times over — by the numeral's size, by the height of the card, and by
+ * the ghosted digit filling the panel behind it. Every card still shows the
+ * same four figures, which is the whole reason to publish a top three instead
+ * of a winner.
  */
 function FrontRow({ leaders }: { leaders: Timed[] }) {
   /** Podium order at width, reading order without it. */
@@ -233,19 +272,38 @@ function PodiumCard({ entry }: { entry: Timed }) {
   return (
     <article
       className={classNames(
-        'neon flex h-full flex-col rounded-xl border bg-carbon px-4',
-        // The winner is taller, not louder. Height is the podium step.
-        first ? 'py-6 md:py-9' : 'py-4 md:py-5',
+        'neon relative flex h-full flex-col overflow-hidden rounded-xl border bg-carbon px-4 sm:px-5',
+        // The step. Height is what separates first from the other two before a
+        // single number has been read.
+        first ? 'py-7 md:py-12' : 'py-5 md:py-6',
       )}
       style={{ ['--tier' as string]: accent }}
     >
-      <div className="flex items-center gap-3">
+      {/* The place, at panel scale. Decorative — the real numeral is beside the
+          name, and a screen reader should not meet the digit twice. */}
+      <span
+        aria-hidden
+        className="display pointer-events-none absolute -right-2 -bottom-8 leading-none select-none"
+        style={{
+          color: accent,
+          opacity: 0.09,
+          fontSize: first
+            ? 'clamp(8rem, 5rem + 14vw, 13rem)'
+            : 'clamp(6rem, 4rem + 9vw, 9rem)',
+        }}
+      >
+        {player.position}
+      </span>
+
+      <div className="relative flex items-center gap-3 sm:gap-4">
         <span
-          className={classNames(
-            'display leading-none',
-            first ? 'text-fluid-xl' : 'text-fluid-lg text-ink-2',
-          )}
-          style={first ? { color: 'var(--color-accent)' } : undefined}
+          className="display leading-[0.8]"
+          style={{
+            color: first ? 'var(--color-accent)' : 'var(--color-ink-2)',
+            fontSize: first
+              ? 'clamp(3.2rem, 2rem + 4.5vw, 4.6rem)'
+              : 'clamp(2.2rem, 1.6rem + 2.4vw, 3.1rem)',
+          }}
         >
           {player.position}
         </span>
@@ -253,31 +311,40 @@ function PodiumCard({ entry }: { entry: Timed }) {
         <Avatar
           name={player.displayName}
           iconId={player.profileIconId}
-          size={first ? 48 : 38}
+          size={first ? 64 : 46}
           inGame={player.inGame}
         />
 
         <div className="min-w-0 flex-1">
           <p
-            className={classNames(
-              'display truncate leading-none',
-              first ? 'text-fluid-lg' : 'text-fluid-base',
-            )}
+            className="display truncate leading-none"
+            style={{
+              fontSize: first
+                ? 'clamp(1.4rem, 1rem + 1.6vw, 2rem)'
+                : 'clamp(1.05rem, 0.9rem + 0.8vw, 1.35rem)',
+            }}
           >
             {player.displayName}
           </p>
-          <p className="tabular mt-1 text-fluid-xs" style={{ color: accent }}>
+          <p className="tabular mt-1.5 text-fluid-xs" style={{ color: accent }}>
             {formatRankShort(player.rank)}
           </p>
         </div>
       </div>
 
-      <dl className="mt-4 grid grid-cols-4 gap-2 border-t border-line pt-3">
+      <dl className="relative mt-5 grid grid-cols-4 gap-2 border-t border-line pt-3">
         <Cell
-          label={first ? 'Estado' : 'Gap'}
+          label={first ? 'Estado' : 'Al líder'}
           value={first ? 'Líder' : `+${gap.toLocaleString()}`}
           tone={first ? 'lead' : undefined}
         />
+        <Cell
+          label="WR"
+          value={
+            player.totals.games > 0 ? formatPercent(player.winRate, 0) : '—'
+          }
+        />
+        <Cell label="PJ" value={String(player.totals.games)} />
         <Cell
           label="LP"
           value={
@@ -287,13 +354,6 @@ function PodiumCard({ entry }: { entry: Timed }) {
           }
           tone={player.ladderPointsGained >= 0 ? 'up' : 'down'}
         />
-        <Cell
-          label="WR"
-          value={
-            player.totals.games > 0 ? formatPercent(player.winRate, 0) : '—'
-          }
-        />
-        <Cell label="PJ" value={String(player.totals.games)} />
       </dl>
     </article>
   );
@@ -321,7 +381,7 @@ function Cell({
     <div className="min-w-0">
       <dt className="eyebrow text-ink-3">{label}</dt>
       <dd
-        className="tabular mt-0.5 truncate text-fluid-sm leading-none"
+        className="tabular mt-1 truncate text-fluid-sm leading-none"
         style={{ color }}
       >
         {value}
@@ -411,32 +471,56 @@ function ControlBar({
   );
 }
 
+/**
+ * A column header, sortable when it is given a key.
+ *
+ * The arrow is drawn only on the active column. A caret on every header turns
+ * the head row into a row of arrows, and then none of them mean anything.
+ */
 function Th({
   children,
   className,
   title,
-  onClick,
-  active,
+  sortKey,
+  sort,
+  reverse,
+  onSort,
 }: {
   children?: React.ReactNode;
   className?: string;
   title?: string;
-  onClick?: () => void;
-  active?: boolean;
+  sortKey?: SortKey;
+  sort?: SortKey;
+  reverse?: boolean;
+  onSort?: (key: SortKey) => void;
 }) {
+  const active = sortKey !== undefined && sortKey === sort;
+
   return (
     <th
       scope="col"
       title={title}
+      aria-sort={
+        active ? (reverse ? 'ascending' : 'descending') : undefined
+      }
       className={classNames(
         'eyebrow px-2 py-2.5 font-normal',
         active ? 'text-[color:var(--color-accent)]' : 'text-ink-3',
         className,
       )}
     >
-      {onClick ? (
-        <button type="button" onClick={onClick} className="eyebrow">
+      {sortKey && onSort ? (
+        <button
+          type="button"
+          onClick={() => onSort(sortKey)}
+          className="eyebrow inline-flex items-center gap-1 transition-colors hover:text-ink-2"
+        >
           {children}
+          {active && (
+            <span aria-hidden className="text-[0.55rem]">
+              {reverse ? '▲' : '▼'}
+            </span>
+          )}
         </button>
       ) : (
         children
@@ -506,27 +590,27 @@ function Row({
         {gapLabel(interval)}
       </td>
 
-      <td className="tabular hidden px-2 py-2 text-right text-fluid-sm md:table-cell">
-        <Signed value={player.ladderPointsGained} />
-      </td>
-
       <td className="tabular hidden px-2 py-2 text-right text-fluid-sm text-ink-2 md:table-cell">
         {player.totals.games > 0 ? formatPercent(player.winRate, 0) : '—'}
-      </td>
-
-      <td className="tabular hidden px-2 py-2 text-right text-fluid-sm text-ink-2 md:table-cell">
-        {player.totals.games > 0 ? player.kda.toFixed(2) : '—'}
       </td>
 
       <td className="tabular hidden px-2 py-2 text-right text-fluid-sm text-ink-3 md:table-cell">
         {player.totals.games}
       </td>
 
+      <td className="tabular hidden px-2 py-2 text-right text-fluid-sm text-ink-2 md:table-cell">
+        {player.totals.games > 0 ? player.kda.toFixed(2) : '—'}
+      </td>
+
+      <td className="tabular hidden px-2 py-2 text-right text-fluid-sm md:table-cell">
+        <Signed value={player.ladderPointsGained} />
+      </td>
+
       <td className="hidden px-2 py-2 lg:table-cell">
         <Stints results={player.recentResults} />
       </td>
 
-      <td className="px-2 py-2 text-right">
+      <td className="px-2 py-2 text-right whitespace-nowrap">
         <Status player={player} />
       </td>
     </tr>
@@ -604,7 +688,7 @@ function Status({ player }: { player: RankedPlayer }) {
   if (player.inGame) {
     return (
       <span
-        className="eyebrow inline-flex items-center gap-1.5"
+        className="eyebrow inline-flex items-center gap-1.5 whitespace-nowrap"
         style={{ color: 'var(--color-accent)' }}
       >
         <span
@@ -619,11 +703,11 @@ function Status({ player }: { player: RankedPlayer }) {
   if (player.owes.length > 0) {
     return (
       <span
-        className="eyebrow"
+        className="eyebrow whitespace-nowrap"
         style={{ color: 'var(--color-mark-red)' }}
         title={player.owes.join(' · ')}
       >
-        PENALIZADO {player.owes.length}
+        PENALIZADO&nbsp;{player.owes.length}
       </span>
     );
   }
