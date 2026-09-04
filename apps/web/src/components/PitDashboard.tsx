@@ -20,7 +20,8 @@ import { navigate, oneOf, setBasePath, useRoute } from '../lib/route';
 import { BlueShells, CoinMark, COIN_GOLD, ShellMark } from './BlueShells';
 import { Classification } from './Classification';
 import { Clips } from './Clips';
-import { CoinShop } from './CoinShop';
+import { Shop } from './Shop';
+import { BetsHowTo, ShopHowTo } from './HowToContent';
 import { Duels } from './Duels';
 import { BestDays, EloEvolution } from './EloCharts';
 import { LiveGames, useLiveFeed } from './LiveGames';
@@ -194,7 +195,10 @@ export function PitDashboard({
           page back.
         */}
         <aside className="lg:sticky lg:top-4">
-          <div className="mb-3 flex items-center gap-2">
+          {/* Wraps inside the rail instead of running past it: the chip grows
+              with the username and the two balances, and a fixed-width column
+              cannot be asked to hold something of unknown width. */}
+          <div className="mb-3 flex w-full min-w-0 flex-wrap items-center gap-2">
             <SyncLight
               isRefreshing={isRefreshing}
               generatedAt={snapshot.generatedAt}
@@ -287,6 +291,9 @@ export function PitDashboard({
       </TabPanel>
 
       <TabPanel id="track" active={section === 'track'}>
+        <div className="mb-3 flex justify-end">
+          <BetsHowTo />
+        </div>
         <LiveGames
           players={ranking}
           onSelect={openPlayer}
@@ -331,16 +338,17 @@ export function PitDashboard({
       </TabPanel>
 
       <TabPanel id="shop" active={section === 'shop'}>
-        {user?.coins && token ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_1fr]">
-            <CoinShop
-              wallet={user.coins}
-              heldShells={user.shells?.available ?? 0}
-              token={token}
-              onBought={() => void loadSession()}
-            />
-            <ShopNotes wallet={user.coins} />
-          </div>
+        <div className="mb-3 flex justify-end">
+          <ShopHowTo />
+        </div>
+
+        {user && token ? (
+          <Shop
+            user={user}
+            token={token}
+            onWalletChange={() => void loadSession()}
+            revision={revision}
+          />
         ) : (
           <SignInWall
             ready={sessionReady}
@@ -413,42 +421,6 @@ function SignInWall({
         <ShellMark size={14} />
         Entrar con Discord
       </a>
-    </section>
-  );
-}
-
-/** The rules of the currency, next to the thing that spends it. */
-function ShopNotes({ wallet }: { wallet: NonNullable<SessionUser['coins']> }) {
-  const rows: [string, string][] = [
-    ['Hoy llevás', `${wallet.earnedToday} de ${wallet.dailyCap}`],
-    ['Tope de cartera', String(wallet.cap)],
-    [
-      'Cómo se ganan',
-      wallet.isSpectator
-        ? `${SPECTATOR_DAILY_GRANT} por día por mirar`
-        : 'Jugando, y con la entrega diaria',
-    ],
-  ];
-
-  return (
-    <section className="rounded-xl border border-line bg-carbon px-4 py-4">
-      <h3 className="display text-fluid-lg leading-none">Cómo funciona</h3>
-      <p className="mt-1 text-fluid-xs text-ink-3">
-        Las monedas se ganan despacio a propósito: una concha cuesta varios
-        días, y eso es lo que hace que tirarlo signifique algo.
-      </p>
-
-      <dl className="mt-4 divide-y divide-line border-t border-line">
-        {rows.map(([label, value]) => (
-          <div
-            key={label}
-            className="flex items-baseline justify-between gap-4 py-2.5"
-          >
-            <dt className="eyebrow text-ink-3">{label}</dt>
-            <dd className="tabular text-fluid-sm">{value}</dd>
-          </div>
-        ))}
-      </dl>
     </section>
   );
 }
@@ -527,7 +499,7 @@ function AccountChip({
   const avatar = avatarUrl(user);
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-line bg-carbon px-1.5 py-1">
+    <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-sm border border-line bg-carbon px-1.5 py-1">
       {avatar ? (
         <img
           src={avatar}
@@ -542,7 +514,7 @@ function AccountChip({
         </span>
       )}
 
-      <span className="hidden max-w-[7rem] truncate text-fluid-xs sm:inline">
+      <span className="min-w-0 max-w-[6rem] truncate text-fluid-xs">
         {user.username}
       </span>
 

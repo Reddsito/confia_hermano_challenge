@@ -2,15 +2,19 @@ import { randomUUID } from 'node:crypto';
 
 import {
   MAX_HELD_SHELLS,
+  MAX_HELD_SHIELDS,
   SHELL_PRICE_COINS,
   SHELL_SHOP_RULE,
+  SHIELD_PRICE_COINS,
   canBuyShell,
+  canBuyShield,
 } from '@challenge/core/domain';
 import { Hono } from 'hono';
 
 import type { ServerConfig } from '../config';
 import { balanceForHolder, holderFor } from '../db/bets';
 import { coinWallet, debitCoins, listCoinLedger } from '../db/coins';
+import { grantShield, liveShields } from '../db/shells';
 import type { Db } from '../db/index';
 import { currentUser } from './auth';
 
@@ -29,6 +33,10 @@ export function coinRoutes(db: Db, config: ServerConfig) {
       shells: balanceForHolder(db, user.discordId),
       ledger: listCoinLedger(db, user.discordId),
       shellPrice: SHELL_PRICE_COINS,
+      shieldPrice: SHIELD_PRICE_COINS,
+      // Spectators cannot be hit, so they have nothing to shield.
+      shields: user.playerId ? liveShields(db, user.playerId).length : 0,
+      maxShields: MAX_HELD_SHIELDS,
     });
   });
 
@@ -106,6 +114,54 @@ export function coinRoutes(db: Db, config: ServerConfig) {
     return context.json({
       wallet: coinWallet(db, user.discordId),
       shells: balanceForHolder(db, user.discordId),
+    });
+  });
+
+  /**
+   * Buys one shield, which is live from the moment it is paid for.
+   *
+   * Only a roster player can hold one: a shield stops a shell aimed at you, and
+   * nothing can ever be aimed at a spectator.
+   */
+  app.post('/shop/shield', (context) => {
+    const user = currentUser(db, context.req.header('authorization'), config);
+    if (!user) {
+      return context.json({ error: 'Entrá con Discord primero.' }, 401);
+    }
+    if (!user.playerId) {
+      return context.json(
+        { error: 'Solo los jugadores del roster pueden llevar escudo.' },
+        403,
+      );
+    }
+
+    const wallet = coinWallet(db, user.discordId);
+    const held = liveShields(db, user.playerId).length;
+
+    const check = canBuyShield(wallet.coins, held);
+    if (!check.ok) return context.json({ error: check.reason }, 409);
+
+    const purchaseId = randomUUID();
+    let bought = false;
+
+    db.transaction(() => {
+      const paid = debitCoins(db, user.discordId, {
+        source: 'SHOP_SHIELD',
+        ref: purchaseId,
+        amount: SHIELD_PRICE_COINS,
+        detail: 'Compra de escudo',
+      });
+      if (!paid) return;
+
+      grantShield(db, user.playerId!, purchaseId);
+      bought = true;
+    })();
+
+    if (!bought) return context.json({ error: 'No te alcanza.' }, 409);
+
+    return context.json({
+      wallet: coinWallet(db, user.discordId),
+      shields: liveShields(db, user.playerId).length,
     });
   });
 

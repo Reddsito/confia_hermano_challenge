@@ -23,6 +23,7 @@ export type CoinSource =
   | 'BET_PAYOUT'
   | 'BET_REFUND'
   | 'SHOP_SHELL'
+  | 'SHOP_SHIELD'
   | 'ADMIN';
 
 /** Sources that count against the five-a-day income cap. */

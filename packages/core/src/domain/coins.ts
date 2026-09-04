@@ -46,6 +46,18 @@ export const SPECTATOR_DAILY_GRANT = 3;
 /** What a blue shell costs in the shop. */
 export const SHELL_PRICE_COINS = 15;
 
+/**
+ * A shield costs less than the shell it stops, on purpose.
+ *
+ * Defence that costs more than offence never gets bought, and a shop that only
+ * sells attacks turns the challenge into a race to save fifteen coins first.
+ * Ten is roughly two days for somebody playing, so it still hurts.
+ */
+export const SHIELD_PRICE_COINS = 10;
+
+/** How many shields one player may hold at once. */
+export const MAX_HELD_SHIELDS = 2;
+
 export const MIN_STAKE = 1;
 
 /** Nobody stakes more than this on one game, whatever they are holding. */
@@ -145,6 +157,37 @@ export function canBuyShell(
     return {
       ok: false,
       reason: `Ya tenés ${shellCap} conchas. Tirá una antes de comprar otra.`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Whether this account can buy a shield right now.
+ *
+ * Mirrors `canBuyShell` rather than sharing it: the two have different prices,
+ * different ceilings and different refusals to explain, and folding them into
+ * one function parameterised by three things would be harder to read than
+ * either.
+ */
+export function canBuyShield(
+  coins: number,
+  heldShields: number,
+  max: number = MAX_HELD_SHIELDS,
+): { ok: true } | { ok: false; reason: string } {
+  if (heldShields >= max) {
+    return {
+      ok: false,
+      reason:
+        max === 1
+          ? 'Ya tenés un escudo puesto.'
+          : `Ya tenés ${max} escudos puestos.`,
+    };
+  }
+  if (coins < SHIELD_PRICE_COINS) {
+    return {
+      ok: false,
+      reason: `Te faltan ${SHIELD_PRICE_COINS - coins} monedas.`,
     };
   }
   return { ok: true };

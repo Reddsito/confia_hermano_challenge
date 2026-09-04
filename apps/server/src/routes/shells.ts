@@ -23,6 +23,8 @@ import {
   throwsAgainst,
   throwsEnabled,
   lastThrowAgainst,
+  liveShields,
+  recordBlockedThrow,
   type ChallengeKind,
 } from '../db/shells';
 import {
@@ -204,6 +206,19 @@ export function shellRoutes(db: Db, config: ServerConfig) {
         { error: 'No tenés conchas azules. Ganá una o compralas por 15 monedas.' },
         409,
       );
+    }
+
+    // A shield stops it here, after the balance check and before the wheel:
+    // the shell was fired, so it is spent and written, but nothing is owed and
+    // nothing is rolled. The attacker is not told in advance — a defence that
+    // announces itself only teaches people to wait it out.
+    if (liveShields(db, targetId).length > 0) {
+      recordBlockedThrow(db, user.playerId, user.discordId, targetId);
+
+      return context.json({
+        blocked: true,
+        message: `${target.displayName} llevaba escudo. La concha se rompió contra él y vos la perdiste.`,
+      });
     }
 
     // Admins may name the challenge instead of spinning for it. It is the only

@@ -34,6 +34,10 @@ export interface CoinState {
   shells: Wallet;
   ledger: CoinMovement[];
   shellPrice: number;
+  shieldPrice: number;
+  /** Shields still up. Always 0 for spectators, who cannot be hit. */
+  shields: number;
+  maxShields: number;
 }
 
 export async function fetchCoins(token: string): Promise<CoinState> {
@@ -53,4 +57,15 @@ export async function buyShell(
   });
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as { wallet: CoinWallet; shells: Wallet };
+}
+
+export async function buyShield(
+  token: string,
+): Promise<{ wallet: CoinWallet; shields: number }> {
+  const response = await fetch(`${API_URL}/api/coins/shop/shield`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  return (await response.json()) as { wallet: CoinWallet; shields: number };
 }

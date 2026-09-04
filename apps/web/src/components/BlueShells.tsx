@@ -33,6 +33,7 @@ import {
   type ShellPayload,
   type ShellsState,
 } from '../lib/session';
+import { ShellsHowTo } from './HowToContent';
 import { TierCrest } from './icons';
 import {
   ChampionReel,
@@ -262,13 +263,18 @@ export function BlueShells({
   ];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,11rem)_1fr] lg:items-start">
+    <div className="space-y-4">
       {/*
-        A rail rather than another stack. Six panels down one column is a page
-        nobody reaches the bottom of, and the two that matter — what you owe and
-        who you can hit — were the ones buried furthest down.
+        Across the top, not down the side: the page's own channels already own
+        the left rail, and a second vertical list beside it reads as two
+        competing navigations rather than as one inside the other.
       */}
-      <ShellRail views={views} active={view} onChange={setView} />
+      <div className="flex flex-wrap items-center gap-2">
+        <ShellRail views={views} active={view} onChange={setView} />
+        <span className="ml-auto">
+          <ShellsHowTo />
+        </span>
+      </div>
 
       <div className="min-w-0">
         {view === 'throw' && (
@@ -465,9 +471,8 @@ interface ShellView {
 }
 
 /**
- * The rail. Vertical from the large breakpoint, a horizontal scroller below it
- * — a column of six buttons across the top of a phone would cost more height
- * than the panel it is meant to be saving.
+ * The sub-navigation for this panel, drawn as one segmented strip so it reads
+ * as a control belonging to the card rather than as a second site menu.
  */
 function ShellRail({
   views,
@@ -481,7 +486,7 @@ function ShellRail({
   return (
     <nav
       aria-label="Secciones de conchas"
-      className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:-mx-0 sm:px-0 lg:sticky lg:top-20 lg:flex-col"
+      className="-mx-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0"
     >
       {views.map((entry) => {
         const on = entry.id === active;

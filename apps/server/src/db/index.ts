@@ -578,6 +578,33 @@ const MIGRATIONS: string[] = [
     fetched_at      INTEGER NOT NULL
   );
   `,
+
+  // Shields, and the throws they stopped.
+  //
+  // A shield is bought and immediately live — there is nothing to activate,
+  // because a defence you have to remember to switch on is one you will be
+  // holding, unused, at the moment it was needed. It is spent by the next
+  // shell aimed at its owner, which is written here rather than as a counter
+  // so a blocked throw can name the shield that ate it.
+  //
+  // `blocked_at` marks the throw that hit one. The row is still written and
+  // still counts against the thrower's balance: the shell was fired, and a
+  // block that costs the attacker nothing is not a defence, it is a delay.
+  `
+  CREATE TABLE shell_shields (
+    id          TEXT PRIMARY KEY,
+    player_id   TEXT NOT NULL REFERENCES players (id) ON DELETE CASCADE,
+    bought_at   INTEGER NOT NULL,
+    -- Null while it is still up.
+    consumed_at INTEGER,
+    -- The throw that broke it, once one has.
+    throw_id    TEXT REFERENCES shell_throws (id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX idx_shields_live ON shell_shields (player_id, consumed_at);
+
+  ALTER TABLE shell_throws ADD COLUMN blocked_at INTEGER;
+  `,
 ];
 
 export function openDatabase(path: string): Db {

@@ -1032,3 +1032,75 @@ export function lastThrowAgainst(db: Db, playerId: string): number | null {
     .get(playerId) as { thrownAt: number } | undefined;
   return row?.thrownAt ?? null;
 }
+
+export interface ShieldRow {
+  id: string;
+  boughtAt: number;
+}
+
+/** Shields this player is still holding, oldest first — the oldest is spent first. */
+export function liveShields(db: Db, playerId: string): ShieldRow[] {
+  return db
+    .prepare(
+      `SELECT id, bought_at AS boughtAt FROM shell_shields
+       WHERE player_id = ? AND consumed_at IS NULL
+       ORDER BY bought_at ASC`,
+    )
+    .all(playerId) as ShieldRow[];
+}
+
+export function grantShield(db: Db, playerId: string, id: string): void {
+  db.prepare(
+    `INSERT INTO shell_shields (id, player_id, bought_at, consumed_at, throw_id)
+     VALUES (?, ?, ?, NULL, NULL)`,
+  ).run(id, playerId, Date.now());
+}
+
+/**
+ * Spends the oldest live shield on a throw. Returns false when there was none,
+ * which is the caller's signal that the shell lands for real.
+ */
+export function consumeShield(
+  db: Db,
+  playerId: string,
+  throwId: string,
+): boolean {
+  const shield = liveShields(db, playerId)[0];
+  if (!shield) return false;
+
+  db.prepare(
+    `UPDATE shell_shields SET consumed_at = ?, throw_id = ? WHERE id = ?`,
+  ).run(Date.now(), throwId, shield.id);
+  return true;
+}
+
+/**
+ * Writes a throw that a shield stopped.
+ *
+ * Kept apart from `recordThrow` because almost nothing about it is the same: no
+ * challenge is owed, so it is closed the moment it is written, and it must not
+ * pay retribution — a shell that never landed cannot be one of the five that
+ * earns the target a shell back.
+ */
+export function recordBlockedThrow(
+  db: Db,
+  fromPlayer: string | null,
+  fromDiscord: string | null,
+  toPlayer: string,
+): string {
+  const id = randomUUID();
+  const now = Date.now();
+
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO shell_throws
+         (id, from_player, to_player, challenge_id, challenge_name, thrown_at,
+          completed_at, payload, from_discord, blocked_at)
+       VALUES (?, ?, ?, NULL, 'Bloqueada por un escudo', ?, ?, NULL, ?, ?)`,
+    ).run(id, fromPlayer, toPlayer, now, now, fromDiscord, now);
+
+    consumeShield(db, toPlayer, id);
+  })();
+
+  return id;
+}
