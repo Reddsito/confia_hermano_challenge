@@ -22,10 +22,6 @@ export interface ChampionInfo {
   icon: string;
 }
 
-const REEL_MS = 2400;
-/** Decoys shown before the real one. Enough to feel like a spin, short enough to sit through. */
-const REEL_LENGTH = 24;
-
 interface ChampionReelProps {
   /** The champion the server drew. */
   championId: number;
@@ -36,98 +32,234 @@ interface ChampionReelProps {
   animate?: boolean;
 }
 
+/** How long the strip runs before it has to be stopped on the answer. */
+const REEL_MS = 3600;
+/** One tile plus its gap. The strip is positioned in multiples of this. */
+const TILE = 88;
+const GAP = 10;
+const STEP = TILE + GAP;
+/** Decoys to flick past, and where in them the real one is planted. */
+const STRIP_LENGTH = 46;
+const WINNER_INDEX = 39;
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * A real reel.
+ *
+ * The previous version was a single tile swapping its own image on a timer, so
+ * the candidates never existed as a strip and there was nothing to watch go
+ * past. This is the strip: every option laid out in a row, dragged left under a
+ * fixed marker, and stopped with the drawn champion under it.
+ *
+ * The movement is one CSS transform with a long ease-out rather than a
+ * per-frame React update. That keeps it on the compositor — forty images
+ * animated through state would drop frames on a phone, and a reel that stutters
+ * reads as broken rather than as fast.
+ */
 export function ChampionReel({
   championId,
   champions,
   pool,
   animate = true,
 }: ChampionReelProps) {
-  const [settled, setSettled] = useState(!animate);
-  const [frame, setFrame] = useState(0);
+  const viewport = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  const [phase, setPhase] = useState<'idle' | 'running' | 'settled'>('settled');
 
-  // The decoys are fixed for the life of the reel: regenerating them on every
-  // tick would make the strip jump around instead of scrolling through.
-  const decoys = useMemo(() => {
+  const instant = !animate;
+
+  /**
+   * Fixed for the life of the reel. Regenerating the decoys mid-spin would
+   * change what is under the marker without the strip having moved.
+   */
+  const strip = useMemo(() => {
     const source = pool.length > 1 ? pool : [...champions.keys()];
-    if (source.length === 0) return [];
+    if (source.length === 0) return [championId];
 
-    return Array.from(
-      { length: REEL_LENGTH },
+    const items = Array.from(
+      { length: STRIP_LENGTH },
       (_, index) => source[(index * 7 + 3) % source.length]!,
     );
-  }, [pool, champions]);
+    items[WINNER_INDEX] = championId;
+    return items;
+  }, [pool, champions, championId]);
 
-  const startedAt = useRef(0);
+  // The marker sits at the centre of the viewport, so the offset depends on how
+  // wide the card actually is — which is not known until it has been laid out.
+  useEffect(() => {
+    const element = viewport.current;
+    if (!element) return;
+
+    const measure = () => setWidth(element.clientWidth);
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const target = width > 0 ? width / 2 - TILE / 2 - WINNER_INDEX * STEP : 0;
 
   useEffect(() => {
-    if (!animate) {
-      setSettled(true);
+    if (instant || width === 0 || prefersReducedMotion()) {
+      setPhase('settled');
       return;
     }
 
-    setSettled(false);
-    setFrame(0);
-    startedAt.current = performance.now();
+    setPhase('idle');
 
-    let raf = 0;
-    const tick = (now: number) => {
-      const progress = Math.min((now - startedAt.current) / REEL_MS, 1);
-      // Eased so the strip tears past at first and crawls into place, which is
-      // what makes the last name feel decided rather than merely displayed.
-      const eased = 1 - (1 - progress) ** 3;
-      setFrame(Math.floor(eased * REEL_LENGTH));
+    // Two frames: one for the browser to paint the strip at its start position
+    // with no transition, one for the transform to count as a change. Without
+    // the pause the reel jumps straight to the answer.
+    let outer = 0;
+    let inner = 0;
+    outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setPhase('running'));
+    });
 
-      if (progress < 1) raf = requestAnimationFrame(tick);
-      else setSettled(true);
+    const stop = setTimeout(() => setPhase('settled'), REEL_MS);
+
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+      clearTimeout(stop);
     };
-
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [championId, animate]);
+  }, [championId, instant, width]);
 
   const winner = champions.get(championId);
-  const showing =
-    settled || decoys.length === 0
-      ? winner
-      : (champions.get(decoys[frame % decoys.length]!) ?? winner);
+  const moving = phase === 'running';
+  const placed = instant || phase !== 'idle';
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       <div
-        className={classNames(
-          'relative grid h-28 w-28 place-items-center overflow-hidden rounded-2xl border transition-all duration-500',
-          settled ? 'border-transparent' : 'border-line',
-        )}
+        ref={viewport}
+        className="relative w-full overflow-hidden rounded-2xl border border-line bg-carbon-2"
         style={{
-          boxShadow: settled ? '0 0 48px -10px var(--color-accent)' : undefined,
+          height: TILE + 34,
+          // The strip runs off both edges rather than stopping at a border, so
+          // it reads as a longer reel than the card can show.
+          maskImage:
+            'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
+          WebkitMaskImage:
+            'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
         }}
       >
-        {showing ? (
-          <img
-            src={showing.icon}
-            alt={showing.name}
-            width={112}
-            height={112}
-            className={classNames(
-              'h-full w-full object-cover transition-transform',
-              settled ? 'scale-100' : 'scale-110',
-            )}
+        <div
+          className="flex items-start py-2"
+          style={{
+            gap: GAP,
+            transform: `translate3d(${placed ? target : 0}px, 0, 0)`,
+            transition:
+              instant || phase === 'idle'
+                ? 'none'
+                : `transform ${REEL_MS}ms cubic-bezier(0.08, 0.82, 0.12, 1)`,
+            // Knocked out of focus while it tears past, sharp once it is an
+            // answer somebody has to read.
+            filter: moving ? 'blur(1.4px)' : 'none',
+            willChange: 'transform',
+          }}
+        >
+          {strip.map((id, index) => {
+            const champion = champions.get(id);
+            const isWinner = phase === 'settled' && index === WINNER_INDEX;
+
+            return (
+              <div
+                key={`${id}-${index}`}
+                className="shrink-0"
+                style={{ width: TILE }}
+              >
+                <div
+                  className={classNames(
+                    'grid overflow-hidden rounded-xl border transition-all duration-300',
+                    isWinner ? 'border-transparent' : 'border-line',
+                  )}
+                  style={{
+                    height: TILE,
+                    opacity: phase === 'settled' && !isWinner ? 0.28 : 1,
+                    boxShadow: isWinner
+                      ? '0 0 0 2px var(--color-accent), 0 0 42px -8px var(--color-accent)'
+                      : undefined,
+                  }}
+                >
+                  {champion ? (
+                    <img
+                      src={champion.icon}
+                      alt=""
+                      width={TILE}
+                      height={TILE}
+                      draggable={false}
+                      aria-hidden
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="grid h-full w-full place-items-center bg-carbon-3 text-fluid-xs text-ink-3">
+                      ?
+                    </span>
+                  )}
+                </div>
+
+                <p
+                  className={classNames(
+                    'mt-1 truncate text-center text-[0.6rem] leading-tight transition-colors',
+                    isWinner ? 'text-ink' : 'text-ink-3',
+                  )}
+                >
+                  {champion?.name ?? '—'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* The marker. It never moves; the strip is what is dragged under it. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2"
+          style={{ width: TILE + 8 }}
+        >
+          <span
+            className="absolute inset-x-0 top-0 h-[3px]"
+            style={{ background: 'var(--color-accent)' }}
           />
-        ) : (
-          <span className="text-fluid-xs text-ink-3">…</span>
-        )}
+          <span
+            className="absolute inset-x-0 bottom-0 h-[3px]"
+            style={{ background: 'var(--color-accent)' }}
+          />
+          <span
+            className="absolute inset-y-0 left-0 w-px"
+            style={{
+              background:
+                'linear-gradient(to bottom, var(--color-accent), transparent 45%, var(--color-accent))',
+            }}
+          />
+          <span
+            className="absolute inset-y-0 right-0 w-px"
+            style={{
+              background:
+                'linear-gradient(to bottom, var(--color-accent), transparent 45%, var(--color-accent))',
+            }}
+          />
+        </span>
       </div>
 
       <p
         className={classNames(
-          'display text-center transition-all duration-300',
-          settled ? 'text-fluid-lg' : 'text-fluid-sm text-ink-3',
+          'display text-center transition-all duration-500',
+          phase === 'settled'
+            ? 'text-fluid-lg text-ink'
+            : 'text-fluid-sm text-ink-3',
         )}
         // Announced only once it has stopped, so a screen reader is not read a
         // stream of champions that were never the answer.
-        aria-live={settled ? 'polite' : 'off'}
+        aria-live={phase === 'settled' ? 'polite' : 'off'}
       >
-        {showing?.name ?? '—'}
+        {phase === 'settled' ? (winner?.name ?? '—') : 'Girando…'}
       </p>
     </div>
   );
