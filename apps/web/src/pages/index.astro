@@ -24,7 +24,7 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
 
 <Layout
   title={`${tournament.name} — Próximamente`}
-  description="El próximo reto todavía no ha empezado."
+  description="El próximo reto del challenge se corre en Norteamérica."
   bodyClass="theme-pit"
   fontHref="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;600&family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap"
   themeColor="#0c0a09"
@@ -72,8 +72,8 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
         class="max-w-xl text-fluid-lg leading-snug italic"
         style="color: var(--color-ink-2)"
       >
-        El próximo reto todavía no ha empezado. Vuelve pronto: cuando arranque,
-        la tabla se publica aquí.
+        El próximo reto se corre en Norteamérica. Cuando arranque, la
+        clasificación se publica aquí.
       </p>
 
       <div
@@ -82,8 +82,11 @@ const printedOn = new Intl.DateTimeFormat('es-ES', {
       >
       </div>
 
+      <!-- Literal, not `tournament.platform`: the snapshot still describes the
+           edition that just finished, and this line is about the next one. -->
       <p class="eyebrow" style="color: var(--color-ink-3)">
-        {tournament.platform?.toUpperCase() || 'EUW1'} · SoloQ
+        Próximo circuito · <span style="color: var(--color-accent)">NA</span> ·
+        SoloQ
       </p>
     </main>
 
