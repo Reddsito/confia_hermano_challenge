@@ -49,7 +49,7 @@ export function ShellsHowTo() {
         `Al líder se le puede tirar siempre, sin espera.`,
         `Del 2.º al ${SHELL_CHASER_LIMIT}.º quedan a salvo ${SHELL_COOLDOWN_HOURS.chasers} h después de recibir una.`,
         `Del ${SHELL_CHASER_LIMIT + 1}.º para abajo, ${SHELL_COOLDOWN_HOURS.pack} h.`,
-        'Si tu objetivo llevaba escudo, la concha se rompe y la perdés igual.',
+        'Si tu objetivo lleva escudo, la concha se rompe contra él y la perdés igual. Se ve en la lista antes de tirar.',
         'Una tirada bloqueada por espera no te cuesta nada: ni siquiera sale.',
       ]}
     />
@@ -77,7 +77,7 @@ export function ShopHowTo() {
         },
       ]}
       notes={[
-        'Quien te tira una concha no sabe si llevás escudo. Ese es el punto.',
+        'Los escudos se ven en la lista: quien te vaya a tirar sabe que lo tenés.',
         'El que tira pierde la concha igual, aunque la pare tu escudo.',
         'Los espectadores compran conchas pero no escudos: nadie puede tirarles.',
       ]}

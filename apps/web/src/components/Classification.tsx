@@ -3,10 +3,13 @@ import { useMemo, useState } from 'react';
 import {
   ROLES,
   formatRankShort,
+  shellCooldownRemaining,
   type RankedPlayer,
   type Role,
 } from '@challenge/core/domain';
 
+import { ShellMark } from './BlueShells';
+import { ShieldMark } from './Shop';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 /**
@@ -19,7 +22,7 @@ import { Avatar, classNames, formatPercent, tierColor } from './ui';
  * columns that never drop on a narrow screen.
  */
 
-type SortKey = 'position' | 'gained' | 'winRate' | 'kda' | 'games';
+type SortKey = 'position' | 'gained' | 'winRate' | 'kda' | 'games' | 'shells';
 
 /** A player with their two timing figures, computed once against the true order. */
 interface Timed {
@@ -36,6 +39,7 @@ const COLUMNS: { key: SortKey; label: string; title: string }[] = [
   { key: 'games', label: 'PJ', title: 'Ordenar por partidas jugadas' },
   { key: 'kda', label: 'KDA', title: 'Ordenar por KDA' },
   { key: 'gained', label: 'LP', title: 'Ordenar por LP ganados desde el arranque' },
+  { key: 'shells', label: 'CONCHAS', title: 'Ordenar por conchas sin tirar' },
 ];
 
 /** Signed LP, in the language of a timing screen. */
@@ -116,6 +120,8 @@ export function Classification({
           return row.player.kda;
         case 'games':
           return row.player.totals.games;
+        case 'shells':
+          return row.player.shells;
         case 'position':
         default:
           // Rank order. Position 1 is the best, so it is negated to keep the
@@ -208,6 +214,9 @@ export function Classification({
                 </Th>
               ))}
               <Th className="hidden w-28 lg:table-cell">Forma</Th>
+              <Th className="w-28" title="Conchas sin tirar, retos pendientes y tiempo a salvo">
+                Conchas
+              </Th>
               <Th className="w-32 text-right whitespace-nowrap">Estado</Th>
             </tr>
           </thead>
@@ -610,6 +619,10 @@ function Row({
         <Stints results={player.recentResults} />
       </td>
 
+      <td className="px-2 py-2 whitespace-nowrap">
+        <Shells player={player} />
+      </td>
+
       <td className="px-2 py-2 text-right whitespace-nowrap">
         <Status player={player} />
       </td>
@@ -683,6 +696,96 @@ function Stints({ results }: { results: boolean[] }) {
   );
 }
 
+/**
+ * Everything about shells for one player, in one cell: what they are holding,
+ * what they still owe, and how long they cannot be hit for.
+ *
+ * The shelter is computed from the same rule the server enforces, off the
+ * timestamp of the last shell that landed on them — so the table can never
+ * promise a window the throw route would refuse.
+ */
+function Shells({ player }: { player: RankedPlayer }) {
+  const shelter = shellCooldownRemaining(
+    player.lastHit?.at ?? null,
+    player.position,
+    Date.now(),
+  );
+  const owed = player.owes.length;
+
+  if (
+    player.shells === 0 &&
+    player.shields === 0 &&
+    owed === 0 &&
+    shelter === 0
+  ) {
+    return <span className="text-fluid-xs text-ink-3">—</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-flex items-center gap-1"
+        title={`${player.shells} sin tirar`}
+        style={{
+          color:
+            player.shells > 0
+              ? 'var(--color-accent)'
+              : 'var(--color-ink-3)',
+        }}
+      >
+        <ShellMark size={13} filled={player.shells > 0} />
+        <span className="tabular text-fluid-xs">{player.shells}</span>
+      </span>
+
+      {player.shields > 0 && (
+        <span
+          className="inline-flex items-center gap-0.5"
+          title={`${player.shields} escudo${player.shields > 1 ? 's' : ''} en pie`}
+          style={{ color: 'var(--color-mark-teal)' }}
+        >
+          <ShieldMark size={12} />
+          <span className="tabular text-fluid-xs">{player.shields}</span>
+        </span>
+      )}
+
+      {owed > 0 && (
+        <span
+          className="tabular rounded-sm px-1 text-[0.6rem]"
+          title={player.owes.slice(0, 4).join(' · ')}
+          style={{
+            color: 'var(--color-mark-red)',
+            background:
+              'color-mix(in oklab, var(--color-mark-red) 16%, transparent)',
+          }}
+        >
+          debe {owed}
+        </span>
+      )}
+
+      {shelter > 0 && (
+        <span
+          className="tabular rounded-sm px-1 text-[0.6rem]"
+          title="No se le puede tirar hasta que se acabe"
+          style={{
+            color: 'var(--color-mark-teal)',
+            background:
+              'color-mix(in oklab, var(--color-mark-teal) 16%, transparent)',
+          }}
+        >
+          {shortWait(shelter)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** "11h" while there are hours left, "42m" once there are not. */
+function shortWait(ms: number): string {
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours > 0) return `${hours}h`;
+  return `${Math.max(1, Math.ceil(ms / 60_000))}m`;
+}
+
 /** In a game, owing a challenge, or simply running. */
 function Status({ player }: { player: RankedPlayer }) {
   if (player.inGame) {
@@ -696,18 +799,6 @@ function Status({ player }: { player: RankedPlayer }) {
           style={{ background: 'var(--color-accent)' }}
         />
         EN PISTA
-      </span>
-    );
-  }
-
-  if (player.owes.length > 0) {
-    return (
-      <span
-        className="eyebrow whitespace-nowrap"
-        style={{ color: 'var(--color-mark-red)' }}
-        title={player.owes.join(' · ')}
-      >
-        PENALIZADO&nbsp;{player.owes.length}
       </span>
     );
   }

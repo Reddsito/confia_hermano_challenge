@@ -822,11 +822,15 @@ export function lastHits(db: Db): Map<string, LastHitRow> {
        FROM shell_throws t
        LEFT JOIN players p ON p.id = t.from_player
        -- "inner" cannot be an alias: SQL reserves it for INNER JOIN.
-       WHERE t.thrown_at = (
-         SELECT MAX(latest.thrown_at)
-         FROM shell_throws latest
-         WHERE latest.to_player = t.to_player
-       )`,
+       -- A shell a shield ate never landed: it is not the last challenge
+       -- taken, and it does not start a cooldown either.
+       WHERE t.blocked_at IS NULL
+         AND t.thrown_at = (
+           SELECT MAX(latest.thrown_at)
+           FROM shell_throws latest
+           WHERE latest.to_player = t.to_player
+             AND latest.blocked_at IS NULL
+         )`,
     )
     .all() as Array<LastHitRow & { toPlayer: string }>;
 
@@ -1027,7 +1031,8 @@ export function lastThrowAgainst(db: Db, playerId: string): number | null {
   const row = db
     .prepare(
       `SELECT thrown_at AS thrownAt FROM shell_throws
-       WHERE to_player = ? ORDER BY thrown_at DESC LIMIT 1`,
+       WHERE to_player = ? AND blocked_at IS NULL
+       ORDER BY thrown_at DESC LIMIT 1`,
     )
     .get(playerId) as { thrownAt: number } | undefined;
   return row?.thrownAt ?? null;
@@ -1103,4 +1108,15 @@ export function recordBlockedThrow(
   })();
 
   return id;
+}
+
+/** Live shield counts for the whole roster, in one query. */
+export function shieldCounts(db: Db): Map<string, number> {
+  const rows = db
+    .prepare(
+      `SELECT player_id AS playerId, COUNT(*) AS n FROM shell_shields
+       WHERE consumed_at IS NULL GROUP BY player_id`,
+    )
+    .all() as Array<{ playerId: string; n: number }>;
+  return new Map(rows.map((row) => [row.playerId, row.n]));
 }

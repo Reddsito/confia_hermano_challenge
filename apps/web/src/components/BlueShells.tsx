@@ -224,13 +224,51 @@ export function BlueShells({
   const [view, setView] = useState<ShellView['id']>('throw');
 
   /**
-   * A champion to run the reel on with nothing at stake.
+   * A dry run of the whole spin: the wheel, then the champion.
    *
-   * The animation only ever plays when a shell actually lands, which means most
-   * people never see it — and somebody who has never seen it has no idea what
-   * the button they are about to press does.
+   * The animation only ever plays when a shell actually lands, so there was no
+   * way to look at it on purpose — and no way to check a change to it without
+   * making somebody owe a game. Admin only: it is a bench, not a feature.
    */
-  const [demo, setDemo] = useState<number | null>(null);
+  const [demoSpinning, setDemoSpinning] = useState(false);
+  const [demoLanded, setDemoLanded] = useState<{
+    id: string;
+    name: string;
+    detail: string;
+  } | null>(null);
+  const [demoRolled, setDemoRolled] = useState<{
+    throwId: string;
+    payload: ShellPayload;
+    rerollsLeft: number;
+  } | null>(null);
+
+  /** Runs the real overlay against invented results. Nothing is sent anywhere. */
+  const demoSpin = async () => {
+    const challenge = odds[Math.floor(Math.random() * odds.length)];
+    if (!challenge) return;
+
+    setDemoRolled(null);
+    setDemoLanded(null);
+    setDemoSpinning(true);
+
+    setDemoLanded({
+      id: challenge.id,
+      name: challenge.name,
+      detail: challenge.detail ?? '',
+    });
+    await new Promise((resolve) => setTimeout(resolve, SPIN_MS));
+
+    const championId = randomFrom(pool, champions);
+    if (championId !== null) {
+      setDemoRolled({
+        throwId: 'demo',
+        payload: { kind: 'RANDOM_CHAMPION', championId },
+        rerollsLeft: 0,
+      });
+    }
+
+    setDemoSpinning(false);
+  };
 
   const targetBlockedFor = target
     ? Math.max(0, (balances.get(target)?.cooldownUntil ?? 0) - Date.now())
@@ -376,14 +414,6 @@ export function BlueShells({
                   {error}
                 </p>
               )}
-
-              <button
-                type="button"
-                onClick={() => setDemo(randomFrom(pool, champions))}
-                className="eyebrow mt-3 min-h-11 w-full rounded-xl border border-line text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
-              >
-                Ver cómo gira la ruleta
-              </button>
             </section>
 
             <Odds odds={odds} />
@@ -421,23 +451,59 @@ export function BlueShells({
         {view === 'log' && <History state={state} byId={byId} />}
 
         {view === 'bench' && user.isAdmin && (
-          <TestBench
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-line bg-carbon p-5">
+              <h3 className="display text-fluid-lg">Probar la ruleta</h3>
+              <p className="mt-1 text-fluid-xs text-ink-3">
+                Corre la animación completa — rueda y campeón — con un reto al
+                azar. No se envía nada, no se gasta ninguna concha y nadie queda
+                debiendo un juego.
+              </p>
+
+              <button
+                type="button"
+                disabled={demoSpinning || odds.length === 0}
+                onClick={() => void demoSpin()}
+                className="eyebrow mt-4 min-h-12 w-full rounded-xl px-4 text-void transition-all disabled:cursor-not-allowed disabled:opacity-35"
+                style={{ background: 'var(--color-accent)' }}
+              >
+                {odds.length === 0
+                  ? 'No hay retos cargados'
+                  : demoSpinning
+                    ? 'Girando…'
+                    : 'Girar en seco'}
+              </button>
+            </section>
+
+            <TestBench
             token={token}
             targetId={target ?? user.playerId}
             champions={champions}
             runes={runes}
-            items={items}
-            pool={pool}
-          />
+              items={items}
+              pool={pool}
+            />
+          </div>
         )}
       </div>
 
-      {demo !== null && (
-        <ReelDemo
-          championId={demo}
+      {(demoSpinning || demoLanded) && (
+        <SpinOverlay
+          odds={odds}
+          spinning={demoSpinning}
+          landed={demoLanded}
+          targetName="nadie · prueba"
+          rolled={demoRolled}
+          rerolling={false}
+          onReroll={() => {}}
           champions={champions}
+          runes={runes}
+          items={items}
           pool={pool}
-          onClose={() => setDemo(null)}
+          onClose={() => {
+            setDemoLanded(null);
+            setDemoRolled(null);
+          }}
         />
       )}
 
@@ -530,65 +596,6 @@ function randomFrom(
   const source = pool.length > 0 ? pool : [...champions.keys()];
   if (source.length === 0) return null;
   return source[Math.floor(Math.random() * source.length)] ?? null;
-}
-
-/**
- * The reel, run for show. Nothing is written and no shell is spent — it exists
- * so the animation can be seen by somebody who has never been hit.
- */
-function ReelDemo({
-  championId,
-  champions,
-  pool,
-  onClose,
-}: {
-  championId: number;
-  champions: Map<number, ChampionInfo>;
-  pool: number[];
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-void/85 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Vista previa de la ruleta"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl rounded-2xl border border-line bg-carbon p-5"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="mb-4 flex items-baseline justify-between gap-3">
-          <h3 className="display text-fluid-lg">Así se ve la ruleta</h3>
-          <p className="eyebrow text-ink-3">Prueba · no cuenta</p>
-        </header>
-
-        <ChampionReel
-          championId={championId}
-          champions={champions}
-          pool={pool}
-          animate
-        />
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="eyebrow mt-5 min-h-11 w-full rounded-xl border border-line transition-colors hover:text-ink"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /** "12 h 04 min" while it matters, "8 min" once it does not. */

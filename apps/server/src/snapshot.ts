@@ -21,7 +21,7 @@ import {
   listPlayers,
   setLastPosition,
 } from './db/players';
-import { balanceFor, lastHits, pendingThrows } from './db/shells';
+import { balanceFor, lastHits, pendingThrows, shieldCounts } from './db/shells';
 import { newLeaderEmbed } from './discord/embeds';
 import { mentionFor } from './db/users';
 import type { DiscordNotifier } from './discord/notifier';
@@ -41,6 +41,7 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
   const players = listPlayers(db, 'approved');
   const states = listPlayerStates(db);
   const hits = lastHits(db);
+  const shields = shieldCounts(db);
   // One grouped query for the whole roster, not one per player inside the map.
   const duoGames = duoGameCounts(db);
 
@@ -68,6 +69,7 @@ export function buildSnapshot(db: Db, config: ServerConfig): Snapshot {
       extras: extraTotalsFor(db, player.id),
       duoGames: duoGames.get(player.id) ?? 0,
       shells: balanceFor(db, player.id).available,
+      shields: shields.get(player.id) ?? 0,
       lastHit: hits.get(player.id) ?? null,
       owes: pendingThrows(db, player.id).map((row) => row.challengeName),
     };

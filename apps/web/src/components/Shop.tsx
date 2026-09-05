@@ -56,7 +56,7 @@ const ITEMS: Item[] = [
     name: 'Escudo',
     tagline: 'Para la próxima que te tiren',
     detail:
-      'Se activa solo al comprarlo: no hay nada que encender. La siguiente concha que te tiren se rompe contra él, y quien la tiró la pierde igual. Hasta ' +
+      'Se activa solo al comprarlo: no hay nada que encender. La siguiente concha que te tiren se rompe contra él, y quien la tiró la pierde igual. Se ve en la clasificación. Hasta ' +
       `${MAX_HELD_SHIELDS} a la vez.`,
     accent: 'var(--color-mark-teal)',
     Mark: ({ size = 22 }) => <ShieldMark size={size} />,

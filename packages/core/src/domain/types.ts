@@ -75,6 +75,15 @@ export interface PlayerEntry {
   duoGames: number;
   /** Unspent blue shells this player is holding. */
   shells: number;
+  /**
+   * Shields still up.
+   *
+   * Public, which is a real trade: an attacker can now pick somebody
+   * undefended instead of finding out the hard way. In a group this size that
+   * spreads the aggression around rather than concentrating it, which is worth
+   * more than the ambush.
+   */
+  shields: number;
   /** The most recent challenge fired at them, for the hover card. */
   lastHit: LastHit | null;
   /** Challenges still owed, oldest first. One game settles one of them. */
