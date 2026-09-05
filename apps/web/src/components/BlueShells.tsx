@@ -414,6 +414,19 @@ export function BlueShells({
                   {error}
                 </p>
               )}
+
+              {/* Also here, not only on the bench: this is where the wheel is,
+                  so this is where somebody wanting to look at it will be. */}
+              {user.isAdmin && (
+                <button
+                  type="button"
+                  disabled={demoSpinning || odds.length === 0}
+                  onClick={() => void demoSpin()}
+                  className="eyebrow mt-3 min-h-11 w-full rounded-xl border border-line text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2 disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {demoSpinning ? 'Girando…' : 'Girar en seco (admin)'}
+                </button>
+              )}
             </section>
 
             <Odds odds={odds} />
