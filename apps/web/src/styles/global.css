@@ -196,3 +196,48 @@ body::after {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * The wheel.
+ *
+ * Two moments, both short. The pawl kicks while the face runs under it, so the
+ * pointer reads as something being struck rather than as a decal; the whole
+ * wheel takes one small breath when it stops, which is what makes the landing
+ * feel like an event instead of the animation merely ending.
+ */
+@keyframes wheel-pawl {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-11deg);
+  }
+}
+
+@keyframes wheel-land {
+  0% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.035);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.wheel-pawl {
+  animation: wheel-pawl 110ms ease-in-out infinite;
+}
+
+.wheel-land {
+  animation: wheel-land 520ms cubic-bezier(0.2, 0.9, 0.2, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-pawl,
+  .wheel-land {
+    animation: none;
+  }
+}

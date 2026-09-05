@@ -1060,6 +1060,26 @@ function SpinOverlay({
   );
 }
 
+/** The wheel's own palette: one hue per slice, cycled. */
+const SLICE_COLORS = [
+  'var(--color-mark-blue)',
+  'var(--color-mark-magenta)',
+  'var(--color-mark-teal)',
+  'var(--color-mark-amber)',
+  'var(--color-mark-red)',
+];
+
+/** Below this a slice is too narrow to carry a legible label. */
+const LABEL_MIN_SWEEP = 11;
+/** Full turns before it settles. */
+const WHEEL_TURNS = 8;
+
+const VIEW = 320;
+const CENTRE = VIEW / 2;
+const RIM = CENTRE - 6;
+const FACE = RIM - 12;
+const HUB = FACE * 0.26;
+
 function Wheel({
   odds,
   spinning,
@@ -1077,9 +1097,15 @@ function Wheel({
   const slices = useMemo(() => {
     const total = odds.reduce((sum, o) => sum + o.weight, 0) || 1;
     let angle = 0;
-    return odds.map((challenge) => {
+    return odds.map((challenge, index) => {
       const sweep = (challenge.weight / total) * 360;
-      const slice = { challenge, start: angle, sweep, mid: angle + sweep / 2 };
+      const slice = {
+        challenge,
+        start: angle,
+        sweep,
+        mid: angle + sweep / 2,
+        color: SLICE_COLORS[index % SLICE_COLORS.length]!,
+      };
       angle += sweep;
       return slice;
     });
@@ -1097,8 +1123,7 @@ function Wheel({
       typeof matchMedia !== 'undefined' &&
       matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Five full turns before settling, so it reads as a spin rather than a jump.
-    const settle = 360 * 5 - target.mid;
+    const settle = 360 * WHEEL_TURNS - target.mid;
 
     setAnimating(false);
     setRotation(0);
@@ -1110,15 +1135,13 @@ function Wheel({
   }, [landed, slices]);
 
   const done = Boolean(landed) && !spinning;
-  const size = 260;
-  const radius = size / 2 - 6;
 
   return (
     <section
-      className="flex flex-col items-center rounded-2xl border bg-carbon p-5"
+      className="flex w-full flex-col items-center rounded-2xl border bg-carbon p-5 transition-shadow duration-500"
       style={{
         borderColor: done ? 'var(--color-accent)' : 'var(--color-line)',
-        boxShadow: done ? '0 0 60px -24px var(--color-accent)' : undefined,
+        boxShadow: done ? '0 0 80px -28px var(--color-accent)' : undefined,
       }}
       aria-live="polite"
     >
@@ -1132,53 +1155,136 @@ function Wheel({
             : 'La ruleta'}
       </p>
 
-      <div className="relative mt-4" style={{ width: size, height: size }}>
-        {/* Pointer, fixed at the top. */}
+      <div
+        className={classNames('relative mt-4 w-full', done && 'wheel-land')}
+        style={{ maxWidth: 380 }}
+      >
+        {/* The pawl. Fixed at the top, and it kicks while the wheel runs under
+            it — a pointer that sits perfectly still reads as a decal. */}
         <span
           aria-hidden="true"
-          className="absolute top-0 left-1/2 z-10 -translate-x-1/2"
-          style={{
-            width: 0,
-            height: 0,
-            borderLeft: '9px solid transparent',
-            borderRight: '9px solid transparent',
-            borderTop: '16px solid var(--color-accent)',
-            filter: 'drop-shadow(0 0 6px var(--color-accent))',
-          }}
-        />
+          className={classNames(
+            'absolute -top-1 left-1/2 z-10 -translate-x-1/2',
+            spinning && 'wheel-pawl',
+          )}
+          style={{ transformOrigin: '50% 10%' }}
+        >
+          <svg width="26" height="30" viewBox="0 0 26 30" fill="none">
+            <path
+              d="M13 29 3.5 9.5A10.6 10.6 0 0 1 13 1a10.6 10.6 0 0 1 9.5 8.5L13 29Z"
+              fill="var(--color-accent)"
+              stroke="var(--color-void)"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
 
         <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          style={{
-            transform: `rotate(${rotation}deg)`,
-            transition: animating
-              ? `transform ${SPIN_MS}ms cubic-bezier(0.15, 0.75, 0.1, 1)`
-              : 'none',
-          }}
+          viewBox={`0 0 ${VIEW} ${VIEW}`}
+          className="block w-full"
+          role="img"
+          aria-label={
+            done ? `La ruleta cayó en ${landed?.name}` : 'Ruleta de retos'
+          }
         >
-          {slices.map((slice, index) => {
-            const isLanded = done && slice.challenge.id === landed?.id;
+          {/* The housing stays still: only the face turns. */}
+          <circle
+            cx={CENTRE}
+            cy={CENTRE}
+            r={RIM}
+            fill="var(--color-carbon-2)"
+            stroke="var(--color-line-strong)"
+            strokeWidth="2"
+          />
+          {Array.from({ length: 24 }, (_, index) => {
+            const rad = ((index * 15 - 90) * Math.PI) / 180;
             return (
-              <path
-                key={slice.challenge.id}
-                d={arc(size / 2, size / 2, radius, slice.start, slice.sweep)}
-                fill="var(--color-accent)"
-                fillOpacity={isLanded ? 0.85 : index % 2 === 0 ? 0.22 : 0.1}
-                stroke="var(--color-carbon)"
-                strokeWidth="2"
+              <circle
+                key={index}
+                cx={CENTRE + (RIM - 6) * Math.cos(rad)}
+                cy={CENTRE + (RIM - 6) * Math.sin(rad)}
+                r={1.6}
+                fill="var(--color-line-strong)"
               />
             );
           })}
+
+          <g
+            style={{
+              transform: `rotate(${rotation}deg)`,
+              transformOrigin: '50% 50%',
+              transition: animating
+                ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.86, 0.1, 1.02)`
+                : 'none',
+            }}
+          >
+            {slices.map((slice) => {
+              const isLanded = done && slice.challenge.id === landed?.id;
+              return (
+                <path
+                  key={slice.challenge.id}
+                  d={arc(CENTRE, CENTRE, FACE, slice.start, slice.sweep)}
+                  fill={slice.color}
+                  fillOpacity={isLanded ? 0.92 : 0.3}
+                  stroke="var(--color-carbon)"
+                  strokeWidth="1.5"
+                  style={{ transition: 'fill-opacity 400ms ease-out' }}
+                />
+              );
+            })}
+
+            {/* The names ride the face, so the options are readable while it
+                turns — a wheel whose slices are blank is a loading spinner. */}
+            {slices.map((slice) => {
+              if (slice.sweep < LABEL_MIN_SWEEP) return null;
+              const isLanded = done && slice.challenge.id === landed?.id;
+
+              return (
+                <text
+                  key={`${slice.challenge.id}-label`}
+                  x={CENTRE + FACE - 12}
+                  y={CENTRE}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  transform={`rotate(${slice.mid - 90} ${CENTRE} ${CENTRE})`}
+                  fill={isLanded ? 'var(--color-void)' : 'var(--color-ink)'}
+                  fontSize="11"
+                  fontWeight="600"
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {slice.challenge.name.length > 22
+                    ? `${slice.challenge.name.slice(0, 21)}…`
+                    : slice.challenge.name}
+                </text>
+              );
+            })}
+          </g>
+
           <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius * 0.3}
+            cx={CENTRE}
+            cy={CENTRE}
+            r={HUB}
             fill="var(--color-carbon)"
-            stroke="var(--color-line)"
+            stroke={done ? 'var(--color-accent)' : 'var(--color-line-strong)'}
             strokeWidth="2"
+            style={{ transition: 'stroke 400ms ease-out' }}
           />
+          <text
+            x={CENTRE}
+            y={CENTRE}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={done ? 'var(--color-accent)' : 'var(--color-ink-3)'}
+            fontSize="10"
+            letterSpacing="2.4"
+            style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}
+          >
+            {spinning ? '···' : done ? 'YA' : 'GIRO'}
+          </text>
         </svg>
       </div>
 
