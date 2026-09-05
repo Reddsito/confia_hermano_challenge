@@ -335,8 +335,24 @@ function PodiumCard({ entry }: { entry: Timed }) {
           >
             {player.displayName}
           </p>
-          <p className="tabular mt-1.5 text-fluid-xs" style={{ color: accent }}>
+          {/* The tier names the shelf; the LP is the number people actually
+              quote at each other, so it gets the size. */}
+          <p className="eyebrow mt-2" style={{ color: accent }}>
             {formatRankShort(player.rank)}
+          </p>
+          <p
+            className="tabular mt-1 leading-none"
+            style={{
+              color: accent,
+              fontSize: first
+                ? 'clamp(1.6rem, 1.1rem + 2vw, 2.4rem)'
+                : 'clamp(1.2rem, 0.95rem + 1.1vw, 1.7rem)',
+            }}
+          >
+            {player.rank ? player.rank.leaguePoints.toLocaleString() : '—'}
+            <span className="eyebrow ml-1.5" style={{ color: 'var(--color-ink-3)' }}>
+              LP
+            </span>
           </p>
         </div>
       </div>
