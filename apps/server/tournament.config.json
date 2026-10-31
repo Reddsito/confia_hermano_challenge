@@ -1,10 +1,10 @@
 {
   "name": "Confia Hermano Challenge",
-  "edition": "Temporada 1",
+  "edition": "Temporada 2",
   "subtitle": "Challenge privado entre amigos",
-  "platform": "la1",
+  "platform": "na1",
   "queue": "RANKED_SOLO_5x5",
-  "startsAt": "2026-07-30T00:00:00.000Z",
-  "endsAt": "2026-09-03T17:00:00.000Z",
+  "startsAt": "2026-10-31T05:00:00.000Z",
+  "endsAt": "2027-01-01T05:00:00.000Z",
   "refreshIntervalMinutes": 2
 }
