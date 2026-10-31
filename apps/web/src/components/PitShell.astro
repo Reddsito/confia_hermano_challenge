@@ -1,6 +1,6 @@
 ---
 /**
- * The shell for the alternate design at `/demo`.
+ * The shell for the dashboard at the root.
  *
  * Where the production page opens with a broadcast title card — the name at
  * display size, a subtitle, a rule — this one opens with the strip along the
@@ -94,7 +94,7 @@ const onTrack = ranking.filter((player) => player.inGame).length;
       <TournamentProgress tournament={tournament} client:idle />
     </header>
 
-    <PitDashboard initialSnapshot={snapshot} basePath="demo" client:load />
+    <PitDashboard initialSnapshot={snapshot} client:load />
 
     <footer class="mt-20 border-t border-line pt-6 text-fluid-xs text-ink-3">
       <p class="mb-4">

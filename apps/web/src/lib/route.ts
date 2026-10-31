@@ -29,15 +29,14 @@ const KEYS = {
 const listeners = new Set<() => void>();
 
 /**
- * Prefix every section path sits under. Empty for the production dashboard,
- * which owns the root; `/demo` for the alternate design, which mounts the same
- * island one level down. Set once before the island renders, so `useRoute` and
- * `navigate` agree on which segment is the section and which is the mount
- * point.
+ * Prefix every section path sits under. Empty for the dashboard, which owns
+ * the root; a segment when the same island is mounted one level down. Set once
+ * before the island renders, so `useRoute` and `navigate` agree on which
+ * segment is the section and which is the mount point.
  */
 let basePath = '';
 
-/** Normalises `demo`, `/demo` and `/demo/` to the same `/demo`. */
+/** Normalises `x`, `/x` and `/x/` to the same `/x`, and `''` to no prefix. */
 export function setBasePath(value: string): void {
   const trimmed = value.replace(/^\/+|\/+$/g, '');
   basePath = trimmed ? `/${trimmed}` : '';

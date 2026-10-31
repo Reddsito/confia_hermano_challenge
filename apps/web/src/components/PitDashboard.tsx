@@ -38,7 +38,7 @@ import { classNames } from './ui';
 const POLL_CHECK_MS = 3_000;
 
 /**
- * The alternate information architecture, at `/demo`.
+ * The information architecture of the board.
  *
  * The production dashboard opens on a podium and a stats tab built from the
  * four numbers every scoreboard already shows. This one opens on a timing
@@ -65,7 +65,7 @@ export const PIT_HOME: PitSection = 'grid';
 
 export function PitDashboard({
   initialSnapshot,
-  basePath = 'demo',
+  basePath = '',
 }: {
   initialSnapshot: Snapshot;
   basePath?: string;

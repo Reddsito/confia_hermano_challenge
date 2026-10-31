@@ -1,0 +1,19 @@
+---
+/**
+ * One prerendered document per channel, so `/duels` survives a refresh and a
+ * paste. The parrilla is the root itself, so it is not in this list.
+ *
+ * Astro resolves static routes before dynamic ones, which is why `/panel` still
+ * reaches `panel.astro` instead of being swallowed by this catch-all.
+ */
+import PitShell from '../components/PitShell.astro';
+import { PIT_HOME, PIT_SECTIONS } from '../components/PitDashboard';
+
+export function getStaticPaths() {
+  return PIT_SECTIONS.filter((section) => section !== PIT_HOME).map(
+    (section) => ({ params: { section } }),
+  );
+}
+---
+
+<PitShell />

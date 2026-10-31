@@ -5,9 +5,9 @@ interface Props {
   title: string;
   description: string;
   /**
-   * Theme scope for the document. The dashboard leaves it empty and inherits
-   * the tokens defined on `:root`; `/demo` passes `theme-press`, which
-   * redefines every one of them for the duration of the page.
+   * Theme scope for the document. Left empty, the page inherits the tokens
+   * defined on `:root`; the dashboard passes `theme-pit`, which redefines
+   * every one of them for the duration of the page.
    */
   bodyClass?: string;
   /** Google Fonts stylesheet for the active theme's typefaces. */
