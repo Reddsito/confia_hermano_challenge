@@ -1,4 +1,4 @@
-import type { TournamentMeta } from '@challenge/core/domain';
+import { TOURNAMENT_TIME_ZONE, type TournamentMeta } from '@challenge/core/domain';
 import { useCountdown, useMounted } from './useCountdown';
 
 /**
@@ -107,7 +107,8 @@ export function TournamentProgress({
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString('es', {
+    timeZone: TOURNAMENT_TIME_ZONE,
     day: '2-digit',
     month: 'short',
   });

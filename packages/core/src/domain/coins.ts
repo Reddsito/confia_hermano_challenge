@@ -19,6 +19,17 @@
  */
 export const DAY_OFFSET_HOURS = -5;
 
+/**
+ * The same clock, spelled the way Intl wants it.
+ *
+ * Every date the site prints is a tournament date, so it has to be rendered on
+ * the tournament's clock and not on the reader's: a window that ends at
+ * midnight in Panama is already the next morning in Madrid, and formatting it
+ * locally moves the closing date by a day for anybody travelling or living
+ * abroad. It sits here so it cannot drift away from the offset above.
+ */
+export const TOURNAMENT_TIME_ZONE = 'America/Panama';
+
 /** The most anybody's wallet holds. */
 export const COIN_WALLET_CAP = 15;
 

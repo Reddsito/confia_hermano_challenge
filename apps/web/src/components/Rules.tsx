@@ -20,6 +20,7 @@ import {
   SHELL_RULE_AWARD,
   SHELL_RULE_LABEL,
   type TournamentMeta,
+  TOURNAMENT_TIME_ZONE,
 } from '@challenge/core/domain';
 
 /**
@@ -52,6 +53,7 @@ const PLAY_RULES = [
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es', {
+    timeZone: TOURNAMENT_TIME_ZONE,
     day: 'numeric',
     month: 'long',
   });
@@ -59,6 +61,7 @@ function formatDate(iso: string): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('es', {
+    timeZone: TOURNAMENT_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
   });
