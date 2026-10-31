@@ -65,8 +65,12 @@ db.transaction(() => {
 
 for (const [table, n] of before) console.log(`[reset] ${table}: ${n} -> 0`);
 
-// A season wipe frees a large share of the file. VACUUM cannot run inside a
-// transaction, so it goes here: without it the pages stay allocated and every
-// later backup carries the dead weight.
+// A season wipe frees a large share of the file, and both of these are needed
+// to get it back. The database runs in WAL mode, where a VACUUM on its own
+// rewrites into the write-ahead log and leaves the main file exactly as large
+// as it was; the checkpoint folds the log back in first so the VACUUM has
+// something to shrink. Without the pair, every later backup carries the dead
+// weight of the finished season.
+db.pragma('wal_checkpoint(TRUNCATE)');
 db.prepare('VACUUM').run();
 db.close();
