@@ -8,7 +8,6 @@ import {
   PLAYER_DAILY_GRANT,
   PLAYER_WIN_GRANT,
   SHELL_COOLDOWN_HOURS,
-  SHELL_CHASER_LIMIT,
   SHELL_PRICE_COINS,
   SHIELD_PRICE_COINS,
   SPECTATOR_DAILY_GRANT,
@@ -46,9 +45,9 @@ export function ShellsHowTo() {
         },
       ]}
       notes={[
-        `Al líder se le puede tirar siempre, sin espera.`,
-        `Del 2.º al ${SHELL_CHASER_LIMIT}.º quedan a salvo ${SHELL_COOLDOWN_HOURS.chasers} h después de recibir una.`,
-        `Del ${SHELL_CHASER_LIMIT + 1}.º para abajo, ${SHELL_COOLDOWN_HOURS.pack} h.`,
+        `Al líder se le puede tirar siempre, sin espera y sin límite.`,
+        `Del 2.º para abajo, una sola concha cada ${SHELL_COOLDOWN_HOURS.pack} h, la tire quien la tire.`,
+        `La espera se mide por la posición de ahora: al que le pegaron siendo líder y después lo pasan, esa concha ya lo cubre el resto del día.`,
         'Si tu objetivo lleva escudo, la concha se rompe contra él y la perdés igual. Se ve en la lista antes de tirar.',
         'Una tirada bloqueada por espera no te cuesta nada: ni siquiera sale.',
       ]}

@@ -79,15 +79,19 @@ describe('shell cooldown', () => {
     expect(shellCooldownRemaining(Date.now(), 1, Date.now())).toBe(0);
   });
 
-  it('shelters the chasing four for twelve hours', () => {
-    for (const position of [2, 3, 4, 5]) {
-      expect(shellCooldownMs(position)).toBe(12 * HOUR);
+  it('shelters everybody but the leader for a full day', () => {
+    for (const position of [2, 3, 5, 6, 20]) {
+      expect(shellCooldownMs(position)).toBe(24 * HOUR);
     }
   });
 
-  it('shelters everybody behind them for a full day', () => {
-    expect(shellCooldownMs(6)).toBe(24 * HOUR);
-    expect(shellCooldownMs(20)).toBe(24 * HOUR);
+  // The window is read against the position held now, which is what makes a
+  // hit taken while leading start counting the moment they are passed.
+  it('covers a player hit while leading once they drop to second', () => {
+    const hitAt = 1_000_000;
+
+    expect(shellCooldownRemaining(hitAt, 1, hitAt + HOUR)).toBe(0);
+    expect(shellCooldownRemaining(hitAt, 2, hitAt + HOUR)).toBe(23 * HOUR);
   });
 
   it('treats a player who has never been hit as open', () => {
@@ -97,7 +101,7 @@ describe('shell cooldown', () => {
 
   it('counts down from the last hit and reaches zero on the boundary', () => {
     const hitAt = 1_000_000;
-    const window = 12 * HOUR;
+    const window = 24 * HOUR;
 
     expect(shellCooldownRemaining(hitAt, 3, hitAt)).toBe(window);
     expect(shellCooldownRemaining(hitAt, 3, hitAt + HOUR)).toBe(window - HOUR);

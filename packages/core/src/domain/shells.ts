@@ -268,35 +268,32 @@ export function totalShells(earned: EarnedShell[]): number {
 /**
  * How long a player is safe after taking a shell, by where they sit.
  *
- * The leader is always fair game: the whole point of the shell is that the
- * person in front is the one everybody can reach. The further back somebody
- * is, the longer they are left alone, because a player already losing ground
- * is the one a pile-on removes from the challenge entirely.
+ * The leader has no shelter at all and can be hit again immediately: the whole
+ * point of the shell is that the person in front is the one everybody can
+ * reach. Everybody else gets a day, so a pile-on cannot remove a player who is
+ * already losing ground from the challenge entirely.
+ *
+ * The window is read against the target's position *now*, not the position
+ * they held when the shell landed. Somebody hit while leading and then passed
+ * is covered by that same hit for the rest of the day: they are no longer the
+ * one in front, so the exemption that made them fair game is gone.
  *
  * The cooldown belongs to the target, not to the pair. A per-thrower window
- * would let twenty people land twenty shells inside the same twelve hours,
- * which is precisely the thing this exists to stop.
+ * would let twenty people land twenty shells inside the same day, which is
+ * precisely the thing this exists to stop.
  */
 export const SHELL_COOLDOWN_HOURS = {
-  /** Position 1. No shelter at the front. */
+  /** Position 1. No shelter at the front, and no limit on throws either. */
   leader: 0,
-  /** Positions 2 to 5, the ones still in the fight for it. */
-  chasers: 12,
-  /** Everybody else. */
+  /** Everybody else: one shell a day, whoever throws it. */
   pack: 24,
 } as const;
-
-/** Last position that counts as chasing the lead rather than as the pack. */
-export const SHELL_CHASER_LIMIT = 5;
 
 const HOUR_MS = 3_600_000;
 
 /** The window a player at this position gets after being hit. */
 export function shellCooldownMs(position: number): number {
   if (position <= 1) return SHELL_COOLDOWN_HOURS.leader * HOUR_MS;
-  if (position <= SHELL_CHASER_LIMIT) {
-    return SHELL_COOLDOWN_HOURS.chasers * HOUR_MS;
-  }
   return SHELL_COOLDOWN_HOURS.pack * HOUR_MS;
 }
 
