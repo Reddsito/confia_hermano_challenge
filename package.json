@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "pnpm --filter @challenge/web dev",
     "dev:server": "pnpm --filter @challenge/server dev",
-    "build": "pnpm --filter @challenge/web build",
+    "build": "rm -rf apps/web/dist && mkdir -p apps/web/dist && cp deploy/strike/index.html deploy/strike/404.html apps/web/dist/",
     "doctor": "pnpm --filter @challenge/server doctor",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "build:site": "pnpm --filter @challenge/web build"
   },
   "devDependencies": {
     "typescript": "^5.9.0"
