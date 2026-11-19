@@ -10,6 +10,7 @@ import {
 
 import { ShellMark } from './BlueShells';
 import { ShieldMark } from './Shop';
+import { CorruptStamp, isCorrupt } from './Strike';
 import { Avatar, classNames, formatPercent, tierColor } from './ui';
 
 /**
@@ -335,6 +336,11 @@ function PodiumCard({ entry }: { entry: Timed }) {
           >
             {player.displayName}
           </p>
+          {isCorrupt(player) && (
+            <p className="mt-2">
+              <CorruptStamp size="lg" />
+            </p>
+          )}
           {/* The tier names the shelf; the LP is the number people actually
               quote at each other, so it gets the size. */}
           <p className="eyebrow mt-2" style={{ color: accent }}>
@@ -593,8 +599,9 @@ function Row({
             inGame={player.inGame}
           />
           <div className="min-w-0">
-            <p className="truncate text-fluid-sm leading-tight">
-              {player.displayName}
+            <p className="flex items-center gap-2 text-fluid-sm leading-tight">
+              <span className="truncate">{player.displayName}</span>
+              {isCorrupt(player) && <CorruptStamp />}
             </p>
             <p className="eyebrow text-ink-3">{player.role}</p>
           </div>

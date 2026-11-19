@@ -19,6 +19,7 @@ import {
 import { navigate, oneOf, setBasePath, useRoute } from '../lib/route';
 import { BlueShells, CoinMark, COIN_GOLD, ShellMark } from './BlueShells';
 import { Classification } from './Classification';
+import { StrikeBanner } from './Strike';
 import { Clips } from './Clips';
 import { Shop } from './Shop';
 import { BetsHowTo, ShopHowTo } from './HowToContent';
@@ -287,6 +288,7 @@ export function PitDashboard({
       )}
 
       <TabPanel id="grid" active={section === 'grid'}>
+        <StrikeBanner />
         <Classification players={ranking} onSelect={openPlayer} />
       </TabPanel>
 
